@@ -1,0 +1,15 @@
+{
+  "schema": "switchyard-independent-task-owner-stop/v1",
+  "basis": "d798f4f88646dd9b994fa3ef1184864e0fd76e23",
+  "sourceSha256": "5d631139403f38a169a1d3f6eb11ba80f398ebc70c492426415b757b7459acb0",
+  "receipt": "isolated-test-76b7c4be-9ca2-492e-b1fa-2bb0a27d89b8.json",
+  "passedTests": 20,
+  "allChildAndTreeCleanupVerified": true,
+  "typecheck": true,
+  "correction": "A failed or throwing driver close no longer skips the independent original native-owner stop. Successful native retirement cannot upgrade an unconfirmed bridge exit; the saved owner remains uncertain and blocks replacement.",
+  "limits": [
+    "No foreign process is adopted or stopped.",
+    "Installed source remains 4b5e3cc; this later source correction has focused evidence.",
+    "The complete 359a825 run is independent and still running."
+  ]
+}

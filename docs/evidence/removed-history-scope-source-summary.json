@@ -1,0 +1,606 @@
+{
+  "schema": "switchyard-removed-history-scope-source-summary/v1",
+  "at": "2026-11-09T13:14:37.498205+00:00",
+  "baseCommit": "738c1754c09bc920988cf43d5af286e714f26182",
+  "sourceFiles": {
+    "scripts/run-isolated-tests.mjs": "08e6ea06479937faa3b6a55ead0b0ec6a51e11f5ecf67adbd1a014d3af72a3a7",
+    "scripts/verify-agent-security-host.mjs": "55e8c7283056540cb338ab180633a7efcd4fcf983ae45c5c248c7267c994659d",
+    "scripts/verify-task-owner-host.mjs": "97344c94fca0f6fb8f12f1d8ee9948d4d0d9d08239460cfa84f64d9985672758",
+    "tools/layout-studio/authority-ui.mjs": "e4c65421f7e746aafdcc68ba83ae6b6bc38bb1ac9245fc7cfd7d41c01c217806",
+    "tools/layout-studio/history-scope-ui.test.mjs": "a842a3c98334d208b396117fd62e865646f7470c37dd77336eae26d5b9b3c29e",
+    "tools/layout-studio/index.html": "1c53590272b17c6ded95681fc92c3d1be5b08c3357fd84348fa06409057ade91",
+    "tools/layout-studio/repository-execution.mjs": "16d566b00b607006179f3d5156c6730e69331ecf6dcbb09aad43acc426381eba",
+    "tools/layout-studio/repository-windows-shield-history.test.mjs": "ccb37e97ebe3671e6358dac6bdc8085be1a428069c282264d42eedc0b6e926d8",
+    "tools/layout-studio/scanner-history-review.test.mjs": "eedbcaed0fd5499773fbf8dd0f635f08f264a9fcc83aa12028645704d4ce80ff",
+    "tools/layout-studio/scanner-recipe-draft.test.mjs": "5b22aa99ccd49ac9ab906ad3045e81ce148023ad3a266a2678de1dfbc6e8994a",
+    "tools/layout-studio/scanner-ui.mjs": "92f47a2b692a4f1bb9bbee631c990b7d6b11aadb850a57811501968b104bfd93",
+    "tools/layout-studio/task-authority.mjs": "1a8dcd5dc59f28efd2fbd56d2ffc897b6f7207ce17da643d16086943bd2d1782",
+    "tools/layout-studio/task-history-scope.mjs": "b4bfb04d62362802c12b85eee65f993171af2b0cb736984ed5a02a1084e42e62",
+    "tools/layout-studio/task-history-scope.test.mjs": "1dac574570e9d6808705c8bf5ff46b6ec51fcbe09e07ebc9a7acff286b2c140f",
+    "tools/layout-studio/test-support/windows-execution-fixture.mjs": "145706744763ae6655324c5fd80c75abd7f9dfdc9e3ea2b62908066dabd40938"
+  },
+  "runs": [
+    {
+      "receiptId": "0e3a7a67-5deb-43b5-8500-0d21724020c2",
+      "receiptSha256": "a6447fee5928e3dbf77c02b13a9b4cf70a03f1ad0a2d2275ccee7dd8c2eb271f",
+      "totals": {
+        "required": 1,
+        "passed": 0,
+        "failed": 1,
+        "tests": 14,
+        "passedTests": 13,
+        "failedTests": 1,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "green": false,
+      "duplicateReceiptRemoved": true
+    },
+    {
+      "receiptId": "2c68dc8e-f2dc-45ca-901e-f00a17793250",
+      "receiptSha256": "7c688d9178f85ac54572a0ca8aeba4c51684dc4428045ba9c4207df959cc6928",
+      "totals": {
+        "required": 1,
+        "passed": 0,
+        "failed": 1,
+        "tests": 14,
+        "passedTests": 13,
+        "failedTests": 1,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "green": false,
+      "duplicateReceiptRemoved": true
+    },
+    {
+      "receiptId": "2210f74d-364f-482e-b497-1f043bfa5ee3",
+      "receiptSha256": "3e98564aeaed8a985cbe78329f88e190e768de143c5434ce4536b0f39a907397",
+      "totals": {
+        "required": 2,
+        "passed": 2,
+        "failed": 0,
+        "tests": 26,
+        "passedTests": 26,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "green": true,
+      "duplicateReceiptRemoved": true
+    },
+    {
+      "receiptId": "1cad9f15-47e2-41a9-904d-49b2a4e3f289",
+      "receiptSha256": "670d74720de8a3baf8fb6e96a770c9d6aa599ec2147ff74de65f9336f12b350b",
+      "totals": {
+        "required": 11,
+        "passed": 10,
+        "failed": 1,
+        "tests": 96,
+        "passedTests": 95,
+        "failedTests": 1,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "green": false,
+      "duplicateReceiptRemoved": true
+    },
+    {
+      "receiptId": "9865bd54-68f7-4743-a51f-7f108a3748b8",
+      "receiptSha256": "796bba6dc3f6aa86ceecbae612ebcdf890dce05bce03497f4a32492914f93b41",
+      "totals": {
+        "required": 5,
+        "passed": 5,
+        "failed": 0,
+        "tests": 40,
+        "passedTests": 40,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "green": true,
+      "duplicateReceiptRemoved": true
+    },
+    {
+      "receiptId": "d635d3fe-cbb7-411b-b3ad-68dcc54e5630",
+      "receiptSha256": "555e3c917f1dc4c055ed38d4c3a41dfb89877d24c2b48573a4430d50a642859f",
+      "totals": {
+        "required": 10,
+        "passed": 10,
+        "failed": 0,
+        "tests": 74,
+        "passedTests": 74,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "green": true,
+      "duplicateReceiptRemoved": true
+    }
+  ],
+  "finalGroups": [
+    {
+      "receiptId": "9865bd54-68f7-4743-a51f-7f108a3748b8",
+      "file": "tools/layout-studio/scanner-history-review.test.mjs",
+      "pattern": null,
+      "tests": {
+        "total": 15,
+        "passed": 15,
+        "failed": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "durationMs": 20118,
+      "effectiveTimeoutMs": 120000,
+      "success": true
+    },
+    {
+      "receiptId": "1cad9f15-47e2-41a9-904d-49b2a4e3f289",
+      "file": "tools/layout-studio/scanner-recipe-draft.test.mjs",
+      "pattern": null,
+      "tests": {
+        "total": 12,
+        "passed": 12,
+        "failed": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "durationMs": 21610,
+      "effectiveTimeoutMs": 120000,
+      "success": true
+    },
+    {
+      "receiptId": "1cad9f15-47e2-41a9-904d-49b2a4e3f289",
+      "file": "tools/layout-studio/repository-shield-history.test.mjs",
+      "pattern": null,
+      "tests": {
+        "total": 5,
+        "passed": 5,
+        "failed": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "durationMs": 9338,
+      "effectiveTimeoutMs": 120000,
+      "success": true
+    },
+    {
+      "receiptId": "1cad9f15-47e2-41a9-904d-49b2a4e3f289",
+      "file": "tools/layout-studio/scanner-mixed-review.test.mjs",
+      "pattern": null,
+      "tests": {
+        "total": 7,
+        "passed": 7,
+        "failed": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "durationMs": 13187,
+      "effectiveTimeoutMs": 120000,
+      "success": true
+    },
+    {
+      "receiptId": "1cad9f15-47e2-41a9-904d-49b2a4e3f289",
+      "file": "tools/layout-studio/scanner-recipe-save.test.mjs",
+      "pattern": null,
+      "tests": {
+        "total": 23,
+        "passed": 23,
+        "failed": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "durationMs": 31407,
+      "effectiveTimeoutMs": 120000,
+      "success": true
+    },
+    {
+      "receiptId": "1cad9f15-47e2-41a9-904d-49b2a4e3f289",
+      "file": "tools/layout-studio/task-history-scope.test.mjs",
+      "pattern": null,
+      "tests": {
+        "total": 3,
+        "passed": 3,
+        "failed": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "durationMs": 101,
+      "effectiveTimeoutMs": 45000,
+      "success": true
+    },
+    {
+      "receiptId": "1cad9f15-47e2-41a9-904d-49b2a4e3f289",
+      "file": "tools/layout-studio/task-history-inputs.test.mjs",
+      "pattern": null,
+      "tests": {
+        "total": 12,
+        "passed": 12,
+        "failed": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "durationMs": 3826,
+      "effectiveTimeoutMs": 120000,
+      "success": true
+    },
+    {
+      "receiptId": "1cad9f15-47e2-41a9-904d-49b2a4e3f289",
+      "file": "tools/layout-studio/repository-windows-shield-history.test.mjs",
+      "pattern": null,
+      "tests": {
+        "total": 2,
+        "passed": 2,
+        "failed": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "durationMs": 11990,
+      "effectiveTimeoutMs": 120000,
+      "success": true
+    },
+    {
+      "receiptId": "1cad9f15-47e2-41a9-904d-49b2a4e3f289",
+      "file": "tools/layout-studio/task-authority-ignored-trees.test.mjs",
+      "pattern": null,
+      "tests": {
+        "total": 3,
+        "passed": 3,
+        "failed": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "durationMs": 1422,
+      "effectiveTimeoutMs": 120000,
+      "success": true
+    },
+    {
+      "receiptId": "1cad9f15-47e2-41a9-904d-49b2a4e3f289",
+      "file": "tools/layout-studio/task-authority-ignored-inputs.test.mjs",
+      "pattern": null,
+      "tests": {
+        "total": 3,
+        "passed": 3,
+        "failed": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "durationMs": 1417,
+      "effectiveTimeoutMs": 45000,
+      "success": true
+    },
+    {
+      "receiptId": "1cad9f15-47e2-41a9-904d-49b2a4e3f289",
+      "file": "tools/layout-studio/task-authority.test.mjs",
+      "pattern": null,
+      "tests": {
+        "total": 11,
+        "passed": 11,
+        "failed": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "durationMs": 3727,
+      "effectiveTimeoutMs": 45000,
+      "success": true
+    },
+    {
+      "receiptId": "9865bd54-68f7-4743-a51f-7f108a3748b8",
+      "file": "tools/layout-studio/execution-ui.test.mjs",
+      "pattern": null,
+      "tests": {
+        "total": 7,
+        "passed": 7,
+        "failed": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "durationMs": 12085,
+      "effectiveTimeoutMs": 45000,
+      "success": true
+    },
+    {
+      "receiptId": "9865bd54-68f7-4743-a51f-7f108a3748b8",
+      "file": "tools/layout-studio/authority-ui.test.mjs",
+      "pattern": null,
+      "tests": {
+        "total": 9,
+        "passed": 9,
+        "failed": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "durationMs": 3152,
+      "effectiveTimeoutMs": 45000,
+      "success": true
+    },
+    {
+      "receiptId": "9865bd54-68f7-4743-a51f-7f108a3748b8",
+      "file": "tools/layout-studio/scanner-ui.test.mjs",
+      "pattern": null,
+      "tests": {
+        "total": 7,
+        "passed": 7,
+        "failed": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "durationMs": 10718,
+      "effectiveTimeoutMs": 45000,
+      "success": true
+    },
+    {
+      "receiptId": "9865bd54-68f7-4743-a51f-7f108a3748b8",
+      "file": "tools/layout-studio/history-scope-ui.test.mjs",
+      "pattern": null,
+      "tests": {
+        "total": 2,
+        "passed": 2,
+        "failed": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "durationMs": 339,
+      "effectiveTimeoutMs": 45000,
+      "success": true
+    },
+    {
+      "receiptId": "d635d3fe-cbb7-411b-b3ad-68dcc54e5630",
+      "file": "scripts/windows-complete-shards.test.mjs",
+      "pattern": null,
+      "tests": {
+        "total": 5,
+        "passed": 5,
+        "failed": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "durationMs": 765,
+      "effectiveTimeoutMs": 45000,
+      "success": true
+    },
+    {
+      "receiptId": "d635d3fe-cbb7-411b-b3ad-68dcc54e5630",
+      "file": "scripts/run-isolated-tests.test.mjs",
+      "pattern": null,
+      "tests": {
+        "total": 27,
+        "passed": 27,
+        "failed": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "durationMs": 5769,
+      "effectiveTimeoutMs": 45000,
+      "success": true
+    },
+    {
+      "receiptId": "d635d3fe-cbb7-411b-b3ad-68dcc54e5630",
+      "file": "tools/layout-studio/receipt-authority-state.test.mjs",
+      "pattern": null,
+      "tests": {
+        "total": 3,
+        "passed": 3,
+        "failed": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "durationMs": 1190,
+      "effectiveTimeoutMs": 45000,
+      "success": true
+    },
+    {
+      "receiptId": "d635d3fe-cbb7-411b-b3ad-68dcc54e5630",
+      "file": "tools/layout-studio/repository-windows-execution.test.mjs",
+      "pattern": null,
+      "tests": {
+        "total": 4,
+        "passed": 4,
+        "failed": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "durationMs": 4040,
+      "effectiveTimeoutMs": 45000,
+      "success": true
+    },
+    {
+      "receiptId": "d635d3fe-cbb7-411b-b3ad-68dcc54e5630",
+      "file": "tools/layout-studio/repository-execution.test.mjs",
+      "pattern": null,
+      "tests": {
+        "total": 5,
+        "passed": 5,
+        "failed": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "durationMs": 13835,
+      "effectiveTimeoutMs": 240000,
+      "success": true
+    },
+    {
+      "receiptId": "d635d3fe-cbb7-411b-b3ad-68dcc54e5630",
+      "file": "tools/layout-studio/repository-shield-index.test.mjs",
+      "pattern": null,
+      "tests": {
+        "total": 6,
+        "passed": 6,
+        "failed": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "durationMs": 9257,
+      "effectiveTimeoutMs": 120000,
+      "success": true
+    },
+    {
+      "receiptId": "d635d3fe-cbb7-411b-b3ad-68dcc54e5630",
+      "file": "tools/layout-studio/scanner-review.test.mjs",
+      "pattern": null,
+      "tests": {
+        "total": 5,
+        "passed": 5,
+        "failed": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "durationMs": 12288,
+      "effectiveTimeoutMs": 120000,
+      "success": true
+    },
+    {
+      "receiptId": "d635d3fe-cbb7-411b-b3ad-68dcc54e5630",
+      "file": "tools/layout-studio/scanner-index-review.test.mjs",
+      "pattern": null,
+      "tests": {
+        "total": 12,
+        "passed": 12,
+        "failed": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "durationMs": 15405,
+      "effectiveTimeoutMs": 120000,
+      "success": true
+    },
+    {
+      "receiptId": "d635d3fe-cbb7-411b-b3ad-68dcc54e5630",
+      "file": "tools/layout-studio/git-history-inputs.test.mjs",
+      "pattern": null,
+      "tests": {
+        "total": 5,
+        "passed": 5,
+        "failed": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "durationMs": 102,
+      "effectiveTimeoutMs": 45000,
+      "success": true
+    },
+    {
+      "receiptId": "d635d3fe-cbb7-411b-b3ad-68dcc54e5630",
+      "file": "tools/layout-studio/repository-windows-shield-index.test.mjs",
+      "pattern": null,
+      "tests": {
+        "total": 2,
+        "passed": 2,
+        "failed": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "durationMs": 4540,
+      "effectiveTimeoutMs": 120000,
+      "success": true
+    }
+  ],
+  "finalTotals": {
+    "groups": 25,
+    "passedTests": 195,
+    "failedTests": 0,
+    "skippedTests": 0
+  },
+  "failuresRetained": [
+    {
+      "receiptId": "0e3a7a67-5deb-43b5-8500-0d21724020c2",
+      "reason": "New removed-history request refused before implementation."
+    },
+    {
+      "receiptId": "2c68dc8e-f2dc-45ca-901e-f00a17793250",
+      "reason": "First implementation appended history in a different property order from issuance; exact confirmation digest refused. Canonical ordering corrected."
+    },
+    {
+      "receiptId": "1cad9f15-47e2-41a9-904d-49b2a4e3f289",
+      "reason": "The new staged-file fixture compared index bytes across its own intentional commit. Original byte equality now runs before that commit; refusal checks retain the exact post-commit index too."
+    }
+  ],
+  "audit": {
+    "originalManifestCommandsBoundsSkips": true,
+    "twoNewGroupsUseOriginalDefaultBound": true,
+    "serialOrder": true,
+    "outputBounds": true,
+    "originalChildTreeCleanup": true,
+    "privateReceiptCopiesVerified": true
+  },
+  "demonstration": {
+    "linux": "Actual protected save, fresh permission, separate execution review and isolated scanner find a synthetic secret in a deleted file; output redacted, no recreated file, original HEAD/index preserved, process exit and staging cleanup verified.",
+    "windows": "Actual Git blobs and separate historical authority pass the existing Release Shield journey with an explicit guest double. Native guest acceptance is separate.",
+    "frontend": "Authenticated HTTP and event/selection surface verify selection, saved handoff, exact history scope, cancellation and task/action/workspace clearing. No graphical browser acceptance."
+  },
+  "limitations": [
+    "All history limits and incomplete coverage markers remain; no other refs, deeper history, messages or rename following.",
+    "No live account, provider task, hardware or installed-agent operation.",
+    "Normal installation and immutable frontend pin pending at this source checkpoint.",
+    "Automatic native Windows recipe/catalog generation remains unfinished; the existing Windows save path writes the portable process recipe and does not turn it into a Windows guest manifest. The guest-double evidence uses its explicit Windows recipe."
+  ],
+  "typecheck": {
+    "command": "node node_modules/typescript/bin/tsc --noEmit -p tsconfig.json",
+    "exitCode": 0
+  },
+  "nonValidationAttempts": [
+    {
+      "receiptId": "85117181-4e95-40ab-9264-65cc2ad8d338",
+      "receiptSha256": "5dc3c21f30bb2c8c4c9eb8a3c1336b9b4a208738b886d030fb0e2d895c7768aa",
+      "totals": {
+        "required": 0,
+        "passed": 0,
+        "failed": 0,
+        "tests": 0,
+        "passedTests": 0,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "duplicateReceiptRemoved": true,
+      "reason": "A verifier filename had no original group. Empty selection is not accepted as validation; the actual original eight-case guard group ran separately."
+    }
+  ],
+  "verifierGuard": {
+    "receiptId": "40d5bd5f-5cdc-446f-a219-1ca590d844f3",
+    "receiptSha256": "b946d324c0529b84d46ed4e6dc349fd3b6dff36bd0870eb175941fe70961c8ac",
+    "totals": {
+      "required": 1,
+      "passed": 1,
+      "failed": 0,
+      "tests": 8,
+      "passedTests": 8,
+      "failedTests": 0,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    },
+    "duplicateReceiptRemoved": true
+  }
+}

@@ -1,0 +1,25 @@
+{
+  "schema": "switchyard-complete-linux/v1",
+  "source": "370c21e7d635430d28a1087162c09df8a0ec76b3",
+  "receipt": "isolated-test-6592f20c-dda9-4a97-9869-1c357d869133.json",
+  "totals": {
+    "required": 241,
+    "passed": 241,
+    "failed": 0,
+    "tests": 1520,
+    "passedTests": 1509,
+    "failedTests": 0,
+    "skippedTests": 11,
+    "cancelledTests": 0,
+    "todoTests": 0
+  },
+  "accepted": true,
+  "allChildAndTreeCleanupVerified": true,
+  "cleanupReceipt": "linux-370c21e-cleanup-1793940254941.json",
+  "exactOwnedCheckoutAliasesBuildsMarkerRemoved": true,
+  "limits": [
+    "Accepts this immutable source, not later registry or diagnostic changes.",
+    "Eleven declared platform skips are not native Windows acceptance.",
+    "The earlier failed runs remain failed; no hardware, account or full-suite completion is inferred."
+  ]
+}

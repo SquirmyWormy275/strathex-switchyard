@@ -1,0 +1,74 @@
+{
+  "schema": "switchyard-installed-editor-commands-summary/v1",
+  "readback": {
+    "schema": "switchyard-editor-installed-readback/v1",
+    "sourceCommit": "99784a78c62a0f625eb77122abf17ea34352ce4f",
+    "packageSha256": "f2efee8b5ca720d7f8059a60f55c1a58be0b8e499ddc35f75b2a4e65c4d78dcd",
+    "packageBytes": 260789,
+    "payloadFiles": 53,
+    "exactPayloadHashesVerified": true,
+    "packageMetadataOnlyCLIAddition": true,
+    "extraVsixManifestVerified": true,
+    "registeredCommands": [
+      "switchyard.showSavedTasks",
+      "switchyard.connectSavedTask",
+      "switchyard.returnToConnectedTask"
+    ],
+    "otherExtensionRegistrySemanticsPreserved": true,
+    "registryNormalizations": [
+      {
+        "extension": "anthropic.claude-code",
+        "uriSerializationChanged": true,
+        "identifierUuidFilledFromExistingMetadata": true
+      },
+      {
+        "extension": "local.omarchy-theme",
+        "uriSerializationChanged": true,
+        "identifierUuidFilledFromExistingMetadata": false
+      }
+    ],
+    "originalReadbackFailure": "Initial exact JSON equality rejected Code normalizing URI serialization and filling an existing gallery UUID. Corrected readback verifies equivalent paths and UUID equality to prior metadata, with every other field unchanged.",
+    "originalExtensionBackupVerified": true,
+    "originalExtensionFiles": 32,
+    "originalExtensionBytes": 956123,
+    "registryBackupVerified": true,
+    "pinnedLocalInstallation": true
+  },
+  "cli": {
+    "exitCode": 0,
+    "packageSha256": "f2efee8b5ca720d7f8059a60f55c1a58be0b8e499ddc35f75b2a4e65c4d78dcd",
+    "stderrSha256": "2246a1551d3711688a424d4c8d8290788bae9600fe53d247668c2c3f950ccd78",
+    "warning": "The installed Code CLI emitted its Node url.parse deprecation warning and completed successfully."
+  },
+  "activation": {
+    "commands": [
+      "switchyard.showSavedTasks",
+      "switchyard.connectSavedTask",
+      "switchyard.returnToConnectedTask"
+    ],
+    "commonJsCommandModuleLoaded": true,
+    "syntheticRegistrationNoIO": true,
+    "injectedIdentityRefused": true,
+    "unownedReturnStartsNoTask": true,
+    "disposablesRetired": 5,
+    "runtimeFiles": 6
+  },
+  "cleanup": {
+    "schema": "switchyard-editor-prepared-cleanup/v1",
+    "sourceCommit": "99784a78c62a0f625eb77122abf17ea34352ce4f",
+    "filesRemoved": 54,
+    "bytesRemoved": 1393488,
+    "ownerDevice": 57,
+    "ownerInode": 8137735,
+    "exactFileInventoryVerified": true,
+    "completed": true,
+    "originalExtensionBackupRetained": true
+  },
+  "sourceEvidence": "editor-commands-source-summary.json",
+  "limitations": [
+    "Installed payload and declared commands are verified; the running graphical editor was not driven or reloaded. An already-open editor may need its normal reload to activate the updated extension.",
+    "CommonJS command registration, argument refusal and empty owned-return behavior use an explicit VS Code surface/session double against the installed module. No live editor/task/account/model operation is inferred.",
+    "Native exact task attachment and actual Windows editor acceptance remain separate.",
+    "Other extension registry identities, versions, paths, pins and metadata are preserved; Code normalizes equivalent URI fields and fills the prior gallery UUID. The original exact-JSON readback failure is retained above."
+  ]
+}

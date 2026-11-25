@@ -1,0 +1,92 @@
+{
+  "schema": "switchyard-installed-editor-terminal-summary/v1",
+  "readback": {
+    "schema": "switchyard-editor-terminal-installed-readback/v1",
+    "sourceCommit": "42655aa0667dfbf06c88c560a1098ae65543ecf2",
+    "packageSha256": "ae27bbe507c3bb2df151808bed9067ed22947639d7b7334ef8f20e8dab5d78fc",
+    "packageBytes": 260834,
+    "payloadFiles": 53,
+    "exactPayloadHashesVerified": true,
+    "packageMetadataOnlyCLIAddition": true,
+    "extraVsixManifestVerified": true,
+    "registeredCommands": [
+      "switchyard.showSavedTasks",
+      "switchyard.connectSavedTask",
+      "switchyard.returnToConnectedTask"
+    ],
+    "otherExtensionRegistryUnchanged": true,
+    "originalExtensionBackupVerified": true,
+    "originalExtensionFiles": 54,
+    "originalExtensionBytes": 1132216,
+    "registryBackupVerified": true,
+    "pinnedLocalInstallation": true
+  },
+  "moduleChecks": {
+    "schema": "switchyard-installed-editor-terminal-metadata/v1",
+    "sourceCommit": "42655aa0667dfbf06c88c560a1098ae65543ecf2",
+    "packageSha256": "ae27bbe507c3bb2df151808bed9067ed22947639d7b7334ef8f20e8dab5d78fc",
+    "checks": [
+      "installed Linux remote resume omits CLI permission overrides and preserves exact UUID/root/socket",
+      "installed Windows remote resume keeps bearer only in terminal-local environment",
+      "installed argument builders reject selectors, ambiguous sockets and remote endpoints",
+      "installed commands register without service or task I/O",
+      "installed command rejects injected task identities",
+      "return without an owned terminal cannot create a task",
+      "installed command lifecycle retires every registration",
+      "all six packaged runtime modules retain exact hashes"
+    ],
+    "commonJsLoaded": true,
+    "syntheticRegistrationOnly": true,
+    "disposablesRetired": 5,
+    "nativeRequests": 0,
+    "modelPrompts": 0,
+    "graphicalActivationVerified": false
+  },
+  "cli": {
+    "exitCode": 0,
+    "packageSha256": "ae27bbe507c3bb2df151808bed9067ed22947639d7b7334ef8f20e8dab5d78fc",
+    "stderrSha256": "7a030c6ecc71f89a967bb26db6ebca8eef4213616ff00727c34210a621e8269d"
+  },
+  "cleanup": {
+    "schema": "switchyard-editor-terminal-prepared-cleanup/v1",
+    "sourceCommit": "42655aa0667dfbf06c88c560a1098ae65543ecf2",
+    "filesRemoved": 54,
+    "bytesRemoved": 1393638,
+    "ownerDevice": 57,
+    "ownerInode": 8177389,
+    "exactFileInventoryVerified": true,
+    "originalBuildGuardiansExited": 3,
+    "completed": true,
+    "originalExtensionBackupRetained": true
+  },
+  "sourceEvidence": "codex-native-bootstrap-summary.json",
+  "receipts": [
+    {
+      "name": "editor-terminal-installed-readback.json",
+      "sha256": "a3d56e4bc39ed67f7bc75c4ddc246277061697eb0b8585fcd7e7e7837ad4a47d"
+    },
+    {
+      "name": "editor-terminal-installed-module-checks.json",
+      "sha256": "fb32fe849a829ef3e381344c43867a78a7c0089dc8ed2b4df178ec62bb8ff5cf"
+    },
+    {
+      "name": "editor-terminal-installed-cli-result.json",
+      "sha256": "fb9e9c51ab003c7acf69094f71c17306d2be22d3d5b666ff7e2ca6e6243f641d"
+    },
+    {
+      "name": "editor-terminal-installed-cleanup.json",
+      "sha256": "0e972235ec7716df47864481c582d886d5e21a77d89a4711d21ca24c1d803cf6"
+    }
+  ],
+  "retainedPreparationFailures": [
+    "The first build wrapper expected a detailed result while requesting stdout-only mode; the compiler succeeded and its original guardian exited. The corrected bounded build has detailed exit evidence.",
+    "The first readback comparison omitted the existing .vsixmanifest from the historical payload list; its bytes were separately verified before backup.",
+    "The first installed package check looked for source/pinned in package metadata; Code keeps those fields in the extension registry. Registry pin/source and every package field verify.",
+    "The first synthetic module-check wrapper had a syntax error before any code ran; its corrected check passes all eight assertions."
+  ],
+  "limitations": [
+    "Installed file integrity, CommonJS builders and command registration/refusal are verified with synthetic values. The graphical editor was not reloaded or driven.",
+    "No real task, model prompt, account change or hardware operation occurred.",
+    "All other extension registry rows remain exactly unchanged. The prior extension and registry are retained in a dated backup."
+  ]
+}

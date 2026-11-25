@@ -1,0 +1,60 @@
+{
+  "schema": "switchyard-runtime-startup-observation-summary/v1",
+  "basis": "3462404ef539d2e0f51be5e3fcbfe707652df8ab",
+  "sourceSha256": {
+    "apps/desktop-hotkeys/RuntimeCommandRunner.cs": "75b49f94080b8efe26a72545cf05ec6b58299d5873b343e42a66e963343ff405",
+    "scripts/windows-owner-probe-observation.mjs": "d9535209e6bde56d06399ba5518be2d9b6ead8cf8413c8aaa53f9b62ac6badbe",
+    "scripts/windows-restricted-owner-report.test.mjs": "a64361d372977403f0af6ab11b28d3d3979df305b9b1c18fb96ee258309d9e33",
+    "tools/layout-studio/runtime-command.mjs": "3b34bfb6188c8dd5fdf06c0950da35ed54e2abfd53d83f92125df2a59a022ba8",
+    "tools/layout-studio/runtime-command.test.mjs": "1f6541c9813664335b0e0c91b2e183984ae3e7f9e5b25082808b3e9dd4479fe5"
+  },
+  "isolated": {
+    "receipt": "isolated-test-e7333715-4139-46b2-b818-b811b729982c.json",
+    "totals": {
+      "required": 6,
+      "passed": 6,
+      "failed": 0,
+      "tests": 78,
+      "passedTests": 78,
+      "failedTests": 0,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    },
+    "allChildAndTreeCleanupVerified": true
+  },
+  "managed": {
+    "receipt": "runtime-startup-observation-managed-1793974326443.json",
+    "builds": [
+      {
+        "name": "helper",
+        "warnings": 0,
+        "errors": 0,
+        "managedAssemblySha256": "dd939efe59256282f92674b2c81730b3c14422d1fc7e6c0aafef27aed0a6c096",
+        "managedPeSubsystem": 2
+      },
+      {
+        "name": "proof",
+        "warnings": 0,
+        "errors": 0,
+        "managedAssemblySha256": "3b49cd0a94485ca3d08bc982dfb9e74ac47017441933267f2da8d4dfc0597782",
+        "managedPeSubsystem": 3
+      }
+    ],
+    "portableChecks": 2006,
+    "ownedCleanup": {
+      "files": 124,
+      "bytes": 3207249,
+      "removed": true
+    },
+    "noDownloads": true
+  },
+  "typecheckPassed": true,
+  "behavior": [
+    "Before readiness only, the native helper may emit one closed startup-failure frame tied to the original request ID. Nine fixed stages distinguish request/environment, executable attributes/open/hash, Job creation/configuration, self birth and readiness output.",
+    "Only failed Job creation/configuration APIs attach their immediate Win32 numeric code. Other stages have no native code. No raw errors, source paths, URLs, credentials or output are included.",
+    "The host retains refusal and RUNTIME_STOP_UNCONFIRMED, invokes no readiness callback for this frame, and ignores further output after failure. A failure frame cannot acknowledge execution, verify exit, grant rights or retire uncertain resources.",
+    "The CI owner projects only the validated fixed phase through its existing bounded field. All original owner/token/Job/identity/cleanup checks remain."
+  ],
+  "nativeAcceptance": "Pending. The prior 6f2097b proof identifies the guardian boundary but not which managed startup operation fails."
+}

@@ -187,6 +187,33 @@ export class ReceiptLedger {
     });
   }
 
+  /** Atomically retire prior results for a reviewed policy change, retaining the first lineage. */
+  async invalidateActions(actions: readonly string[], invalidatedBy: string): Promise<readonly string[]> {
+    const selected = [...new Set(actions.map(action => nonEmpty(action, "action")))].sort();
+    const reason = nonEmpty(invalidatedBy, "invalidatedBy");
+    if (!selected.length || selected.length > 32 || selected.some(action => action.length > 128) || reason.length > 512) throw new ReceiptLedgerError("Use a bounded action set and invalidation identity.");
+    const at = validTimestamp(this.clock(), "invalidation timestamp");
+    return this.store.transaction(async transaction => {
+      const entries = await transaction.readEntries();
+      const prior = entries.find(entry => entry.kind === "receipt.actions-invalidated" && (entry.payload as { invalidatedBy?: string }).invalidatedBy === reason);
+      if (prior) {
+        const payload = prior.payload as { actions: readonly string[]; receiptIds: readonly string[] };
+        if (JSON.stringify(payload.actions) !== JSON.stringify(selected)) throw new ReceiptLedgerError("The original invalidation is bound to a different action set.");
+        return [...payload.receiptIds];
+      }
+      const receiptIds: string[] = [];
+      for (const [receiptId, retained] of receiptEntries(entries)) {
+        if (!selected.includes(retained.entry.payload.receipt.action) || retained.invalidatedBy) continue;
+        await transaction.append<ReceiptInvalidatedEvent>("receipt.invalidated", { receiptId, invalidatedBy: reason, at });
+        receiptIds.push(receiptId);
+      }
+      // Even an empty invalidation advances the host policy binding, so an
+      // in-flight observation cannot issue a new receipt under the old policy.
+      await transaction.append("receipt.actions-invalidated", { actions: selected, receiptIds, invalidatedBy: reason, at });
+      return receiptIds;
+    });
+  }
+
   async get(receiptId: string): Promise<ProtectedReceipt | undefined> {
     const receipts = receiptEntries(await this.store.readEntries());
     const found = receipts.get(receiptId);
@@ -200,9 +227,11 @@ export class ReceiptLedger {
 
   /** A stale, failed, incomplete, invalidated, or target-mismatched receipt never authorizes a gate. */
   async isFresh(receipt: ProtectedReceipt, targetSnapshotId: string, now = this.clock()): Promise<boolean> {
-    if (receipt.result !== "passed" || receipt.completeness !== "complete") return false;
-    if (receipt.invalidatedBy || receipt.targetSnapshotId !== targetSnapshotId) return false;
-    if (receipt.expiresAt && Date.parse(receipt.expiresAt) <= Date.parse(now)) return false;
+    const current = await this.get(receipt.id);
+    if (!current || current.hash !== receipt.hash || !Number.isFinite(Date.parse(now))) return false;
+    if (current.result !== "passed" || current.completeness !== "complete") return false;
+    if (current.invalidatedBy || current.targetSnapshotId !== targetSnapshotId) return false;
+    if (current.expiresAt && Date.parse(current.expiresAt) <= Date.parse(now)) return false;
     return true;
   }
 

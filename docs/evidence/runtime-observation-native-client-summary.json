@@ -1,0 +1,50 @@
+{
+  "schema": "switchyard-runtime-observation-native-client-summary/v1",
+  "sourceCommit": "0bb7fd446ede13528280d63ad701bb5fe57cc3e2",
+  "mergeCommit": "d5c7fe0a98f8af5ac6ff9c7ae56a853b506f4c1f",
+  "tree": "e1773615ff8690b93254cf9f17cf022d062d86e7",
+  "sourceAndMergeTreesEqual": true,
+  "workflowRun": 42378182713,
+  "jobs": {
+    "helper": 128420018866,
+    "client": 128420211686,
+    "conclusion": "success"
+  },
+  "artifact": {
+    "id": 13576548206,
+    "bytes": 3534,
+    "sha256": "26326640a6f1cfc061c64df49b85c41ba42b9aa8b20bed81c6ab5a6213814f8d",
+    "zipRetained": false,
+    "nativeHelperDownloaded": false
+  },
+  "receipt": {
+    "id": "189bda94-f1a9-4e75-83ee-5d6aa6b0598e",
+    "file": "ci-artifact-13576548206-0.json",
+    "sha256": "001388ea5809ac3b4f350ead196f2788f1dbe767622c60e213af8989ed417a63"
+  },
+  "totals": {
+    "required": 25,
+    "passed": 25,
+    "failed": 0,
+    "tests": 249,
+    "passedTests": 249,
+    "failedTests": 0,
+    "skippedTests": 0,
+    "cancelledTests": 0,
+    "todoTests": 0
+  },
+  "originalManifestCommandsBoundsSkipsAndCleanupVerified": true,
+  "metadataOnlyPlatformProjection": true,
+  "projectionStartedNoTestProcesses": true,
+  "sourceFiles": {
+    "scripts/run-isolated-tests.mjs": "1033187440dd6e21f3a9470426b255ac04c0a69bc86c4332c0e992b84e7fee1e",
+    "scripts/windows-scenario-groups.mjs": "055963bbaa3da60ef7afed7207d5177f7b49a376aa4157099eb8eded3f62bac4",
+    "scripts/test-support/process-tree.mjs": "a480913dcafb50351ac4544d07e184ea4b21c53eb5b13a59b245952e63d859e6",
+    "scripts/verify-client-platform.mjs": "7c85086841008e6fc409ffa8afbf9e87951f7e59689cbb49bce33d8b9be90ff4"
+  },
+  "limitations": [
+    "This is the 25-group native client lane, not the complete Windows release or the new runtime-observation backend groups.",
+    "Exact native endpoint/process/file/Job checks are separate from explicit terminal/provider doubles in composed launch demonstrations.",
+    "No live provider/account/TUI, interactive desktop, keyboard or microphone acceptance is claimed. Editor command activation remains frozen."
+  ]
+}

@@ -1,0 +1,124 @@
+{
+  "schema": "switchyard-native-windows-policy-evidence/v1",
+  "pullRequestHead": "bd77ec4159d9da4a4b537afe852440210c26af34",
+  "artifactRevision": "b5295a67b55e02064daf3b0a5494332212817b7f",
+  "workflowRun": 42017703748,
+  "workflowConclusion": "success",
+  "artifacts": [
+    {
+      "id": 13410925830,
+      "name": "switchyard-windows-policy-recovery-b5295a67b55e02064daf3b0a5494332212817b7f",
+      "archiveSha256": "f02759028db8e0ca25d04a9203a52201361c77f44df45099fda31b376a32b396",
+      "localReceipt": "windows-bd77-policy-recovery.json",
+      "receiptSha256": "8ffcbe8e8e273f79fadb63213b8b2a30be8dc44c13b4fb8eec6ddb90da3ca386",
+      "totals": {
+        "required": 2,
+        "passed": 2,
+        "failed": 0,
+        "tests": 20,
+        "passedTests": 20,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "id": 13410506521,
+      "name": "switchyard-windows-policy-stop-b5295a67b55e02064daf3b0a5494332212817b7f",
+      "archiveSha256": "07a18460b065d6cc6b7fe7e07310619bd5fab41516c762310cb677318624aecb",
+      "localReceipt": "windows-bd77-policy-stop.json",
+      "receiptSha256": "4d7b5a9d2cf41fe55dcb8eb37a22c7ff8172292f9f115ca87e1f72cba2cf92df",
+      "totals": {
+        "required": 4,
+        "passed": 4,
+        "failed": 0,
+        "tests": 20,
+        "passedTests": 20,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "id": 13410241758,
+      "name": "switchyard-windows-policy-host-stop-b5295a67b55e02064daf3b0a5494332212817b7f",
+      "archiveSha256": "df08fe08aeb020c45dc79544c1f424a43a62ce0dc8639bd9e6d6c3d095843bcb",
+      "localReceipt": "windows-bd77-policy-host-stop.json",
+      "receiptSha256": "6e1fb8208a3012e2d06143e5695f485a916030756582da9cb83d400518ea1892",
+      "totals": {
+        "required": 2,
+        "passed": 2,
+        "failed": 0,
+        "tests": 24,
+        "passedTests": 24,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "id": 13410037957,
+      "name": "switchyard-windows-policy-output-b5295a67b55e02064daf3b0a5494332212817b7f",
+      "archiveSha256": "d4f26b483e78f84388cef2291d9d269fe28588b2354d197cc4c34c4ee6b049b0",
+      "localReceipt": "windows-bd77-policy-output.json",
+      "receiptSha256": "e1431d91d84eec3252c9afa74eb3be0cabbe62d1105b5ba9ff1e3d3f0cd2c6d8",
+      "totals": {
+        "required": 2,
+        "passed": 2,
+        "failed": 0,
+        "tests": 20,
+        "passedTests": 20,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "id": 13409947719,
+      "name": "switchyard-windows-policy-policy-b5295a67b55e02064daf3b0a5494332212817b7f",
+      "archiveSha256": "4b7938cea97c1246d92ab30789cb8402f6af2f32f86f671b591980624e2b9c97",
+      "localReceipt": "windows-bd77-policy-admission.json",
+      "receiptSha256": "83d8ec93269032925d5d40dd12d9a015fb6ce2d93ba438d1e655a3032b840050",
+      "totals": {
+        "required": 2,
+        "passed": 2,
+        "failed": 0,
+        "tests": 21,
+        "passedTests": 21,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "id": 13409743319,
+      "name": "switchyard-windows-policy-authority-b5295a67b55e02064daf3b0a5494332212817b7f",
+      "archiveSha256": "18b1326361b62da439bca8660e7c6de7ff023d3aa6d72f645b6127c1a0815e92",
+      "localReceipt": "windows-bd77-policy-authority.json",
+      "receiptSha256": "79e208089d18f5d0d77c696674bab6a4ddb8ce6b69dd794dcd65113428c3f221",
+      "totals": {
+        "required": 2,
+        "passed": 2,
+        "failed": 0,
+        "tests": 26,
+        "passedTests": 26,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    }
+  ],
+  "passedTestExecutionsIncludingRepeatedHarness": 131,
+  "allChildCleanupVerified": true,
+  "nativeWindowsHost": true,
+  "guestDoubled": true,
+  "nativeGuestAccepted": false,
+  "ordinaryUserSetupAccepted": false,
+  "archivesRetainedLocally": false
+}

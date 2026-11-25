@@ -1,0 +1,25 @@
+{
+  "kind": "suspended-worker",
+  "sourceCommit": "7dd2c36450ce7d9a6f2d188327a164214bde3a25",
+  "executionCommit": "f5bc3d1e24b3baa035e3c695c363192522fcd51b",
+  "sourceAndExecutionTree": "2600c983a332a7ea4009167fede74591e165566c",
+  "runId": 42251540113,
+  "jobId": 128008101588,
+  "artifactId": 13520332714,
+  "archiveBytes": 464,
+  "archiveSha256": "cbc1ad5e0720956d64fd79395aade750a7fddab5f1d346dd12b261cc6d4eb02d",
+  "privateReceipt": "windows-suspended-worker-7dd-native.json",
+  "receipt": {
+    "sourceCommit": "f5bc3d1e24b3baa035e3c695c363192522fcd51b",
+    "passedTests": 6,
+    "success": true,
+    "helperSha256": "58dffe4a2dd68d374e67003138ca483ff9d3af9dc8ac87844864e881e4a48622",
+    "failedTests": 0,
+    "testSourceSha256": "3f97967ca2717adf4c393f4d24391bc65b460d9023c8d41b3851d11284964e73",
+    "schema": "switchyard-windows-suspended-worker-native/v1",
+    "skippedTests": 0
+  },
+  "zipSavedLocally": false,
+  "installedChanged": false,
+  "restrictedOwnerAccepted": false
+}

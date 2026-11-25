@@ -1,0 +1,39 @@
+{
+  "schema": "switchyard-restricted-stdio-native/v1",
+  "source": "7a75189cf897d9067b31333c96e0b36a85c940f3",
+  "executionMerge": "f20d311a1e84ff41491f6c22eec52ba21b48b529",
+  "runId": 42162292914,
+  "jobId": 127710916141,
+  "artifactId": 13477556901,
+  "archiveSha256": "1c01884fbb95bd8255912b2f7a59c5b1f7b4c1ccedbb24943a7001f7dfd7e4be",
+  "receipt": "windows-restricted-stdio-7a751-native.json",
+  "accepted": false,
+  "childExit": {
+    "waitResult": 0,
+    "exitCode": 134,
+    "resultAvailable": false
+  },
+  "standardIo": {
+    "schema": "switchyard-restricted-child-stdio/v1",
+    "standardHandles": 3,
+    "inheritanceRestricted": true,
+    "stdinEof": true,
+    "stdoutBytes": 0,
+    "stderrBytes": 663,
+    "outputBounded": true,
+    "handlesClosedVerified": true,
+    "drainsCompleted": true,
+    "stderr": {
+      "category": "assertion",
+      "function": null,
+      "code": null
+    }
+  },
+  "failedFixturePreserved": true,
+  "cause": "The fixed parser identifies an assertion; its precise condition and source location are not yet identified.",
+  "limits": [
+    "The child still exits 134 without an owner result.",
+    "Verified pipe closure and diagnostic bounds do not establish the complete child journey or whole failed-fixture cleanup.",
+    "No token, privilege, desktop, Job or deadline guard was relaxed."
+  ]
+}

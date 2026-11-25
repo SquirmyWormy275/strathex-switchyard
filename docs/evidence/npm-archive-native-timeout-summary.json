@@ -1,0 +1,23 @@
+{
+  "schema": "switchyard-native-npm-archive-timeout/v1",
+  "sourceCommit": "7e45654a5dca544815f86336b4bc2512c60648a9",
+  "executionCommit": "e9dbade1668c8041a264a2c05b6834836ab205df",
+  "sourceAndExecutionTree": "9dd69636801ad6c50397ccdae8d943ccb516bda6",
+  "runId": 42276890426,
+  "jobId": 128095805871,
+  "artifactId": 13533657479,
+  "archiveBytes": 1696,
+  "archiveSha256": "b252e963a22cc061e0261d840822793b6f4ff713f25695f824a0039624826b8d",
+  "privateReceipt": "windows-npm-archive-7e45654-timeout.json",
+  "success": false,
+  "timeout": true,
+  "originalTimeoutMs": 300000,
+  "acceptedTests": 0,
+  "partialPlanExcluded": true,
+  "allChildAndTreeCleanupVerified": true,
+  "zipSavedLocally": false,
+  "otherWindowsBoundaryJobsPassed": 65,
+  "originalBoundaryJobs": 66,
+  "actualGuestAccepted": false,
+  "installedChanged": false
+}

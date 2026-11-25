@@ -1,0 +1,580 @@
+{
+  "schema": "switchyard-windows-shortcut-recurring-timeout/v1",
+  "trials": [
+    {
+      "sourceCommit": "9193471ac9a1de6154badfebd79c311b9a3ed78a",
+      "executionCommit": "a63fe443b01a3f8dfaf17ac1ff89e07783babd0b",
+      "sourceAndExecutionTree": "daee00378e275dea202b4dc404bcbf41809e0eba",
+      "runId": 42284298707,
+      "artifactId": 13537198081,
+      "archiveBytes": 3663,
+      "archiveSha256": "dcaf62d8f5aaaea5d9f75563452b3075ce25d1893f0ce4f356f1c566ed8d27d4",
+      "privateReceipt": "windows-boundary-9193471-13537198081.json",
+      "receiptSha256": "97633a267c7fec404b748f7148b94e2755386dd6682f80720cf8d9fe42ad8b7d",
+      "totals": {
+        "required": 17,
+        "passed": 16,
+        "failed": 1,
+        "tests": 25,
+        "passedTests": 24,
+        "failedTests": 1,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "success": false,
+      "allChildAndTreeCleanupVerified": true,
+      "zipSavedLocally": false,
+      "groups": [
+        {
+          "file": "deployment/suite/installation.test.mjs",
+          "pattern": "installation keeps current and one rollback version, records dated backups, preserves data and removes only owned entries",
+          "success": false,
+          "timeout": false,
+          "effectiveTimeoutMs": 120000,
+          "testCounts": {
+            "total": 1,
+            "passed": 0,
+            "failed": 1,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "boundedFailure": "Native shortcut creation timed out.",
+          "nativeShortcutExecutionDeadlineMs": 10000
+        },
+        {
+          "file": "deployment/suite/installation.test.mjs",
+          "pattern": "unowned or edited desktop entries and corrupted new releases preserve the current application",
+          "success": true,
+          "timeout": false,
+          "effectiveTimeoutMs": 120000,
+          "testCounts": {
+            "total": 1,
+            "passed": 1,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "deployment/suite/installation.test.mjs",
+          "pattern": "a failed persistent write restores every earlier launcher and the exact previous installation record",
+          "success": true,
+          "timeout": false,
+          "effectiveTimeoutMs": 120000,
+          "testCounts": {
+            "total": 1,
+            "passed": 1,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "deployment/suite/installation.test.mjs",
+          "pattern": "forced owner exit leaves a durable journal; another installer restores the exact before state without touching unrelated files",
+          "success": true,
+          "timeout": false,
+          "effectiveTimeoutMs": 120000,
+          "testCounts": {
+            "total": 1,
+            "passed": 1,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "deployment/suite/installation.test.mjs",
+          "pattern": "recovery preflights all edits before writing, and respects a committed update whose pending marker survived",
+          "success": true,
+          "timeout": false,
+          "effectiveTimeoutMs": 120000,
+          "testCounts": {
+            "total": 1,
+            "passed": 1,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "deployment/suite/installation.test.mjs",
+          "pattern": "active host connections block uninstall before any application stop or persistent mutation",
+          "success": true,
+          "timeout": false,
+          "effectiveTimeoutMs": 120000,
+          "testCounts": {
+            "total": 1,
+            "passed": 1,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "deployment/suite/installation.test.mjs",
+          "pattern": "uninstall verifies exact owner exit and restores host connections before removing persistent program entries",
+          "success": true,
+          "timeout": false,
+          "effectiveTimeoutMs": 120000,
+          "testCounts": {
+            "total": 1,
+            "passed": 1,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "deployment/suite/installation.test.mjs",
+          "pattern": "a restoration conflict retains all program entries and resumes the previous running application",
+          "success": true,
+          "timeout": false,
+          "effectiveTimeoutMs": 120000,
+          "testCounts": {
+            "total": 1,
+            "passed": 1,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "deployment/suite/installation.test.mjs",
+          "pattern": "a second registered instance blocks uninstall without stopping either owner",
+          "success": true,
+          "timeout": false,
+          "effectiveTimeoutMs": 120000,
+          "testCounts": {
+            "total": 1,
+            "passed": 1,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "deployment/suite/installation.test.mjs",
+          "pattern": "unconfirmed owner exit leaves a durable removal journal and blocks restoration until recovery",
+          "success": true,
+          "timeout": false,
+          "effectiveTimeoutMs": 120000,
+          "testCounts": {
+            "total": 1,
+            "passed": 1,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "deployment/suite/installation.test.mjs",
+          "pattern": "a failed uninstall write restores the owned program and keeps restart recovery durable",
+          "success": true,
+          "timeout": false,
+          "effectiveTimeoutMs": 120000,
+          "testCounts": {
+            "total": 1,
+            "passed": 1,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "deployment/suite/installation.test.mjs",
+          "pattern": "a dated verified recovery entry restores an interrupted uninstall even after the main loader was removed",
+          "success": true,
+          "timeout": false,
+          "effectiveTimeoutMs": 120000,
+          "testCounts": {
+            "total": 1,
+            "passed": 1,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "deployment/suite/installation.test.mjs",
+          "pattern": "an explicit no-start update stops the previous generation without restarting the new one",
+          "success": true,
+          "timeout": false,
+          "effectiveTimeoutMs": 120000,
+          "testCounts": {
+            "total": 1,
+            "passed": 1,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "deployment/suite/installation.test.mjs",
+          "pattern": "the stable installed loader verifies and addresses the actual application across update and rollback",
+          "success": true,
+          "timeout": false,
+          "effectiveTimeoutMs": 120000,
+          "testCounts": {
+            "total": 1,
+            "passed": 1,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "deployment/suite/installation.test.mjs",
+          "pattern": "pre-promotion owner loss recovers only verified staging copies and exact incomplete source prefixes",
+          "success": true,
+          "timeout": false,
+          "effectiveTimeoutMs": 120000,
+          "testCounts": {
+            "total": 1,
+            "passed": 1,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "deployment/suite/installation.test.mjs",
+          "pattern": "interrupted installation recovery accepts the full release file ceiling plus its manifest and preserves unrelated edits",
+          "success": true,
+          "timeout": false,
+          "effectiveTimeoutMs": 120000,
+          "testCounts": {
+            "total": 1,
+            "passed": 1,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "deployment/suite/shortcut-process.test.mjs",
+          "pattern": null,
+          "success": true,
+          "timeout": false,
+          "effectiveTimeoutMs": 45000,
+          "testCounts": {
+            "total": 9,
+            "passed": 9,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        }
+      ]
+    },
+    {
+      "sourceCommit": "4b2daede4ead6293b5344b3e9c2b4d7b68601ad4",
+      "executionCommit": "24ca43eda518d28ed25a8b9081275d5803ea8f78",
+      "sourceAndExecutionTree": "45128d3599b22ce4b05379215bcc18100f2478bb",
+      "runId": 42286195659,
+      "artifactId": 13538022127,
+      "archiveBytes": 3690,
+      "archiveSha256": "bdebb4a96cd2f146816e7b5ca88a29379717ca5533bc37a75e0d27cb80622269",
+      "privateReceipt": "windows-boundary-4b2daed-13538022127.json",
+      "receiptSha256": "9518db80d76fb1628476bb9920dbc421cc8ed4d0687fd565ad6f2b649548d95f",
+      "totals": {
+        "required": 17,
+        "passed": 16,
+        "failed": 1,
+        "tests": 25,
+        "passedTests": 24,
+        "failedTests": 1,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "success": false,
+      "allChildAndTreeCleanupVerified": true,
+      "zipSavedLocally": false,
+      "groups": [
+        {
+          "file": "deployment/suite/installation.test.mjs",
+          "pattern": "installation keeps current and one rollback version, records dated backups, preserves data and removes only owned entries",
+          "success": false,
+          "timeout": false,
+          "effectiveTimeoutMs": 120000,
+          "testCounts": {
+            "total": 1,
+            "passed": 0,
+            "failed": 1,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "boundedFailure": "Native shortcut creation timed out.",
+          "nativeShortcutExecutionDeadlineMs": 10000
+        },
+        {
+          "file": "deployment/suite/installation.test.mjs",
+          "pattern": "unowned or edited desktop entries and corrupted new releases preserve the current application",
+          "success": true,
+          "timeout": false,
+          "effectiveTimeoutMs": 120000,
+          "testCounts": {
+            "total": 1,
+            "passed": 1,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "deployment/suite/installation.test.mjs",
+          "pattern": "a failed persistent write restores every earlier launcher and the exact previous installation record",
+          "success": true,
+          "timeout": false,
+          "effectiveTimeoutMs": 120000,
+          "testCounts": {
+            "total": 1,
+            "passed": 1,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "deployment/suite/installation.test.mjs",
+          "pattern": "forced owner exit leaves a durable journal; another installer restores the exact before state without touching unrelated files",
+          "success": true,
+          "timeout": false,
+          "effectiveTimeoutMs": 120000,
+          "testCounts": {
+            "total": 1,
+            "passed": 1,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "deployment/suite/installation.test.mjs",
+          "pattern": "recovery preflights all edits before writing, and respects a committed update whose pending marker survived",
+          "success": true,
+          "timeout": false,
+          "effectiveTimeoutMs": 120000,
+          "testCounts": {
+            "total": 1,
+            "passed": 1,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "deployment/suite/installation.test.mjs",
+          "pattern": "active host connections block uninstall before any application stop or persistent mutation",
+          "success": true,
+          "timeout": false,
+          "effectiveTimeoutMs": 120000,
+          "testCounts": {
+            "total": 1,
+            "passed": 1,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "deployment/suite/installation.test.mjs",
+          "pattern": "uninstall verifies exact owner exit and restores host connections before removing persistent program entries",
+          "success": true,
+          "timeout": false,
+          "effectiveTimeoutMs": 120000,
+          "testCounts": {
+            "total": 1,
+            "passed": 1,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "deployment/suite/installation.test.mjs",
+          "pattern": "a restoration conflict retains all program entries and resumes the previous running application",
+          "success": true,
+          "timeout": false,
+          "effectiveTimeoutMs": 120000,
+          "testCounts": {
+            "total": 1,
+            "passed": 1,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "deployment/suite/installation.test.mjs",
+          "pattern": "a second registered instance blocks uninstall without stopping either owner",
+          "success": true,
+          "timeout": false,
+          "effectiveTimeoutMs": 120000,
+          "testCounts": {
+            "total": 1,
+            "passed": 1,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "deployment/suite/installation.test.mjs",
+          "pattern": "unconfirmed owner exit leaves a durable removal journal and blocks restoration until recovery",
+          "success": true,
+          "timeout": false,
+          "effectiveTimeoutMs": 120000,
+          "testCounts": {
+            "total": 1,
+            "passed": 1,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "deployment/suite/installation.test.mjs",
+          "pattern": "a failed uninstall write restores the owned program and keeps restart recovery durable",
+          "success": true,
+          "timeout": false,
+          "effectiveTimeoutMs": 120000,
+          "testCounts": {
+            "total": 1,
+            "passed": 1,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "deployment/suite/installation.test.mjs",
+          "pattern": "a dated verified recovery entry restores an interrupted uninstall even after the main loader was removed",
+          "success": true,
+          "timeout": false,
+          "effectiveTimeoutMs": 120000,
+          "testCounts": {
+            "total": 1,
+            "passed": 1,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "deployment/suite/installation.test.mjs",
+          "pattern": "an explicit no-start update stops the previous generation without restarting the new one",
+          "success": true,
+          "timeout": false,
+          "effectiveTimeoutMs": 120000,
+          "testCounts": {
+            "total": 1,
+            "passed": 1,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "deployment/suite/installation.test.mjs",
+          "pattern": "the stable installed loader verifies and addresses the actual application across update and rollback",
+          "success": true,
+          "timeout": false,
+          "effectiveTimeoutMs": 120000,
+          "testCounts": {
+            "total": 1,
+            "passed": 1,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "deployment/suite/installation.test.mjs",
+          "pattern": "pre-promotion owner loss recovers only verified staging copies and exact incomplete source prefixes",
+          "success": true,
+          "timeout": false,
+          "effectiveTimeoutMs": 120000,
+          "testCounts": {
+            "total": 1,
+            "passed": 1,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "deployment/suite/installation.test.mjs",
+          "pattern": "interrupted installation recovery accepts the full release file ceiling plus its manifest and preserves unrelated edits",
+          "success": true,
+          "timeout": false,
+          "effectiveTimeoutMs": 120000,
+          "testCounts": {
+            "total": 1,
+            "passed": 1,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "deployment/suite/shortcut-process.test.mjs",
+          "pattern": null,
+          "success": true,
+          "timeout": false,
+          "effectiveTimeoutMs": 45000,
+          "testCounts": {
+            "total": 9,
+            "passed": 9,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        }
+      ]
+    }
+  ],
+  "causeEstablished": false,
+  "earlier25CheckPassSource": "9f35961ca18087b2406e7e2ad716b5fe97ebc2bb",
+  "earlierPassDoesNotResolveRepeatedFailure": true,
+  "originalDeadlinesPreserved": true,
+  "originalInstallationAssertionsPreserved": true,
+  "installedChanged": false,
+  "fullReleaseAccepted": false
+}

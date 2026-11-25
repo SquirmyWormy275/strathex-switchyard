@@ -1,0 +1,106 @@
+{
+  "schema": "switchyard-windows-lease-pipe-owner-source/v1",
+  "basis": "da28b5c3c28a934efffb31f976a7124d4c424259",
+  "sourceSha256": {
+    "apps/desktop-hotkeys/StateLeaseWorker.cs": "617c6b404179a9289bb9992117807ecbe7beaf77a9da6b8028c621ad7873626a",
+    "deployment/windows/test-support/storage-broker-protocol/StateLeaseProtocolProof.cs": "088fe27af792c25937c852630015b0a2526ac2564d9b94fb63a1b6da5df830b6",
+    "deployment/windows/test-support/storage-broker-protocol/StateLockFailureEvidence.cs": "0305dcd8898b0defcb65b6568d9b45705d288f2465c9d35b303294749cd0d2c7",
+    "scripts/verify-windows-storage-broker.mjs": "fd7c154b910ab705a8c74f6453d328d7d4e1421060e5411ebe6d0f5e75595a1e",
+    "tools/layout-studio/keyless-lease-pool.mjs": "fe6ebd7906b69cb78bdbc335344c1044b26157d4b639f33a62de4fa89af87545",
+    "tools/layout-studio/keyless-lease-pool.test.mjs": "cd144b024aca8f5a27f396c3059a38094a0afd1b37ffca013ff7e63321ef5365",
+    "tools/layout-studio/state-lock.mjs": "4fd3b6871ed148f189101620a5efdc44a015f929bdccbbc2555f0d3a5094b61d",
+    "tools/layout-studio/state-lock.test.mjs": "ae33f45660b028b27c4143c05cad5176ed4ce63664fec27ffae8f3726629a526"
+  },
+  "retainedNativeFailure": {
+    "sourceCommit": "da28b5c3c28a934efffb31f976a7124d4c424259",
+    "executionCommit": "22c20ba161f480ad2cf34c7cc6b244e5432ee03d",
+    "sourceAndExecutionTree": "6bd35d92ca3c0df2d3d34c70cb255383850e4330",
+    "runId": 42224703259,
+    "artifactId": 13505297066,
+    "archiveBytes": 4332,
+    "archiveSha256": "26d13dcd64263327eec7e4d8099918cca87e4045e6e15f5e0115aa5255d59de9",
+    "zipSavedLocally": false,
+    "jobId": 127915515126,
+    "privateReceipt": "windows-parent-denied-da28-native.json",
+    "helperSha256": "b30733bc637793d38ea39ef5dc1669f3b76095aa56ddb501440eea2255a28c22",
+    "failure": {
+      "waitResult": 0,
+      "exitCode": 2,
+      "resultAvailable": true,
+      "childReportedSuccess": false,
+      "ownerReportedSuccess": false,
+      "completedChecks": 0,
+      "failedPhase": "private-state-initialize",
+      "failureCategory": "Error",
+      "stateLockFailure": {
+        "schema": "switchyard-state-lock-failure/v1",
+        "kind": "child-exit",
+        "phase": "worker-startup",
+        "progress": "lease-parent-open-denied",
+        "exitCode": 2,
+        "signal": null,
+        "spawnCode": null
+      }
+    },
+    "ordinaryOwnerChecks": 8,
+    "restrictedMetadataChecks": 13,
+    "restrictedNativeExchangeChecks": 31,
+    "finding": "The exact fixed label lease-parent-open-denied is emitted only when OpenProcess returns Access Denied (5). The original restricted owner remains zero of eight checks."
+  },
+  "change": [
+    "Version 2 binds worker lifetime to its existing inherited input pipe, replacing the denied parent-process lookup. Version 1 and caller-supplied PIDs are not a supported owner mode.",
+    "One reader polls available pipe bytes before each read. Idle, partial frames, held leases and contended acquisition all observe EOF without another thread blocking the input handle. Regular-file standard input refuses.",
+    "The original normal Node spawn/Job, token restrictions, query-only token ACL, canonical path and pinned-file identity, exclusive sharing, sequenced release, bounded pool and acquisition deadline remain. No process/token access is added.",
+    "The malformed-release and replaced-file native fixtures now keep their writer open through the relevant file/release assertion, so early EOF cannot mask those checks. Additional native cases require EOF exit within 1500ms and successful reacquisition after release."
+  ],
+  "managed": {
+    "receipt": "lease-pipe-owner-managed-1793971990654.json",
+    "builds": [
+      {
+        "name": "helper",
+        "warnings": 0,
+        "errors": 0,
+        "managedAssemblySha256": "cfaaa22742558bcd62828284e2af74cecdec356c6571171757ae37dd69f2b5ad",
+        "managedPeSubsystem": 2
+      },
+      {
+        "name": "proof",
+        "warnings": 0,
+        "errors": 0,
+        "managedAssemblySha256": "9a0132c16b55746697a4b4d5c76ff13fcd97575cfbe026d2eb29f8943b77c700",
+        "managedPeSubsystem": 3
+      }
+    ],
+    "portableChecks": 2006,
+    "stateLeaseProtocolChecks": 50,
+    "stateLockFailureChecks": 40,
+    "ownedCleanup": {
+      "files": 124,
+      "bytes": 3199413,
+      "removed": true
+    },
+    "noDownloads": true
+  },
+  "isolated": {
+    "receipt": "isolated-test-07992b96-43c6-49a1-9904-a4b09aa96761.json",
+    "totals": {
+      "required": 5,
+      "passed": 5,
+      "failed": 0,
+      "tests": 54,
+      "passedTests": 53,
+      "failedTests": 0,
+      "skippedTests": 1,
+      "cancelledTests": 0,
+      "todoTests": 0
+    },
+    "allChildAndTreeCleanupVerified": true
+  },
+  "typecheckPassed": true,
+  "nativeAcceptance": false,
+  "limits": [
+    "Portable checks exercise the bounded reader with controlled ports; they do not establish Windows PeekNamedPipe behavior.",
+    "New ordinary/restricted native EOF, crash, original owner and cleanup journeys must pass before accepting this protocol.",
+    "No installed runtime, frontend, hardware, account, model or native task operation ran locally."
+  ]
+}

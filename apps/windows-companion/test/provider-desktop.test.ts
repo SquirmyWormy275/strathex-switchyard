@@ -4,6 +4,7 @@ import { mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
+import { DurableProviderDesktopEffectLedger } from "../src/provider-desktop-effects.ts";
 
 import { ProtectedJsonStore, type JournalAuthenticator } from "../../../packages/control-plane/src/store.ts";
 import {
@@ -161,7 +162,7 @@ test("normal desktop action focuses one exact running instance and never launche
   const installed = await setup.registry.install("claude_desktop");
   const port = new FakeProcessPort();
   port.observations = [{
-    processId: 777,
+    processId: 777, processStartTime: "133000000000000001",
     windowId: "window:777",
     isForeground: true,
     identity: installed.identity
@@ -205,8 +206,8 @@ test("normal desktop presses focus the last-used surface and then cycle every ex
     now: () => new Date(at)
   });
 
-  const first = { processId: 1, windowId: "one", isForeground: false, identity: installed.identity };
-  const second = { processId: 2, windowId: "two", isForeground: false, identity: installed.identity };
+  const first = { processId: 1, processStartTime: "133000000000000001", windowId: "one", isForeground: false, identity: installed.identity };
+  const second = { processId: 2, processStartTime: "133000000000000002", windowId: "two", isForeground: false, identity: installed.identity };
   port.observations = [first, second];
   const focusedLastUsed = await lifecycle.open({ provider: "claude_desktop", mode: "normal", operationId: "focus-last-used", control: control() });
   assert.equal(focusedLastUsed.status, "completed");
@@ -231,12 +232,20 @@ test("identity-mismatched running provider processes fail unavailable", async (c
     effectGuard: new RecordingGuard(),
     now: () => new Date(at)
   });
-  const exact = { processId: 1, windowId: "one", isForeground: false, identity: installed.identity };
+  const exact = { processId: 1, processStartTime: "133000000000000001", windowId: "one", isForeground: false, identity: installed.identity };
 
   port.observations = [{ ...exact, identity: { ...installed.identity, executableSha256: "0".repeat(64) } }];
   assert.equal((await lifecycle.open({ provider: "claude_desktop", mode: "normal", operationId: "mismatch", control: control() })).status, "unavailable");
   assert.equal(port.effects.filter((event) => event.startsWith("focus")).length, 0);
   assert.equal(port.effects.filter((event) => event.startsWith("launch")).length, 0);
+  for (const processStartTime of [undefined, 133000000000000001, "0", "01", "18446744073709551616"]) {
+    port.observations = [{ ...exact, processStartTime } as ProviderDesktopProcessObservation];
+    assert.equal((await lifecycle.open({ provider: "claude_desktop", mode: "normal", operationId: "invalid-birth", control: control() })).status, "unavailable");
+  }
+  assert.equal(port.effects.filter(event => event.startsWith("focus") || event.startsWith("launch")).length, 0);
+  port.observations = [exact];
+  port.focusExisting = async () => ({ processId: exact.processId + 1 });
+  assert.equal((await lifecycle.open({ provider: "claude_desktop", mode: "normal", operationId: "changed-result", control: control() })).status, "failed");
 });
 
 test("final guard and final executable recheck happen inside the process side-effect boundary", async (context) => {
@@ -257,6 +266,28 @@ test("final guard and final executable recheck happen inside the process side-ef
   const changed = await lifecycle.open({ provider: "claude_desktop", mode: "fresh", operationId: "late-identity", control: control() });
   assert.equal(changed.status, "unavailable");
   assert.deepEqual(port.effects, ["launch-requested:--new-window"]);
+});
+
+test("cancellation-read failure after native authorization remains durably ambiguous", async (context) => {
+  const setup = await fixture(context), installed = await setup.registry.install("claude_desktop"), ledger = new DurableProviderDesktopEffectLedger(setup.store);
+  for (const mode of ["normal", "fresh"] as const) {
+    const port = new FakeProcessPort(); let effected = false;
+    port.observations = [{ processId: 4242, processStartTime: "133000000000000001", windowId: "window:4242", isForeground: true, identity: installed.identity }];
+    const stallAfterEffect = async (request: ProviderProcessEffectRequest): Promise<never> => {
+      await request.beforeEffect(); effected = true;
+      return new Promise((_resolve, reject) => { request.signal.addEventListener("abort", () => reject(request.signal.reason), { once: true }); });
+    };
+    port.focusExisting = stallAfterEffect; port.launch = stallAfterEffect;
+    const lifecycle = new InstalledProviderDesktopLifecycle({ registry: setup.registry, processes: port, effectGuard: new RecordingGuard(), now: () => new Date(at) });
+    const binding = { operationId: "uncertain-native-" + mode, action: mode === "normal" ? "open_claude" : "fresh_claude", provider: "claude_desktop", mode } as const;
+    await ledger.begin(binding);
+    const result = await lifecycle.open({ ...binding, control: control({ async isCancellationRequested() { if (effected) throw Error("synthetic journal read failure"); return false; } }) });
+    assert.equal(effected, true); assert.equal(result.status, "failed");
+    await ledger.settle(binding, result);
+    const restarted = new DurableProviderDesktopEffectLedger(setup.store), observation = await restarted.observeOperation(binding.operationId, binding.action);
+    assert.equal(observation.outcome, "unresolved"); assert.equal(observation.details?.manualReconciliation, "required");
+    await assert.rejects(restarted.begin(binding), /settled.*cannot be replayed/);
+  }
 });
 
 test("deadline and cancellation fail before any desktop side effect", async (context) => {

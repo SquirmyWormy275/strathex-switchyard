@@ -1,0 +1,68 @@
+{
+  "schema": "switchyard-private-pipe-readback-source/v1",
+  "basis": "25f07e94c8b7c9d0978ee57253aef82353f01ccb",
+  "sourceSha256": {
+    ".github/workflows/switchyard-windows-filesystem.yml": "3b2dafb88d48e569ad7af0a9e3cd70a8d05fc12c0628937f5709729bb630cf8e",
+    "apps/desktop-hotkeys/RuntimePrivatePipeSecurity.cs": "23c489ab262dd01d45f452878f8ba1feb6065b0ed7a1e8546622e0c33f5d7caf",
+    "deployment/windows/test-support/storage-broker-protocol/Program.cs": "694ac8a634d2fa09f048c362148b9839a51d15ce3dac55993a21661d956c3ec5",
+    "deployment/windows/test-support/storage-broker-protocol/RuntimePrivatePipeProof.cs": "b6190b704a37b571af2e4168dd329d9d5efad44b1a88c266ed7c15d0ce2cde70",
+    "scripts/verify-windows-native-setup.mjs": "87f67aff4df7f23a4b6a43dc3371e230abad93b84939a14a99ac1476cd795ffd",
+    "scripts/windows-scenario-groups.test.mjs": "7bb7e813e875998ffe12abe4b7b0e081bd578fafed1daed2d712d26b8ae0c86a"
+  },
+  "focused": {
+    "receipt": "isolated-test-39b3d427-04cc-42bd-927d-8371c7c7a77f.json",
+    "totals": {
+      "required": 3,
+      "passed": 3,
+      "failed": 0,
+      "tests": 40,
+      "passedTests": 35,
+      "failedTests": 0,
+      "skippedTests": 5,
+      "cancelledTests": 0,
+      "todoTests": 0
+    },
+    "allChildAndTreeCleanupVerified": true
+  },
+  "managed": {
+    "receipt": "private-pipe-readback-managed-1793986262082.json",
+    "builds": [
+      {
+        "name": "helper",
+        "warnings": 0,
+        "errors": 0,
+        "managedAssemblySha256": "9b34fc49fc1d11ca5211e1c2e28cfecedd75750cdae29ce07e90293b29c64d34",
+        "managedPeSubsystem": 2
+      },
+      {
+        "name": "proof",
+        "warnings": 0,
+        "errors": 0,
+        "managedAssemblySha256": "052a33366922ba5018d29c9a7960dd7879fd8c4ca48b0c2483b996b9971c4305",
+        "managedPeSubsystem": 3
+      }
+    ],
+    "portableChecks": 2101,
+    "cleanup": {
+      "files": 149,
+      "bytes": 3369822,
+      "removed": true
+    }
+  },
+  "typecheckPassed": true,
+  "readbackIncludesSidOrPath": false,
+  "existingPreflightFailureStillFailsJob": true,
+  "requiredNativePipeChecks": 36,
+  "nativeAcceptance": false,
+  "originalOwnerAcceptedChecks": 0,
+  "permissionChange": false,
+  "installedChanged": false,
+  "packagingFollowup": {
+    "sourceCommit": "25f07e94c8b7c9d0978ee57253aef82353f01ccb",
+    "receipt": "isolated-test-f1657c7e-fa5f-468a-9169-7ca82f2f55c6.json",
+    "passedGroups": 3,
+    "passedTests": 18,
+    "skippedTests": 0,
+    "allChildAndTreeCleanupVerified": true
+  }
+}

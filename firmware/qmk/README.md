@@ -2,6 +2,8 @@
 
 This tree contains the complete hardware-independent firmware and transport source. Firmware emits bounded intent signals only. It cannot execute a host action and has no process, shell, filesystem, Git, credential, provider, or network interface.
 
+**Ordinary keyboard requirement:** this repository's 22-control `keymap.c` is a logical overlay, not the full B122 typing matrix. Before a physical flash, integrate the controls into a backed-up, verified complete base keymap. Ordinary USB HID typing must work on an unconfigured Windows host with no companion, Raw HID handshake, account, custom driver, or per-machine setup. `process_record_user` passes non-B122 keycodes through to QMK; B122 intent keys have no ordinary typing fallback and must remain inert without an authorized host. The no-companion, full-matrix behavior remains a physical acceptance gate.
+
 ## Canonical map and framing
 
 `packages/protocol/src/b122.ts` exports the one canonical machine-readable map: 22 controls, 65 settled assignments, and intentionally absent assignments for all other chord slots. `packages/protocol/scripts/generate-manifest.mjs` SHA-256 hashes its canonical JSON and generates both the package JSON and `b122_manifest.h`. The current map SHA-256 is:
@@ -43,13 +45,13 @@ Create a self-contained keymap overlay:
 ./firmware/package-qmk.ps1 -OutputDirectory C:\safe\output
 ```
 
-After inspecting the exact keyboard name and matrix in a Vial-QMK checkout, compile the overlay:
+After inspecting the exact keyboard and preserving its factory keymap, integrate the B122 signal code into a full typing keymap. Compile that reviewed keymap:
 
 ```powershell
-./firmware/build-qmk.ps1 -QmkRoot C:\src\vial-qmk -Keyboard <exact-inspected-keyboard>
+./firmware/build-qmk.ps1 -QmkRoot C:\src\vial-qmk -Keyboard <exact-inspected-keyboard> -ReviewedFullTypingKeymap C:\safe\reviewed-full-keymap.c
 ```
 
-`B122_LAYOUT` is deliberately not guessed. The included Vial definition is a logical 1x22 validation/package definition; its coordinates must be replaced with the inspected physical matrix. The Vial unlock chord must also be selected on the real matrix before flashing.
+The build script rejects the repository's 22-control overlay as its input and checks that the supplied full keymap contains the B122 integration. It cannot prove the matrix is complete: that requires source review and physical testing. `B122_LAYOUT` is deliberately not guessed. The included Vial definition is a logical 1x22 validation/package definition; its coordinates must be replaced with the inspected physical matrix. The Vial unlock chord must also be selected on the real matrix before flashing.
 
 ## Windows Raw HID helper
 

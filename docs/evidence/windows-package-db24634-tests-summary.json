@@ -1,0 +1,414 @@
+{
+  "schema": "switchyard-windows-package-test-acceptance/v1",
+  "sourceCommit": "db2463431cff362ce3ef0ab47ffe3c74080b4745",
+  "mergeCommit": "27067de5c888a91dae28069f724abad672dec27c",
+  "sourceTree": "f41fcffeb284bd7cdcdf8a14ee30d4876bbe2d29",
+  "workflowRunId": 42462775807,
+  "jobId": 128695124989,
+  "workflowConclusion": "failure",
+  "artifact": {
+    "id": 13614766671,
+    "archiveBytes": 53322,
+    "archiveSha256": "f685b6e0fc8929bd0bd8abff7ccdd15c4435372acdb33bfa6f76082eb2a18faf"
+  },
+  "receiptId": "55b07028-1f80-40f7-8bf8-4b1c2a94cf0a",
+  "receiptSha256": "b6d5cdb8da7def1e73a2150fbae62a80ab1f32c891a02142ad08802170f698c0",
+  "receiptBytes": 710587,
+  "startedAt": "2026-11-08T09:59:03.174Z",
+  "endedAt": "2026-11-08T10:56:46.612Z",
+  "elapsedMs": 3463438,
+  "execution": {
+    "scheduling": "windows-pairs",
+    "maxConcurrentChildren": 2,
+    "buildDependenciesOrdered": true,
+    "observedMaxConcurrentChildren": 2,
+    "buildOrderingVerified": true
+  },
+  "totals": {
+    "required": 462,
+    "passed": 462,
+    "failed": 0,
+    "tests": 3156,
+    "passedTests": 2910,
+    "failedTests": 0,
+    "skippedTests": 246,
+    "cancelledTests": 0,
+    "todoTests": 0
+  },
+  "originalManifestCommandsBoundsSkipsAndCleanupVerified": true,
+  "manifestSha256": "816705b539568c61f30db61b9ce9e6eabd181197b59523483ee2558bf286d8f5",
+  "failures": [],
+  "declaredSkips": [
+    {
+      "file": "scripts/install-workflow-shortcut.test.mjs",
+      "pattern": null,
+      "count": 2
+    },
+    {
+      "file": "scripts/codex-daemon-status.test.mjs",
+      "pattern": null,
+      "count": 2
+    },
+    {
+      "file": "tools/layout-studio/configuration.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/repository-effects.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/repository-recovery.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/repository-commits.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/repository-execution-supervisor.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/repository-shield-exceptions.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/repository-receipt-authority.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/repository-validation-policy.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/linux-namespace-budget.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/linux-temporary-workspace.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/repository-temporary-build.test.mjs",
+      "pattern": null,
+      "count": 2
+    },
+    {
+      "file": "tools/layout-studio/repository-execution.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/repository-shield-cargo-archives.test.mjs",
+      "pattern": null,
+      "count": 2
+    },
+    {
+      "file": "tools/layout-studio/repository-shield-cargo.test.mjs",
+      "pattern": null,
+      "count": 4
+    },
+    {
+      "file": "tools/layout-studio/repository-shield-python-records.test.mjs",
+      "pattern": null,
+      "count": 2
+    },
+    {
+      "file": "tools/layout-studio/repository-shield-python-wheels.test.mjs",
+      "pattern": null,
+      "count": 2
+    },
+    {
+      "file": "tools/layout-studio/repository-shield-index.test.mjs",
+      "pattern": null,
+      "count": 3
+    },
+    {
+      "file": "tools/layout-studio/repository-shield-history.test.mjs",
+      "pattern": null,
+      "count": 3
+    },
+    {
+      "file": "tools/layout-studio/repository-shield-osv-source.test.mjs",
+      "pattern": null,
+      "count": 8
+    },
+    {
+      "file": "tools/layout-studio/repository-shield-pypi.test.mjs",
+      "pattern": null,
+      "count": 6
+    },
+    {
+      "file": "tools/layout-studio/repository-shield-licenses.test.mjs",
+      "pattern": null,
+      "count": 2
+    },
+    {
+      "file": "tools/layout-studio/scanner-review.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/scanner-index-review.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/scanner-history-review.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/scanner-mixed-review.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/scanner-recipe-draft.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/scanner-recipe-save.test.mjs",
+      "pattern": null,
+      "count": 22
+    },
+    {
+      "file": "tools/layout-studio/task-history-inputs.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/task-index-inputs.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/repository-shield-ignored-trees.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/repository-shield-artifacts.test.mjs",
+      "pattern": null,
+      "count": 2
+    },
+    {
+      "file": "tools/layout-studio/repository-shield-npm-archives.test.mjs",
+      "pattern": null,
+      "count": 2
+    },
+    {
+      "file": "tools/layout-studio/repository-shield-cargo-artifacts.test.mjs",
+      "pattern": null,
+      "count": 2
+    },
+    {
+      "file": "tools/layout-studio/repository-shield-pypi-artifacts.test.mjs",
+      "pattern": null,
+      "count": 2
+    },
+    {
+      "file": "tools/layout-studio/repository-shield-workspaces.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/repository-shield.test.mjs",
+      "pattern": null,
+      "count": 2
+    },
+    {
+      "file": "tools/layout-studio/repository-pipeline.test.mjs",
+      "pattern": null,
+      "count": 5
+    },
+    {
+      "file": "tools/layout-studio/repository-pipeline-fixtures.test.mjs",
+      "pattern": null,
+      "count": 2
+    },
+    {
+      "file": "tools/layout-studio/repository-ignored-scanner-inputs.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/state-lock.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/runtime.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/runtime-command.test.mjs",
+      "pattern": null,
+      "count": 15
+    },
+    {
+      "file": "tools/layout-studio/runtime-command-suspended.test.mjs",
+      "pattern": null,
+      "count": 5
+    },
+    {
+      "file": "tools/layout-studio/coding-editor-connections.test.mjs",
+      "pattern": null,
+      "count": 10
+    },
+    {
+      "file": "tools/layout-studio/codex-editor-recovery.test.mjs",
+      "pattern": null,
+      "count": 3
+    },
+    {
+      "file": "tools/layout-studio/coding-task-owners.test.mjs",
+      "pattern": "protected task registry composes the actual owned Unix listener and bridge while the provider is a controlled double",
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/coding-task-owners.test.mjs",
+      "pattern": "the editor client authenticates the real Studio route and reads original protected target metadata without another native effect",
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/codex-unix-tasks.test.mjs",
+      "pattern": null,
+      "count": 6
+    },
+    {
+      "file": "tools/layout-studio/codex-editor-ingress.test.mjs",
+      "pattern": null,
+      "count": 13
+    },
+    {
+      "file": "tools/layout-studio/codex-editor-ingress-owner.test.mjs",
+      "pattern": null,
+      "count": 9
+    },
+    {
+      "file": "tools/layout-studio/codex-unix-transport.test.mjs",
+      "pattern": null,
+      "count": 6
+    },
+    {
+      "file": "tools/layout-studio/codex-owned-listener.test.mjs",
+      "pattern": null,
+      "count": 13
+    },
+    {
+      "file": "tools/layout-studio/owned-process.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "packages/control-plane/test/git-inspector.test.ts",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "apps/windows-companion/test/authenticated-pipe.test.ts",
+      "pattern": null,
+      "count": 2
+    },
+    {
+      "file": "apps/vscode-extension/test/controller.test.ts",
+      "pattern": null,
+      "count": 3
+    },
+    {
+      "file": "apps/vscode-extension/test/named-pipe-transport.test.ts",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "apps/vscode-extension/test/studio-task-client.test.ts",
+      "pattern": null,
+      "count": 12
+    },
+    {
+      "file": "apps/vscode-extension/test/studio-editor-launch.test.ts",
+      "pattern": null,
+      "count": 22
+    },
+    {
+      "file": "apps/vscode-extension/test/studio-terminal-process.test.ts",
+      "pattern": null,
+      "count": 5
+    },
+    {
+      "file": "apps/vscode-extension/test/studio-editor-session.test.ts",
+      "pattern": null,
+      "count": 2
+    },
+    {
+      "file": "apps/linux-companion/test/linux-isolation.test.ts",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "apps/linux-companion/test/linux-lifecycle.test.ts",
+      "pattern": null,
+      "count": 2
+    },
+    {
+      "file": "apps/linux-companion/test/linux-user-presence.test.ts",
+      "pattern": null,
+      "count": 2
+    },
+    {
+      "file": "apps/linux-companion/test/linux-process-supervisor.test.ts",
+      "pattern": null,
+      "count": 3
+    },
+    {
+      "file": "apps/linux-companion/test/linux-repository-runtime.test.ts",
+      "pattern": null,
+      "count": 6
+    },
+    {
+      "file": "apps/provider-adapter-host/test/linux-path-security.test.ts",
+      "pattern": null,
+      "count": 1
+    }
+  ],
+  "testStageAccepted": true,
+  "nativeHelperBuild": {
+    "accepted": false,
+    "stage": "standalone provider-desktop helper publish",
+    "diagnostic": "CA1416",
+    "file": "apps/windows-companion/provider-desktop-helper/EditorEndpoint.cs",
+    "method": "EditorEndpointSecurity"
+  },
+  "preliminaryInfrastructureFailures": [
+    {
+      "jobId": 128691327134,
+      "shard": 3,
+      "status": "HTTP 504 before tests; no receipt"
+    },
+    {
+      "jobId": 128691327237,
+      "shard": 5,
+      "status": "HTTP 504 before tests; no receipt"
+    }
+  ],
+  "packageAcceptance": false,
+  "limitations": [
+    "All 462 test groups pass, including the corrected native provider and explicit canonical-helper alias refusal. The release subsequently fails standalone provider-helper compilation, so this is test-stage acceptance only.",
+    "Two preliminary backend jobs hit GitHub HTTP 504 before tests and have no receipts; they are not accepted or replaced by the later full-package test receipt.",
+    "The compiler correction requires its own source/native verification. No interactive Windows, provider/account or hardware acceptance is claimed."
+  ]
+}

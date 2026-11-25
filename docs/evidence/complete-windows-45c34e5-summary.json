@@ -1,0 +1,1164 @@
+{
+  "schema": "switchyard-complete-windows-source-followup/v1",
+  "sourceCommit": "45c34e555a16c8946e07176df30c2a0ea4971767",
+  "mergeCommit": "74db0b806e5f03758e733164b0147cb997c9f6fc",
+  "sourceTree": "3427fdaa7b00b9266953d9ac9e025f5f78495204",
+  "runId": 42394713035,
+  "scope": {
+    "platform": "win32",
+    "sourceCommit": "74db0b806e5f03758e733164b0147cb997c9f6fc",
+    "sourceTree": "3427fdaa7b00b9266953d9ac9e025f5f78495204",
+    "nodeVersion": "24.14.0",
+    "nodeExecutable": "C:\\hostedtoolcache\\windows\\node\\24.14.0\\x64\\node.exe",
+    "nodeSha256": "63c259c81e5d472b5f11c8d506070130cb04a1ecf84b80377a34ed6ec9048088",
+    "pythonVersion": "3.13.3",
+    "pythonExecutable": "C:\\hostedtoolcache\\windows\\Python\\3.13.3\\x64\\python.exe",
+    "pythonSha256": "d87063e5597f257004c731b66c59c56c91038861c6877b1a3dca6b8c4e919125",
+    "helperSha256": "36232f3520db66de67f6eae83494c5b2d5ad93bd1e14c676d3e9133a3e16961e",
+    "dotnetManifestSha256": "9387431f821c8af70705752e6d8a9d16ec88e374167bd415c742db3a319c0387"
+  },
+  "completeOriginalReceiptSetVerified": true,
+  "pinnedSourceManifestReconstruction": {
+    "unchangedRunnerSchedulerCostsAndToolchainVerified": true,
+    "onlyLaterManifestAdditionsExcluded": [
+      "saved project inventory uses the selected protected owners without native inspection or authority",
+      "project inventory groups distinct acknowledged tasks and refuses ambiguous saved loads"
+    ],
+    "npmCliFromPinnedWindowsNodeDirectory": true
+  },
+  "workflowCollectorAcceptance": "passed",
+  "manifestSha256": "ba1ea522f1b55c591f4a8008c32c6e22d1c52e448a7b5712c945be77b7b569c2",
+  "totals": {
+    "required": 460,
+    "passed": 460,
+    "failed": 0,
+    "tests": 3145,
+    "passedTests": 2899,
+    "failedTests": 0,
+    "skippedTests": 246,
+    "cancelledTests": 0,
+    "todoTests": 0
+  },
+  "cohorts": [
+    {
+      "shard": "1",
+      "receiptId": "69790f36-1178-4452-b56c-c22fcaeaef83",
+      "receiptSha256": "64fb243ddce64a8aa3d0e5c6fc814cb61a658d1de965b6b753a49442ecb62bd4",
+      "totals": {
+        "required": 21,
+        "passed": 21,
+        "failed": 0,
+        "tests": 172,
+        "passedTests": 166,
+        "failedTests": 0,
+        "skippedTests": 6,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "shard": "2",
+      "receiptId": "145c99db-9862-47af-86b4-d29c3a5e18d6",
+      "receiptSha256": "cccc72efad7456983e71dcbbe85c9986bad9f62378f7d0010605e41a5ea186be",
+      "totals": {
+        "required": 21,
+        "passed": 21,
+        "failed": 0,
+        "tests": 107,
+        "passedTests": 101,
+        "failedTests": 0,
+        "skippedTests": 6,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "shard": "3",
+      "receiptId": "3600857d-8b89-42d7-94cd-d237485e84bd",
+      "receiptSha256": "4ccbbea682dfa0129b6f742621b9d676897ade3043dfffc9824f554910fdc245",
+      "totals": {
+        "required": 21,
+        "passed": 21,
+        "failed": 0,
+        "tests": 144,
+        "passedTests": 96,
+        "failedTests": 0,
+        "skippedTests": 48,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "shard": "4",
+      "receiptId": "00415826-f043-4b09-80e5-cbc1421c81e4",
+      "receiptSha256": "6163a34c5e9279dea07749a0724bea01fb0fd9127b5de8445da6497e13e64d66",
+      "totals": {
+        "required": 22,
+        "passed": 22,
+        "failed": 0,
+        "tests": 182,
+        "passedTests": 155,
+        "failedTests": 0,
+        "skippedTests": 27,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "shard": "5",
+      "receiptId": "bc07ba0c-6cc2-4f68-8df9-a94c453aec65",
+      "receiptSha256": "47c1bbe47d7b731695fe75a9237b380d315303cb44a27b034443b15519a7b8ca",
+      "totals": {
+        "required": 22,
+        "passed": 22,
+        "failed": 0,
+        "tests": 151,
+        "passedTests": 146,
+        "failedTests": 0,
+        "skippedTests": 5,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "shard": "6",
+      "receiptId": "4da05250-ab9e-48ac-84d9-c655c16cb052",
+      "receiptSha256": "3de01b75e512132de0da7894d4bfa7ee36695dd957f57b373c5764bb5d116399",
+      "totals": {
+        "required": 22,
+        "passed": 22,
+        "failed": 0,
+        "tests": 149,
+        "passedTests": 124,
+        "failedTests": 0,
+        "skippedTests": 25,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "shard": "7",
+      "receiptId": "9a0fb9c4-4081-4641-a160-d709a552262d",
+      "receiptSha256": "07fc901c5a2c300cf5c59f379184cab7f7bd9d6f2124ec2578f9f6e3a49b6f91",
+      "totals": {
+        "required": 20,
+        "passed": 20,
+        "failed": 0,
+        "tests": 241,
+        "passedTests": 233,
+        "failedTests": 0,
+        "skippedTests": 8,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "shard": "8",
+      "receiptId": "53c40bf0-1530-42a9-8a2d-5091698d08d7",
+      "receiptSha256": "4afe610c89a941f09ad9631d7a43fc2ad9bf660a12307b86a067d520cfbacf1e",
+      "totals": {
+        "required": 22,
+        "passed": 22,
+        "failed": 0,
+        "tests": 186,
+        "passedTests": 176,
+        "failedTests": 0,
+        "skippedTests": 10,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "shard": "9",
+      "receiptId": "d58457c9-75a0-43ff-88fc-e02f0cee6e07",
+      "receiptSha256": "45fe0de950186b57ae41832e26b2d41b7fa7677d746551b95aabf51516fbfd8d",
+      "totals": {
+        "required": 22,
+        "passed": 22,
+        "failed": 0,
+        "tests": 99,
+        "passedTests": 87,
+        "failedTests": 0,
+        "skippedTests": 12,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "shard": "10",
+      "receiptId": "8f6e8acf-177a-44cf-a87d-672a16503c6b",
+      "receiptSha256": "8c2107007c4cd5b88caf920448588778f556a480f1a23d389b0c471bc81f293c",
+      "totals": {
+        "required": 20,
+        "passed": 20,
+        "failed": 0,
+        "tests": 130,
+        "passedTests": 123,
+        "failedTests": 0,
+        "skippedTests": 7,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "shard": "11",
+      "receiptId": "b7064b48-2d23-4889-8b89-4ceacd561850",
+      "receiptSha256": "b137a80caed5562fbcc2b425f0d4fb2b402c234bc1fa7557ec1b03cf05c74238",
+      "totals": {
+        "required": 23,
+        "passed": 23,
+        "failed": 0,
+        "tests": 97,
+        "passedTests": 92,
+        "failedTests": 0,
+        "skippedTests": 5,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "shard": "12",
+      "receiptId": "da0c65a8-8c8e-4d93-9144-ea40da4d3ec9",
+      "receiptSha256": "45c38adde206b341f55a5bbd5e3465381a240dafc3c5297270901af6903bc034",
+      "totals": {
+        "required": 22,
+        "passed": 22,
+        "failed": 0,
+        "tests": 173,
+        "passedTests": 170,
+        "failedTests": 0,
+        "skippedTests": 3,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "shard": "13",
+      "receiptId": "d077dd06-c15e-4ee9-a74e-f5405cbe8754",
+      "receiptSha256": "f51b514659e9b69a10609259f45e7b44e98dbcef2c00c40b67939e68f8defd0b",
+      "totals": {
+        "required": 23,
+        "passed": 23,
+        "failed": 0,
+        "tests": 185,
+        "passedTests": 177,
+        "failedTests": 0,
+        "skippedTests": 8,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "shard": "14",
+      "receiptId": "6323714f-6daa-4adc-8be1-1ff3c31ddb61",
+      "receiptSha256": "63fefe24f28fd4c3c0993c87ec76fcce743be51b3fb0059a339f5f235746c1c4",
+      "totals": {
+        "required": 23,
+        "passed": 23,
+        "failed": 0,
+        "tests": 117,
+        "passedTests": 108,
+        "failedTests": 0,
+        "skippedTests": 9,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "shard": "15",
+      "receiptId": "aa3516c9-fa4d-4b70-9d97-8302544b5d9f",
+      "receiptSha256": "c67accefc64c832d70925949ed0ac52ace0d63add60a5e44b4e350efb50967c0",
+      "totals": {
+        "required": 23,
+        "passed": 23,
+        "failed": 0,
+        "tests": 172,
+        "passedTests": 170,
+        "failedTests": 0,
+        "skippedTests": 2,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "shard": "16",
+      "receiptId": "00ed6486-e4a2-4910-8ca9-26da29d42aa2",
+      "receiptSha256": "ed123a729e0a82206dbc7ea3be535a585c67fde19fafc4c26e10cee0e4fe9635",
+      "totals": {
+        "required": 24,
+        "passed": 24,
+        "failed": 0,
+        "tests": 157,
+        "passedTests": 153,
+        "failedTests": 0,
+        "skippedTests": 4,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "shard": "17",
+      "receiptId": "1051b651-899b-457e-bc39-43d6f97f55e0",
+      "receiptSha256": "6bc60e6bda5ecb3420d423cdb0b09a287a9610187e0676f48552e3896eaedd30",
+      "totals": {
+        "required": 24,
+        "passed": 24,
+        "failed": 0,
+        "tests": 152,
+        "passedTests": 144,
+        "failedTests": 0,
+        "skippedTests": 8,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "shard": "18",
+      "receiptId": "86616569-9866-49a6-af49-801d5e42713c",
+      "receiptSha256": "0e829bb79a223903ba9e909ed22041833adf6eb24b385b2723c9fa437dd205a1",
+      "totals": {
+        "required": 24,
+        "passed": 24,
+        "failed": 0,
+        "tests": 138,
+        "passedTests": 118,
+        "failedTests": 0,
+        "skippedTests": 20,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "shard": "19",
+      "receiptId": "a694b0a9-bfdc-4208-bcb0-4b64fb51c7d1",
+      "receiptSha256": "a2cf63858868a3379f3bf6ac69c9c0cf67f00e6ddb79fd243b5bef30e13d4c51",
+      "totals": {
+        "required": 24,
+        "passed": 24,
+        "failed": 0,
+        "tests": 207,
+        "passedTests": 178,
+        "failedTests": 0,
+        "skippedTests": 29,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "shard": "20",
+      "receiptId": "0ae80395-81f9-4bcc-97ac-c4a9ae1db770",
+      "receiptSha256": "db88966f5c7da28e0a7cc5149c5cb0023aa5393c922255f6255591c2f82998b6",
+      "totals": {
+        "required": 24,
+        "passed": 24,
+        "failed": 0,
+        "tests": 174,
+        "passedTests": 170,
+        "failedTests": 0,
+        "skippedTests": 4,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "shard": "assembly",
+      "receiptId": "16f259f3-e1b4-4681-91a5-4a02b5a48dce",
+      "receiptSha256": "b3fe686511566d3ceebd0f25b0ab27d107a5f8c18e724f1fea2e56dcc38a961e",
+      "totals": {
+        "required": 13,
+        "passed": 13,
+        "failed": 0,
+        "tests": 12,
+        "passedTests": 12,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    }
+  ],
+  "artifacts": [
+    {
+      "artifactId": 13583656594,
+      "shard": "5",
+      "zipBytes": 4142,
+      "zipSha256": "c3b1957c4926dd145d8916aa147094c838d2a5c606375629b5e1ef2727defded",
+      "envelopeSha256": "24f126412f9826368282178e04d96f730c6dbd4f6a24ccf3d578fde96ba9de19",
+      "receiptSha256": "47c1bbe47d7b731695fe75a9237b380d315303cb44a27b034443b15519a7b8ca",
+      "receiptId": "bc07ba0c-6cc2-4f68-8df9-a94c453aec65",
+      "totals": {
+        "required": 22,
+        "passed": 22,
+        "failed": 0,
+        "tests": 151,
+        "passedTests": 146,
+        "failedTests": 0,
+        "skippedTests": 5,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "artifactId": 13583620831,
+      "shard": "12",
+      "zipBytes": 3965,
+      "zipSha256": "b95cf313acdf76730024783991d735eca2bb1ecbac71b2bfd0599d3dbdcabc87",
+      "envelopeSha256": "9bc9a3f00fadc3d61039da709634bbae0bb0f25f8a32bda9a55aecb26a027b64",
+      "receiptSha256": "45c38adde206b341f55a5bbd5e3465381a240dafc3c5297270901af6903bc034",
+      "receiptId": "da0c65a8-8c8e-4d93-9144-ea40da4d3ec9",
+      "totals": {
+        "required": 22,
+        "passed": 22,
+        "failed": 0,
+        "tests": 173,
+        "passedTests": 170,
+        "failedTests": 0,
+        "skippedTests": 3,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "artifactId": 13583541295,
+      "shard": "19",
+      "zipBytes": 4374,
+      "zipSha256": "7f8690ed211ad78b725a054f26601140e60bd4d65d258f9e3a84f8e9ddf0c77f",
+      "envelopeSha256": "1fe0f04531703afdc1b64c929837cd3a84160b8155363fc317aa6cce4e20e335",
+      "receiptSha256": "a2cf63858868a3379f3bf6ac69c9c0cf67f00e6ddb79fd243b5bef30e13d4c51",
+      "receiptId": "a694b0a9-bfdc-4208-bcb0-4b64fb51c7d1",
+      "totals": {
+        "required": 24,
+        "passed": 24,
+        "failed": 0,
+        "tests": 207,
+        "passedTests": 178,
+        "failedTests": 0,
+        "skippedTests": 29,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "artifactId": 13583511815,
+      "shard": "15",
+      "zipBytes": 4236,
+      "zipSha256": "261d5d044e512f7182c475e7fcb885b3661c9d9ecb24d74e6c355b1def3c6f27",
+      "envelopeSha256": "d0fe603be8ed7cb2f32844e617353669628f073513a37f646bfdbaf5685e4a02",
+      "receiptSha256": "c67accefc64c832d70925949ed0ac52ace0d63add60a5e44b4e350efb50967c0",
+      "receiptId": "aa3516c9-fa4d-4b70-9d97-8302544b5d9f",
+      "totals": {
+        "required": 23,
+        "passed": 23,
+        "failed": 0,
+        "tests": 172,
+        "passedTests": 170,
+        "failedTests": 0,
+        "skippedTests": 2,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "artifactId": 13583501280,
+      "shard": "14",
+      "zipBytes": 4347,
+      "zipSha256": "13a8aafa5277a5e29caadd38a649a2e3ac071590db9b76328812d2ed87e77f49",
+      "envelopeSha256": "0cdda5dc8f0d21e30b5009e100268c09f5c337e32b8641bce809a98899b83d38",
+      "receiptSha256": "63fefe24f28fd4c3c0993c87ec76fcce743be51b3fb0059a339f5f235746c1c4",
+      "receiptId": "6323714f-6daa-4adc-8be1-1ff3c31ddb61",
+      "totals": {
+        "required": 23,
+        "passed": 23,
+        "failed": 0,
+        "tests": 117,
+        "passedTests": 108,
+        "failedTests": 0,
+        "skippedTests": 9,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "artifactId": 13583461068,
+      "shard": "assembly",
+      "zipBytes": 3235,
+      "zipSha256": "f71379a9c1ab495f037468f903636e72767d1741cab60ff2707ac747a7570c6e",
+      "envelopeSha256": "85c8a4afd96567ad5f4ca2d4a75c35fc5737895b18e4fb175d990e33f2ac1bef",
+      "receiptSha256": "b3fe686511566d3ceebd0f25b0ab27d107a5f8c18e724f1fea2e56dcc38a961e",
+      "receiptId": "16f259f3-e1b4-4681-91a5-4a02b5a48dce",
+      "totals": {
+        "required": 13,
+        "passed": 13,
+        "failed": 0,
+        "tests": 12,
+        "passedTests": 12,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "artifactId": 13583377092,
+      "shard": "9",
+      "zipBytes": 4099,
+      "zipSha256": "33c3ecda050c2ef7ba6f7604c8107e7f9a886cc4edd05017c2aea0aba619e8bc",
+      "envelopeSha256": "2c955d0cdefee1a9b860324aaff5e65473b212ae6c753bf4b79e9b11a90256d0",
+      "receiptSha256": "45fe0de950186b57ae41832e26b2d41b7fa7677d746551b95aabf51516fbfd8d",
+      "receiptId": "d58457c9-75a0-43ff-88fc-e02f0cee6e07",
+      "totals": {
+        "required": 22,
+        "passed": 22,
+        "failed": 0,
+        "tests": 99,
+        "passedTests": 87,
+        "failedTests": 0,
+        "skippedTests": 12,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "artifactId": 13583352664,
+      "shard": "20",
+      "zipBytes": 4431,
+      "zipSha256": "749b52dc6f3cf8679abe16a3643277576bbf56bac7b900d1d982bbea39db7522",
+      "envelopeSha256": "38844b0e4830422c234cc22d43f33e03771c9154d714071b1ca3269acd420020",
+      "receiptSha256": "db88966f5c7da28e0a7cc5149c5cb0023aa5393c922255f6255591c2f82998b6",
+      "receiptId": "0ae80395-81f9-4bcc-97ac-c4a9ae1db770",
+      "totals": {
+        "required": 24,
+        "passed": 24,
+        "failed": 0,
+        "tests": 174,
+        "passedTests": 170,
+        "failedTests": 0,
+        "skippedTests": 4,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "artifactId": 13583291733,
+      "shard": "18",
+      "zipBytes": 4359,
+      "zipSha256": "8ba37c06209f5cc58d8fbee50caf015f469901bafa6ac672111a4b7b405e2fa8",
+      "envelopeSha256": "5121f0abfa4f24779f8f13f22afb996746d5922ec42c3965a5b8ccb884e8659e",
+      "receiptSha256": "0e829bb79a223903ba9e909ed22041833adf6eb24b385b2723c9fa437dd205a1",
+      "receiptId": "86616569-9866-49a6-af49-801d5e42713c",
+      "totals": {
+        "required": 24,
+        "passed": 24,
+        "failed": 0,
+        "tests": 138,
+        "passedTests": 118,
+        "failedTests": 0,
+        "skippedTests": 20,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "artifactId": 13583268533,
+      "shard": "3",
+      "zipBytes": 4053,
+      "zipSha256": "5b78a133aa4dc48f4d96be281be873fecf394cfe453a0e5c8bf7d624a4c20ed5",
+      "envelopeSha256": "91a42e091a1bd7e3afdc53a891268114a51b73fa851c93f5a3d92057f0471a79",
+      "receiptSha256": "4ccbbea682dfa0129b6f742621b9d676897ade3043dfffc9824f554910fdc245",
+      "receiptId": "3600857d-8b89-42d7-94cd-d237485e84bd",
+      "totals": {
+        "required": 21,
+        "passed": 21,
+        "failed": 0,
+        "tests": 144,
+        "passedTests": 96,
+        "failedTests": 0,
+        "skippedTests": 48,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "artifactId": 13583267407,
+      "shard": "11",
+      "zipBytes": 4230,
+      "zipSha256": "55d9731295ef28b76b9b4a37c2b89564874ab0bea1b8a3ecb3391fb25173724e",
+      "envelopeSha256": "ebdfead787c6a309f428aafc3f1fbec23d2cfc15915c1f4e1b49ef2d383ebf5d",
+      "receiptSha256": "b137a80caed5562fbcc2b425f0d4fb2b402c234bc1fa7557ec1b03cf05c74238",
+      "receiptId": "b7064b48-2d23-4889-8b89-4ceacd561850",
+      "totals": {
+        "required": 23,
+        "passed": 23,
+        "failed": 0,
+        "tests": 97,
+        "passedTests": 92,
+        "failedTests": 0,
+        "skippedTests": 5,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "artifactId": 13583203761,
+      "shard": "13",
+      "zipBytes": 4227,
+      "zipSha256": "810aa80cd5dd6e9c06fcde528d0512fafb2e817b6fef96b1b4266ee509ee6135",
+      "envelopeSha256": "2af82edc4e39928edb96ec4fbc00dc9c7e696f2c04d68c0c0a0b7c6c650f3b4e",
+      "receiptSha256": "f51b514659e9b69a10609259f45e7b44e98dbcef2c00c40b67939e68f8defd0b",
+      "receiptId": "d077dd06-c15e-4ee9-a74e-f5405cbe8754",
+      "totals": {
+        "required": 23,
+        "passed": 23,
+        "failed": 0,
+        "tests": 185,
+        "passedTests": 177,
+        "failedTests": 0,
+        "skippedTests": 8,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "artifactId": 13583153292,
+      "shard": "8",
+      "zipBytes": 3985,
+      "zipSha256": "624470379ce0401bb20fbc6764c4ec05963f184d85f0fb53c28530ed523dfc09",
+      "envelopeSha256": "7fd251e9d25ad757c8dea5636e85e5a339d6d6507c183c3b739c5899356a2d6a",
+      "receiptSha256": "4afe610c89a941f09ad9631d7a43fc2ad9bf660a12307b86a067d520cfbacf1e",
+      "receiptId": "53c40bf0-1530-42a9-8a2d-5091698d08d7",
+      "totals": {
+        "required": 22,
+        "passed": 22,
+        "failed": 0,
+        "tests": 186,
+        "passedTests": 176,
+        "failedTests": 0,
+        "skippedTests": 10,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "artifactId": 13583063462,
+      "shard": "4",
+      "zipBytes": 4107,
+      "zipSha256": "37a36f5857de5041653e8026fc57a6c1fd3ebe9dbe473ec8d2162e098169ee6d",
+      "envelopeSha256": "00be5a4ec094f633b520d22d25ac4c7383bb698b800b3823eac8cb6dba055e28",
+      "receiptSha256": "6163a34c5e9279dea07749a0724bea01fb0fd9127b5de8445da6497e13e64d66",
+      "receiptId": "00415826-f043-4b09-80e5-cbc1421c81e4",
+      "totals": {
+        "required": 22,
+        "passed": 22,
+        "failed": 0,
+        "tests": 182,
+        "passedTests": 155,
+        "failedTests": 0,
+        "skippedTests": 27,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "artifactId": 13583043445,
+      "shard": "6",
+      "zipBytes": 4075,
+      "zipSha256": "4a6e1061d92bf1f58e6f9c72ea1050680365f47e51016fd3132e0a3a6d29839c",
+      "envelopeSha256": "3409cdd41fb64b441fc2acef8d0c383e8ea29d3b8dfc83ff622b55271c275c94",
+      "receiptSha256": "3de01b75e512132de0da7894d4bfa7ee36695dd957f57b373c5764bb5d116399",
+      "receiptId": "4da05250-ab9e-48ac-84d9-c655c16cb052",
+      "totals": {
+        "required": 22,
+        "passed": 22,
+        "failed": 0,
+        "tests": 149,
+        "passedTests": 124,
+        "failedTests": 0,
+        "skippedTests": 25,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "artifactId": 13583028927,
+      "shard": "10",
+      "zipBytes": 3963,
+      "zipSha256": "3f1d9488e5fc8d0791483ad0ed51484724d841dae0d33927e4737b39944cc428",
+      "envelopeSha256": "5ec0046f653b4bac517d14c40940f7cdaeb558176b1805e5c4ccc86823510f3e",
+      "receiptSha256": "8c2107007c4cd5b88caf920448588778f556a480f1a23d389b0c471bc81f293c",
+      "receiptId": "8f6e8acf-177a-44cf-a87d-672a16503c6b",
+      "totals": {
+        "required": 20,
+        "passed": 20,
+        "failed": 0,
+        "tests": 130,
+        "passedTests": 123,
+        "failedTests": 0,
+        "skippedTests": 7,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "artifactId": 13583013547,
+      "shard": "17",
+      "zipBytes": 4438,
+      "zipSha256": "3188831d415e975a1380410a2e629e22de584a8a32421cc3be9d820b92d0020a",
+      "envelopeSha256": "b58d9687bb06058a7ce13f6c8f4e366847a8ad522f24f2de035b7f594a9ca630",
+      "receiptSha256": "6bc60e6bda5ecb3420d423cdb0b09a287a9610187e0676f48552e3896eaedd30",
+      "receiptId": "1051b651-899b-457e-bc39-43d6f97f55e0",
+      "totals": {
+        "required": 24,
+        "passed": 24,
+        "failed": 0,
+        "tests": 152,
+        "passedTests": 144,
+        "failedTests": 0,
+        "skippedTests": 8,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "artifactId": 13582988482,
+      "shard": "2",
+      "zipBytes": 4040,
+      "zipSha256": "30029f9e2b29a5e25704835dad253499c3568b080768a71aa95b09b645af2d2d",
+      "envelopeSha256": "68fbb3fe6613fb4984cfbfda8a2a3ef4d204a750cb68b13be653cbe73380138a",
+      "receiptSha256": "cccc72efad7456983e71dcbbe85c9986bad9f62378f7d0010605e41a5ea186be",
+      "receiptId": "145c99db-9862-47af-86b4-d29c3a5e18d6",
+      "totals": {
+        "required": 21,
+        "passed": 21,
+        "failed": 0,
+        "tests": 107,
+        "passedTests": 101,
+        "failedTests": 0,
+        "skippedTests": 6,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "artifactId": 13582984364,
+      "shard": "1",
+      "zipBytes": 3988,
+      "zipSha256": "415305141c53655ddc1dd4338b80d26a863a46853f09bafb2b661f75b451284e",
+      "envelopeSha256": "a3645e5f62a239c89d67ebc0ca46ed74f1629a06aa0c754a77990794dd2b3ab7",
+      "receiptSha256": "64fb243ddce64a8aa3d0e5c6fc814cb61a658d1de965b6b753a49442ecb62bd4",
+      "receiptId": "69790f36-1178-4452-b56c-c22fcaeaef83",
+      "totals": {
+        "required": 21,
+        "passed": 21,
+        "failed": 0,
+        "tests": 172,
+        "passedTests": 166,
+        "failedTests": 0,
+        "skippedTests": 6,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "artifactId": 13582904967,
+      "shard": "7",
+      "zipBytes": 3957,
+      "zipSha256": "081a3ac704230d5105bfaafc3bb5e0f337f8aa7fd44448473ed83a2ea3a146ef",
+      "envelopeSha256": "bdf01975d42358b3182f44616ef1a576e6dc2bbe414a01eced2da5087e407884",
+      "receiptSha256": "07fc901c5a2c300cf5c59f379184cab7f7bd9d6f2124ec2578f9f6e3a49b6f91",
+      "receiptId": "9a0fb9c4-4081-4641-a160-d709a552262d",
+      "totals": {
+        "required": 20,
+        "passed": 20,
+        "failed": 0,
+        "tests": 241,
+        "passedTests": 233,
+        "failedTests": 0,
+        "skippedTests": 8,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "artifactId": 13582533522,
+      "shard": "16",
+      "zipBytes": 4413,
+      "zipSha256": "4e75b7a98507e68ac784074fea44a660acb136a1c00ad1da96fa1cbbae581aab",
+      "envelopeSha256": "ed531c3fea6a52f020d025b0144485a67dc4159403f4ca74300cd0a4f7533c97",
+      "receiptSha256": "ed123a729e0a82206dbc7ea3be535a585c67fde19fafc4c26e10cee0e4fe9635",
+      "receiptId": "00ed6486-e4a2-4910-8ca9-26da29d42aa2",
+      "totals": {
+        "required": 24,
+        "passed": 24,
+        "failed": 0,
+        "tests": 157,
+        "passedTests": 153,
+        "failedTests": 0,
+        "skippedTests": 4,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    }
+  ],
+  "declaredSkips": [
+    {
+      "file": "tools/layout-studio/repository-shield-python-wheels.test.mjs",
+      "pattern": null,
+      "count": 2
+    },
+    {
+      "file": "tools/layout-studio/repository-shield-index.test.mjs",
+      "pattern": null,
+      "count": 3
+    },
+    {
+      "file": "tools/layout-studio/scanner-history-review.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "apps/linux-companion/test/linux-user-presence.test.ts",
+      "pattern": null,
+      "count": 2
+    },
+    {
+      "file": "tools/layout-studio/repository-shield-history.test.mjs",
+      "pattern": null,
+      "count": 3
+    },
+    {
+      "file": "tools/layout-studio/state-lock.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/runtime-command.test.mjs",
+      "pattern": null,
+      "count": 15
+    },
+    {
+      "file": "tools/layout-studio/codex-editor-ingress-owner.test.mjs",
+      "pattern": null,
+      "count": 9
+    },
+    {
+      "file": "packages/control-plane/test/git-inspector.test.ts",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/repository-commits.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/scanner-recipe-draft.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/repository-shield-cargo-archives.test.mjs",
+      "pattern": null,
+      "count": 2
+    },
+    {
+      "file": "tools/layout-studio/scanner-index-review.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/owned-process.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "apps/vscode-extension/test/studio-terminal-process.test.ts",
+      "pattern": null,
+      "count": 5
+    },
+    {
+      "file": "scripts/codex-daemon-status.test.mjs",
+      "pattern": null,
+      "count": 2
+    },
+    {
+      "file": "tools/layout-studio/repository-receipt-authority.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/repository-shield-pypi.test.mjs",
+      "pattern": null,
+      "count": 6
+    },
+    {
+      "file": "tools/layout-studio/codex-editor-recovery.test.mjs",
+      "pattern": null,
+      "count": 3
+    },
+    {
+      "file": "tools/layout-studio/scanner-review.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/scanner-mixed-review.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/task-index-inputs.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/repository-shield-ignored-trees.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/repository-recovery.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/repository-temporary-build.test.mjs",
+      "pattern": null,
+      "count": 2
+    },
+    {
+      "file": "tools/layout-studio/repository-shield-cargo.test.mjs",
+      "pattern": null,
+      "count": 4
+    },
+    {
+      "file": "tools/layout-studio/codex-owned-listener.test.mjs",
+      "pattern": null,
+      "count": 13
+    },
+    {
+      "file": "tools/layout-studio/repository-effects.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/repository-execution-supervisor.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/linux-temporary-workspace.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/coding-editor-connections.test.mjs",
+      "pattern": null,
+      "count": 10
+    },
+    {
+      "file": "tools/layout-studio/codex-editor-ingress.test.mjs",
+      "pattern": null,
+      "count": 13
+    },
+    {
+      "file": "apps/vscode-extension/test/studio-editor-launch.test.ts",
+      "pattern": null,
+      "count": 22
+    },
+    {
+      "file": "tools/layout-studio/repository-shield-python-records.test.mjs",
+      "pattern": null,
+      "count": 2
+    },
+    {
+      "file": "tools/layout-studio/repository-shield-cargo-artifacts.test.mjs",
+      "pattern": null,
+      "count": 2
+    },
+    {
+      "file": "tools/layout-studio/coding-task-owners.test.mjs",
+      "pattern": "the editor client authenticates the real Studio route and reads original protected target metadata without another native effect",
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/repository-execution.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/codex-unix-transport.test.mjs",
+      "pattern": null,
+      "count": 6
+    },
+    {
+      "file": "apps/linux-companion/test/linux-isolation.test.ts",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/task-history-inputs.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/repository-shield-pypi-artifacts.test.mjs",
+      "pattern": null,
+      "count": 2
+    },
+    {
+      "file": "tools/layout-studio/repository-pipeline-fixtures.test.mjs",
+      "pattern": null,
+      "count": 2
+    },
+    {
+      "file": "tools/layout-studio/runtime-command-suspended.test.mjs",
+      "pattern": null,
+      "count": 5
+    },
+    {
+      "file": "tools/layout-studio/repository-validation-policy.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/repository-shield-osv-source.test.mjs",
+      "pattern": null,
+      "count": 8
+    },
+    {
+      "file": "tools/layout-studio/repository-pipeline.test.mjs",
+      "pattern": null,
+      "count": 5
+    },
+    {
+      "file": "apps/vscode-extension/test/studio-task-client.test.ts",
+      "pattern": null,
+      "count": 12
+    },
+    {
+      "file": "apps/provider-adapter-host/test/linux-path-security.test.ts",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/scanner-recipe-save.test.mjs",
+      "pattern": null,
+      "count": 22
+    },
+    {
+      "file": "tools/layout-studio/repository-shield-artifacts.test.mjs",
+      "pattern": null,
+      "count": 2
+    },
+    {
+      "file": "tools/layout-studio/repository-ignored-scanner-inputs.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "apps/vscode-extension/test/named-pipe-transport.test.ts",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "apps/linux-companion/test/linux-repository-runtime.test.ts",
+      "pattern": null,
+      "count": 6
+    },
+    {
+      "file": "tools/layout-studio/repository-shield-exceptions.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/coding-task-owners.test.mjs",
+      "pattern": "protected task registry composes the actual owned Unix listener and bridge while the provider is a controlled double",
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/codex-unix-tasks.test.mjs",
+      "pattern": null,
+      "count": 6
+    },
+    {
+      "file": "tools/layout-studio/linux-namespace-budget.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/repository-shield.test.mjs",
+      "pattern": null,
+      "count": 2
+    },
+    {
+      "file": "tools/layout-studio/runtime.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "apps/vscode-extension/test/studio-editor-session.test.ts",
+      "pattern": null,
+      "count": 2
+    },
+    {
+      "file": "tools/layout-studio/repository-shield-licenses.test.mjs",
+      "pattern": null,
+      "count": 2
+    },
+    {
+      "file": "tools/layout-studio/repository-shield-npm-archives.test.mjs",
+      "pattern": null,
+      "count": 2
+    },
+    {
+      "file": "apps/linux-companion/test/linux-lifecycle.test.ts",
+      "pattern": null,
+      "count": 2
+    },
+    {
+      "file": "apps/windows-companion/test/authenticated-pipe.test.ts",
+      "pattern": null,
+      "count": 2
+    },
+    {
+      "file": "apps/vscode-extension/test/controller.test.ts",
+      "pattern": null,
+      "count": 3
+    },
+    {
+      "file": "apps/linux-companion/test/linux-process-supervisor.test.ts",
+      "pattern": null,
+      "count": 3
+    },
+    {
+      "file": "scripts/install-workflow-shortcut.test.mjs",
+      "pattern": null,
+      "count": 2
+    },
+    {
+      "file": "tools/layout-studio/configuration.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/repository-shield-workspaces.test.mjs",
+      "pattern": null,
+      "count": 1
+    }
+  ],
+  "originalManifestCommandsBoundsSkipsAndCleanupVerified": true,
+  "packageAcceptance": false,
+  "limitations": [
+    "This is distributed source acceptance at 45c34e5; later project discovery cf3bb4c and the separate Windows package job remain unaccepted.",
+    "The earlier native focus and restricted-storage retirement failures remain unresolved despite scoped passing follow-ups.",
+    "No interactive Windows account, desktop, guest, microphone or hardware acceptance is claimed."
+  ],
+  "collector": {
+    "jobId": 128473850248,
+    "artifactId": 13584280132,
+    "zipSha256": "14865d2b968a5a0b218b381375f97978a020a2940ad31f9a2617360f8d948fe6",
+    "summarySha256": "0788c0476b72c7adf12c1a09e0165f8305a3496726f7bb6b8187dc93fb2a9460",
+    "independentlyMatchesOriginalReceipts": true
+  },
+  "all23WorkflowJobsPassed": true
+}

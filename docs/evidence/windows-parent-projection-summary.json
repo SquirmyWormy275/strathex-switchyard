@@ -1,0 +1,92 @@
+{
+  "schema": "switchyard-windows-parent-projection-summary/v1",
+  "basis": "f653827f89b7cce8d93dcc0378224e87abb170b9",
+  "sourceSha256": {
+    "deployment/windows/test-support/storage-broker-protocol/StateLockFailureEvidence.cs": "47313c554f48b07cd47a28b80b0cad6e02134a74a32fc5d1445a5b48187a7c83"
+  },
+  "retainedNativeFailure": {
+    "sourceCommit": "f653827f89b7cce8d93dcc0378224e87abb170b9",
+    "executionCommit": "8be1a62426f71e4de8b8b3f08765a73c766972c2",
+    "sourceAndExecutionTree": "b56ab7be28cb97635102369f3db14d1924980bbd",
+    "runId": 42223719976,
+    "artifactId": 13504453938,
+    "archiveBytes": 4253,
+    "archiveSha256": "38d04dd38c62021674d3169009930aad78630d65a1c9a1f8602698efafde55c7",
+    "zipSavedLocally": false,
+    "jobId": 127912339691,
+    "privateReceipt": "windows-parent-observe-f653-native.json",
+    "helperSha256": "55721084a92efbf6345daceeeb84b005562ce9e4312c72705a49c44713e8119b",
+    "failure": {
+      "waitResult": 0,
+      "exitCode": 2,
+      "resultAvailable": true,
+      "childReportedSuccess": false,
+      "ownerReportedSuccess": false,
+      "completedChecks": 0,
+      "failedPhase": "private-state-initialize",
+      "failureCategory": "Error",
+      "stateLockFailure": null
+    },
+    "ordinaryOwnerChecks": 8,
+    "restrictedMetadataChecks": 13,
+    "restrictedNativeExchangeChecks": 31
+  },
+  "nativeLeases": {
+    "sourceCommit": "f653827f89b7cce8d93dcc0378224e87abb170b9",
+    "executionCommit": "8be1a62426f71e4de8b8b3f08765a73c766972c2",
+    "sourceAndExecutionTree": "b56ab7be28cb97635102369f3db14d1924980bbd",
+    "runId": 42223719976,
+    "artifactId": 13504098692,
+    "archiveBytes": 1124,
+    "archiveSha256": "4f27075ee28f51aff230e8767bf570ca4292837b619c929858490cb740f3b237",
+    "zipSavedLocally": false,
+    "privateReceipt": "windows-leases-f653-native.json",
+    "totals": {
+      "required": 2,
+      "passed": 2,
+      "failed": 0,
+      "tests": 25,
+      "passedTests": 24,
+      "failedTests": 0,
+      "skippedTests": 1,
+      "cancelledTests": 0,
+      "todoTests": 0
+    },
+    "allChildAndTreeCleanupVerified": true,
+    "scope": "Actual Windows ordinary-owner kernel locking, replaced/hard-linked file refusal, malformed release, parent loss, detached-owner pipe lease and bounded pool contracts."
+  },
+  "correction": "Managed closed projection now accepts the same ten fixed emitted progress labels as the JavaScript validator. Each label is projected and checked for exact progress, failure kind and exit code. Unknown/raw/private fields still refuse. No parent access or native owner behavior is changed.",
+  "managed": {
+    "receipt": "lease-parent-projection-managed-1793971118894.json",
+    "builds": [
+      {
+        "name": "helper",
+        "warnings": 0,
+        "errors": 0,
+        "managedAssemblySha256": "8febc2d7aace0a523e5ff1d044e84da2330bc8b30cf6eabed67dd27d363ef919",
+        "managedPeSubsystem": 2
+      },
+      {
+        "name": "proof",
+        "warnings": 0,
+        "errors": 0,
+        "managedAssemblySha256": "e24ebb1a37677b5c9150cf7f623b450629135de844ee2a6af2330b39820355d1",
+        "managedPeSubsystem": 3
+      }
+    ],
+    "portableChecks": 1995,
+    "stateLockFailureChecks": 39,
+    "ownedCleanup": {
+      "files": 124,
+      "bytes": 3192643,
+      "removed": true
+    },
+    "noDownloads": true
+  },
+  "restrictedOwnerAccepted": false,
+  "limits": [
+    "The preceding native report discarded an unrecognized progress label; it does not establish the exact parent failure.",
+    "Native leases run under the ordinary CI owner. Their pass does not accept the separate restricted owner.",
+    "Source diagnostics and ordinary lease tests do not establish native guest, interactive user, hardware or live account acceptance."
+  ]
+}

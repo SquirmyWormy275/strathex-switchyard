@@ -1,0 +1,35 @@
+{
+  "schema": "switchyard-coding-creator-effect-boundary/v1",
+  "basis": "7a16bfe5a96ec6ce2e59ee9229aa5c3cbb9aedeb",
+  "sourceSha256": {
+    "tools/layout-studio/coding-sessions.mjs": "32ae701e0c2cf4dec310d9f16c4110a7d4cdccbe56609ac0ee6b75c932553f5a",
+    "tools/layout-studio/codex-stdio-tasks.mjs": "7c288ce490c53cd474f6c3df4b17213b91c8dccc694e331deb327d6bba8b52d2"
+  },
+  "behavior": [
+    "Every dedicated creator checks its own enrolled account against the protected task reservation before thread effects.",
+    "The native stdio/Unix task driver repeats the caller boundary after asynchronous project setup and before creation and marker injection.",
+    "Fresh compartment permission, original repository device/inode, exact reservation and stop generation are required.",
+    "A late refusal preserves any acknowledged thread identity and prevents automatic replay; the exact owned creator must still verify exit."
+  ],
+  "focused": {
+    "receipt": "isolated-test-e4406e35-e404-4c83-8df2-225ad12b2a08.json",
+    "groups": 3,
+    "testsPassed": 42,
+    "allChildAndTreeCleanupVerified": true
+  },
+  "adjacent": {
+    "receipt": "isolated-test-bc5f1f6c-2a56-4f17-9cb3-88d3b5ca4f37.json",
+    "groups": 3,
+    "testsPassed": 39,
+    "allChildAndTreeCleanupVerified": true
+  },
+  "typecheck": true,
+  "nativeThreadsCreated": 0,
+  "modelPrompts": 0,
+  "liveAccountChanges": 0,
+  "limits": [
+    "Provider doubles establish creation/account-race behavior; no live task or account switch was exercised.",
+    "Production remains stdio; persistent owned task/IDE composition is still unfinished.",
+    "The latest accepted complete Linux cohort remains 7897835; these changes have focused evidence."
+  ]
+}

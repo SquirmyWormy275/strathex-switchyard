@@ -1,0 +1,27 @@
+{
+  "schema": "switchyard-native-helper-preflight-evidence/v1",
+  "sourceCommit": "ece17a03ee8a44a4e985840281a4809af78a816b",
+  "mergeCommit": "ee7acc5d556091bb0bc676175c212b6c987aa649",
+  "sourceTree": "623501971159b3d2fcd1fc0ef28dc0566412594c",
+  "workflowRunId": 42570708844,
+  "jobId": 129008065497,
+  "jobConclusion": "success",
+  "exactSourceMergeTreeVerified": true,
+  "originalJobBoundMinutes": 15,
+  "existingPinnedOfflineToolchain": true,
+  "receipt": {
+    "tokenAccessMask": 8,
+    "windowFocused": false,
+    "schema": "switchyard-provider-helper-preflight/v1",
+    "bytes": 67597055,
+    "source": "ee7acc5d556091bb0bc676175c212b6c987aa649",
+    "selfTestVerified": true,
+    "sha256": "046e97594a248d2033cbc4cf3d07173d6708e7baf328933022673daf6655b4e7"
+  },
+  "logSha256": "e286d588df75701a34d5e849cda976323876402037d153700ff97fbe214e712a",
+  "localNativeBinaryDownloaded": false,
+  "limitations": [
+    "Native publish and own-process self-test only; no interactive window, shortcut, account, task or package acceptance.",
+    "Token QUERY 8 and process access 0x101000 remain unchanged."
+  ]
+}

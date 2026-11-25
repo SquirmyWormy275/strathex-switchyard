@@ -1,0 +1,64 @@
+{
+  "schema": "switchyard-codex-status-consent/v1",
+  "sourceParent": "6337263aa789ee7bbca10819db304cbcaf27f5c3",
+  "sourceFiles": {
+    "tools/layout-studio/coding-sessions.mjs": "c0a84343d67e6c674d42f114e9438a8aa8760487a46ab034a39961f511ebd81f",
+    "tools/layout-studio/coding-sessions.test.mjs": "431b0c317b1e4b3470cd96074c0a7a2dc69a8e7acfde39d944d9e369994b68ab",
+    "scripts/verify-agent-security-host.mjs": "a0450a643cd792a2790f4cde2b344a36110d1835de7d69283ff0e57cc7057a4d"
+  },
+  "previousAdapterSha256": "f7acfa5bc18ca732fc7689283a92c284e5f2419194b180a69ffa87b43e2e3c92",
+  "originalFailures": [
+    "An older Codex status result entered a renewed recording with the same timestamp.",
+    "The history event acquired the state-write timestamp instead of the original provider observation time; task-status freshness was already correct."
+  ],
+  "correction": "Capture the opted-in recording generation before the exact provider read and preserve its original observedAt through account/repository verification and state mutation.",
+  "receipts": [
+    {
+      "id": "31e87eb2-917e-4f8f-b865-09e5385fa249",
+      "sha256": "f442d1b14d3e3c779d0d3304c5e5affdb31d752ad740d6498a8eac87df372903",
+      "success": false,
+      "totals": {
+        "required": 1,
+        "passed": 0,
+        "failed": 1,
+        "tests": 21,
+        "passedTests": 19,
+        "failedTests": 2,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "id": "db78b782-aac5-419f-923e-eab2e796d877",
+      "sha256": "62193756e3303d9f5dead57055916f15cf239356c2c3638c2c87594238092d12",
+      "success": true,
+      "totals": {
+        "required": 35,
+        "passed": 35,
+        "failed": 0,
+        "tests": 151,
+        "passedTests": 151,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    }
+  ],
+  "acceptedGroups": 35,
+  "acceptedTests": 151,
+  "skippedTests": 0,
+  "typecheck": true,
+  "originalCommandsBoundsAndCleanupVerified": true,
+  "completeTaskOwnerScenarios": 29,
+  "liveTaskOperations": 0,
+  "modelRequests": 0,
+  "loginChanges": 0,
+  "frontendChanged": false,
+  "limitations": [
+    "Native providers are explicit doubles; the tests use real encrypted stores. No live native task/model acceptance is claimed.",
+    "All 29 original task-owner scenarios, both named adapters and the shared observation collector are included with their original assertions, bounds and cleanup.",
+    "Installed adoption and native Windows execution remain separately scoped."
+  ]
+}

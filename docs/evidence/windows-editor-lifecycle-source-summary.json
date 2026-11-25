@@ -1,0 +1,227 @@
+{
+  "schema": "switchyard-windows-editor-lifecycle-source-summary/v1",
+  "at": "2026-11-07T09:29:04.944Z",
+  "baseCommit": "6881d928c34d067bd53e3c790d63020d41d8706a",
+  "sourceFiles": {
+    ".github/workflows/client-platform.yml": "b435b6ebdd8a178531a8c6f692e85286129c8704a4b2100f275f50104b762abf",
+    "apps/desktop-hotkeys/OwnedStdioRunner.cs": "8a1a4021f4e3f3a5820c4540a0b72578f5f0424c898de926446bda37fa035a00",
+    "apps/desktop-hotkeys/RuntimeCommandRunner.cs": "707abda45e13d70ea7a8a9fa0bb5ab8ac342ae491b9c5590118d3f3ba2047f5b",
+    "scripts/run-isolated-tests.mjs": "2e04ecc8a257f37ff317d85acadc4a83242f05f3a5d1b6a8ec94624922ffb4e8",
+    "scripts/run-isolated-tests.test.mjs": "55091ab79f8e4381a78ec31c4893ad9fcda8dfd38849cdf3126f4b607a4cc456",
+    "scripts/verify-client-platform.mjs": "5efd776a5564ad975e54a2a5312ddf613b190d98f73048738a5e39e792b495a0",
+    "tools/layout-studio/codex-editor-recovery.test.mjs": "c7c7a6a15255d8466eb3c159ed43a49ec14e60d0914ecd087efd780321cabb6f",
+    "tools/layout-studio/codex-editor-relay.mjs": "f3e714807076a5fc870e79edb5e92b4a28e022d8b5977cf290ab1cafb826f40a",
+    "tools/layout-studio/codex-retained-editor-client.mjs": "8c01e115daa41ea67649f1cdccb2bb6fbfbcf6adecfc7c6eba8ed626026665d9",
+    "tools/layout-studio/codex-retained-editor-client.test.mjs": "62d10cd7b554189ec4140758d150850bda5c3fbf88f72fac283ec0e075ad9005",
+    "tools/layout-studio/codex-windows-owner.mjs": "15fd127de59f0f21334e7132eb748ed7968cc268101a82183464135f56487007",
+    "tools/layout-studio/codex-windows-tasks.mjs": "c9d9afd24f6941a39d4eeec1230940a05a36d3496172fb6d8ac5a49c75e8d030",
+    "tools/layout-studio/codex-windows-tasks.test.mjs": "18250705c3f7ad16da8dc6ec5cf4ed435d408dcefd75b776d53436c7ec0624aa",
+    "tools/layout-studio/coding-editor-connections.test.mjs": "134fd8ecb7ed502d7644d09c70bd2bc4e84a70511f4f2d7ae676b60b68c4eecf",
+    "tools/layout-studio/coding-editor-journal.mjs": "fa63fc801c5898383224259accd70fe2a9da9a2892aaceb881f2ea22cd3fe715",
+    "tools/layout-studio/coding-editor-journal.test.mjs": "215c1a729feb1686f75a4abe776561eeb42c1cddc683323e7fb471ab702f1ed3",
+    "tools/layout-studio/instance.mjs": "adb5b796b3880a6c67f24e7a782dcfb6f36495c0eb0ecbf537a748dad2d949ec",
+    "tools/layout-studio/instance.test.mjs": "7c82fb1c56ccfb7771484f117dcf2251d889c9dd622304b1e149e32102064647",
+    "tools/layout-studio/suite.mjs": "6afffebee1fc07900d9353359efcb8fa3877af20510a865273596c95b0293228",
+    "tools/layout-studio/suite.test.mjs": "f60a051ef92d6ef5e45239be5b945eeb0b90ee3f2a57cc00d3e4c3323dbd8e70",
+    "tools/layout-studio/test-support/codex-windows-stdio-fixture.cjs": "06709fe0f6de17b4e77ad720a7fd9b1e8ca98c2fe750d03923f5516f227d2d9f",
+    "tools/layout-studio/windows-codex-editor-connection.mjs": "0a2648d21525bbee3e04142f78ee9afbf50cfec76afc009564af0eba1ca58161",
+    "tools/layout-studio/windows-codex-editor-connection.test.mjs": "c9c3f245244fd4a2af8eab946ab82544d0d455bd38bf38605bd5fa5956d1ebe4",
+    "tools/layout-studio/windows-coding-editor-connections.mjs": "7f909de3d475610a2ab566b334679fe2956e07f5bc63e04c3e6c63761a43eaf8",
+    "tools/layout-studio/windows-coding-editor-connections.test.mjs": "c20a8f35ca5202761b6e4d52bca33d60466f18d390bfe4c1028099991ecf2362",
+    "tools/layout-studio/windows-editor-ingress.test.mjs": "00008ba2ce414c8b45f86c6b5015324a2fde0a57689739ad9425ca87bf3b66a3",
+    "tools/layout-studio/windows-editor-journal-contract.mjs": "b4567ff17ecdb1898c9040bacd34ded18c278186e1768f88708e2f7d6c14f7e7",
+    "tools/layout-studio/windows-editor-journal.test.mjs": "0fd39efbf3ff86f0ad03ae4cfbb35242e09dc446b16efd6db9fb7816d3c4a633",
+    "tools/layout-studio/windows-editor-recovery.mjs": "42e32011867ac667351105d25fc874fcd234c9a3f545d17eb6c922189c4520d4",
+    "tools/layout-studio/windows-editor-recovery.test.mjs": "5c53dd14b18136ddaae114b8010606840e598291868fc65f34b080cddae70f41",
+    "tools/layout-studio/windows-owned-stdio.mjs": "d336c610168dec5b4a6fea716880ec9f43914c7abfedfc74636f483d99f9a426",
+    "tools/layout-studio/windows-query-ownership.mjs": "e8a1796a2cc422e95723be58c4b2f2fad01e9ee70d9886e9c49365695ae9020b",
+    "tools/layout-studio/windows-terminal-peer.test.mjs": "e83f37af27b9a47094fdb23ff81fd9d65c0c48ad02c7fafb8fab6fa16b72b9a2",
+    "tools/layout-studio/windows-terminal-process.test.mjs": "bc9e7fc89888f2b81d2c3806a726ae2af9dc59c61607ecd2f6cc2b6aa4cd68b9"
+  },
+  "receipts": [
+    {
+      "name": "isolated-test-178789b2-c00e-49ec-ba07-d06b6801050a.json",
+      "sha256": "b4e84691290ecb9be78482adf860538dd3b68315f3a6050663a68b9f7ac75e9c",
+      "totals": {
+        "required": 13,
+        "passed": 13,
+        "failed": 0,
+        "tests": 150,
+        "passedTests": 145,
+        "failedTests": 0,
+        "skippedTests": 5,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    }
+  ],
+  "groups": 13,
+  "passedTests": 145,
+  "skippedTests": 5,
+  "originalCommandsBoundsSkipsAndCleanupVerified": true,
+  "typecheck": {
+    "command": "npm run typecheck",
+    "node": "24.14.0",
+    "passed": true
+  },
+  "scope": {
+    "windowsProtectedLifecycleComposed": true,
+    "signedSuiteWindowsPeerSchemaValidated": true,
+    "duplicateReturnsOriginalRecordWithoutCredential": true,
+    "repeatStopUsesOriginalPlatformSchema": true,
+    "workspaceAndModeStopBeforeTaskOwner": true,
+    "durableStartupIntentBeforeNativeCommand": true,
+    "unknownSpawnCannotClaimNotStarted": true,
+    "readOnlyOriginalHostAndQueryJobRecovery": true,
+    "observerCleanupJoined": true,
+    "queryOwnerRetainedBeforeWorkerAcknowledgement": true,
+    "originalScopeHelperDigestAndRoleBound": true,
+    "independentRetirementCallbackJoined": true,
+    "carrierForwardsOriginalQueryOwnership": true,
+    "journalRejectsReplacementOfUnretiredQuery": true,
+    "retirementRemainsRecordableAfterRevocation": true,
+    "activeHelperPreventsSuccessfulLiveCleanupClaim": true,
+    "recoveryReceivesSavedUnretiredHelper": true,
+    "noNativePrivilegeOrAccessMaskChange": true,
+    "actualWindowsCarrierCallbackCaseExtended": true
+  },
+  "nativeProcessEvidence": "windows-editor-recovery-native-summary.json",
+  "effects": {
+    "liveModelPrompts": 0,
+    "liveProviderTasks": 0,
+    "accountChanges": 0,
+    "hardwareOpened": false,
+    "frontendChanged": false,
+    "installedApplicationChanged": false,
+    "newDependencies": false,
+    "newCompilation": false
+  },
+  "limitations": [
+    "Local lifecycle demonstration uses real sockets, signed HTTP and protected state with synthetic provider/native-query doubles.",
+    "The actual Windows host-observation composition case awaits CI; native recovery already passes at 6881d92.",
+    "VS Code Windows endpoint/process/launcher adaptation remains unfinished; command activation and frontend remain frozen.",
+    "The separately retained restricted-storage native retirement failure is unresolved."
+  ],
+  "cleanup": {
+    "originalChildAndTreeRetirementVerified": true,
+    "noCompilerOrBundleStagingCreated": true,
+    "fixtureRootsRemoved": true
+  },
+  "success": true,
+  "correctedDevelopmentFailures": {
+    "receipts": [
+      {
+        "name": "isolated-test-c8da5cbf-7350-45f9-8d1e-3257a667314d.json",
+        "sha256": "0079ea4285d39a781c1f4725bde28e1e7e4d5d739f0393722e4aee8f66c06945",
+        "totals": {
+          "required": 10,
+          "passed": 9,
+          "failed": 1,
+          "tests": 92,
+          "passedTests": 87,
+          "failedTests": 1,
+          "skippedTests": 4,
+          "cancelledTests": 0,
+          "todoTests": 0
+        },
+        "failedFiles": [
+          {
+            "file": "tools/layout-studio/windows-coding-editor-connections.test.mjs",
+            "timeout": false
+          }
+        ]
+      },
+      {
+        "name": "isolated-test-703c9f82-2518-417d-bd3d-09a45b349460.json",
+        "sha256": "b12a26d97abcfebc67677b2878de1f997c96ae212f9d09a622b81ac97f355d07",
+        "totals": {
+          "required": 1,
+          "passed": 0,
+          "failed": 1,
+          "tests": 0,
+          "passedTests": 0,
+          "failedTests": 0,
+          "skippedTests": 0,
+          "cancelledTests": 0,
+          "todoTests": 0
+        },
+        "failedFiles": [
+          {
+            "file": "tools/layout-studio/windows-coding-editor-connections.test.mjs",
+            "timeout": true
+          }
+        ]
+      },
+      {
+        "name": "isolated-test-47e7ee5f-9cb0-4897-97b6-88a00b20566d.json",
+        "sha256": "f8b771b679dc2044b873236e1fc2719ffadb17b321ba829d2b63d91a48c29924",
+        "totals": {
+          "required": 1,
+          "passed": 0,
+          "failed": 1,
+          "tests": 6,
+          "passedTests": 3,
+          "failedTests": 2,
+          "skippedTests": 1,
+          "cancelledTests": 0,
+          "todoTests": 0
+        },
+        "failedFiles": [
+          {
+            "file": "tools/layout-studio/windows-coding-editor-connections.test.mjs",
+            "timeout": false
+          }
+        ]
+      },
+      {
+        "name": "isolated-test-ed31ca60-4907-430b-91d9-6ac399c3dac7.json",
+        "sha256": "881f92b544109f74cea27fc970557b5e1de393b691e78cb795d0bc52d27e7777",
+        "totals": {
+          "required": 1,
+          "passed": 0,
+          "failed": 1,
+          "tests": 6,
+          "passedTests": 4,
+          "failedTests": 1,
+          "skippedTests": 1,
+          "cancelledTests": 0,
+          "todoTests": 0
+        },
+        "failedFiles": [
+          {
+            "file": "tools/layout-studio/windows-coding-editor-connections.test.mjs",
+            "timeout": false
+          }
+        ]
+      },
+      {
+        "name": "isolated-test-cd22af99-2040-4a6b-acf9-75d5f5e22c96.json",
+        "sha256": "a10bf3ae60f5cf302deb5d73baabfbc0db18c08f58d3e0548cca1d48e28a7d12",
+        "totals": {
+          "required": 12,
+          "passed": 11,
+          "failed": 1,
+          "tests": 143,
+          "passedTests": 137,
+          "failedTests": 1,
+          "skippedTests": 5,
+          "cancelledTests": 0,
+          "todoTests": 0
+        },
+        "failedFiles": [
+          {
+            "file": "tools/layout-studio/windows-coding-editor-connections.test.mjs",
+            "timeout": false
+          }
+        ]
+      }
+    ],
+    "causes": [
+      "Fixture syntax, overbroad synthetic target and missing synthetic query UUID corrected; one held fixture reached the original group timeout before its target correction.",
+      "Actual journal repeat-stop path was Linux-only; now verifies its selected platform schema.",
+      "Signed instance gateway lacked the Windows peer schema; now validates the exact native process/image coordinates before forwarding."
+    ],
+    "originalBoundsUnchanged": true,
+    "ownedCleanupVerified": true
+  }
+}

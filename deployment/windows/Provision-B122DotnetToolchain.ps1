@@ -46,6 +46,7 @@ if(-not$VerifyExisting){
     Write-Utf8NoBom (Join-Path $stage 'NuGet.Config') $configText
     if((Get-Sha256 (Join-Path $stage 'NuGet.Config'))-cne[string]$manifest.nugetConfigSha256){throw 'The generated offline NuGet configuration digest is wrong.'}
     $projectRelatives=@(
+      'apps\desktop-hotkeys\Switchyard.Hotkeys.csproj',
       'firmware\windows-hid-helper\Strathex.B122.RawHidHelper.csproj',
       'apps\windows-companion\sandbox-helper\Sxsy.B122.SandboxHelper.csproj',
       'apps\windows-companion\repository-runner-helper\Sxsy.B122.RepositoryRunner.csproj',

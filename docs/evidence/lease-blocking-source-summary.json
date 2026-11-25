@@ -1,0 +1,222 @@
+{
+  "schema": "switchyard-lease-blocking-source/v1",
+  "baseCommit": "c16b37a2c9b85657f1f502489188986d9090304f",
+  "sourceFiles": {
+    "apps/desktop-hotkeys/StateLeaseWorker.cs": "66325c2babc9c891ffd0b51472b3ff88af0ca9edd333be60a913b61ca7668925",
+    "deployment/windows/test-support/storage-broker-protocol/StateLeaseProtocolProof.cs": "88a458fad7fbd62286355c1afdb315988e2e425917a96d5cd8f1a263520712a3",
+    "tools/layout-studio/state-lock.test.mjs": "a107db179f1ff9a38c60cd18d37cccbb997a6adeddbb80ef7f6cbe8ae1039bc0"
+  },
+  "change": [
+    "Read bytes or EOF directly from the inherited pipe instead of waiting for a 25 ms polling tick on each lease command.",
+    "Keep the single reader and PeekNamedPipe ownership check during contention and before lease transitions; no process/token access or fallback is added.",
+    "Every state transaction retains its original kernel lease, file identity, encryption, fsync, sequenced release and independent ownership record.",
+    "Original native EOF/partial-frame/file-replacement/hardlink/malformed-release/contended-owner-loss cases remain; add successful fragmented frames and 24 sequenced round-trip observations.",
+    "Portable parser proof checks direct arrival, complete and partial EOF, invalid byte bounds and read/query faults."
+  ],
+  "focusedVerification": {
+    "receipt": "4fc2fe97-6592-42b0-938a-70c57ee35809",
+    "sha256": "868d60e2c8b006b07e97f08f5191599fe06fb6e0cf9cb76dcde826a08c558402",
+    "totals": {
+      "required": 9,
+      "passed": 9,
+      "failed": 0,
+      "tests": 83,
+      "passedTests": 82,
+      "failedTests": 0,
+      "skippedTests": 1,
+      "cancelledTests": 0,
+      "todoTests": 0
+    },
+    "children": [
+      {
+        "file": "tools/layout-studio/keyless-lease-pool.test.mjs",
+        "durationMs": 5674,
+        "effectiveTimeoutMs": 45000,
+        "outputBytes": 4018,
+        "tests": {
+          "total": 14,
+          "passed": 14,
+          "failed": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        }
+      },
+      {
+        "file": "tools/layout-studio/repository-execution.test.mjs",
+        "durationMs": 14555,
+        "effectiveTimeoutMs": 240000,
+        "outputBytes": 1802,
+        "tests": {
+          "total": 5,
+          "passed": 5,
+          "failed": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        }
+      },
+      {
+        "file": "tools/layout-studio/scanner-recipe-draft.test.mjs",
+        "durationMs": 15434,
+        "effectiveTimeoutMs": 120000,
+        "outputBytes": 3115,
+        "tests": {
+          "total": 12,
+          "passed": 12,
+          "failed": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        }
+      },
+      {
+        "file": "tools/layout-studio/task-authority.test.mjs",
+        "durationMs": 3695,
+        "effectiveTimeoutMs": 45000,
+        "outputBytes": 3309,
+        "tests": {
+          "total": 11,
+          "passed": 11,
+          "failed": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        }
+      },
+      {
+        "file": "tools/layout-studio/execution-ui.test.mjs",
+        "durationMs": 11971,
+        "effectiveTimeoutMs": 45000,
+        "outputBytes": 22056,
+        "tests": {
+          "total": 7,
+          "passed": 7,
+          "failed": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        }
+      },
+      {
+        "file": "tools/layout-studio/authority-ui.test.mjs",
+        "durationMs": 3258,
+        "effectiveTimeoutMs": 45000,
+        "outputBytes": 2577,
+        "tests": {
+          "total": 9,
+          "passed": 9,
+          "failed": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        }
+      },
+      {
+        "file": "tools/layout-studio/scanner-ui.test.mjs",
+        "durationMs": 10643,
+        "effectiveTimeoutMs": 45000,
+        "outputBytes": 19030,
+        "tests": {
+          "total": 7,
+          "passed": 7,
+          "failed": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        }
+      },
+      {
+        "file": "tools/layout-studio/state-lock.test.mjs",
+        "durationMs": 306,
+        "effectiveTimeoutMs": 45000,
+        "outputBytes": 3070,
+        "tests": {
+          "total": 11,
+          "passed": 10,
+          "failed": 0,
+          "cancelled": 0,
+          "skipped": 1,
+          "todo": 0
+        }
+      },
+      {
+        "file": "tools/layout-studio/private-fs.test.mjs",
+        "durationMs": 399,
+        "effectiveTimeoutMs": 45000,
+        "outputBytes": 1961,
+        "tests": {
+          "total": 7,
+          "passed": 7,
+          "failed": 0,
+          "cancelled": 0,
+          "skipped": 0,
+          "todo": 0
+        }
+      }
+    ]
+  },
+  "managedBuilds": [
+    {
+      "project": "apps/desktop-hotkeys/Switchyard.Hotkeys.csproj",
+      "exitCode": 0,
+      "warnings": 0,
+      "errors": 0
+    },
+    {
+      "project": "deployment/windows/test-support/storage-broker-protocol/StorageBrokerProtocol.Proof.csproj",
+      "exitCode": 0,
+      "warnings": 0,
+      "errors": 0
+    }
+  ],
+  "portableProof": {
+    "schema": "switchyard-storage-broker-protocol-proof/v1",
+    "success": true,
+    "checks": 16,
+    "pipeTextProtocolChecks": 10,
+    "serviceHeaderChecks": 1541,
+    "restrictedChildEventChecks": 12,
+    "stateLeaseProtocolChecks": 53,
+    "restrictedChildStderrChecks": 50,
+    "coldRandomParserChecks": 145,
+    "stateLockFailureChecks": 40,
+    "descendantQueryProtocolChecks": 43,
+    "exchangeProtocolChecks": 30,
+    "exchangeJournalChecks": 43,
+    "exchangeFactsChecks": 23,
+    "indexInputChecks": 49,
+    "historyInputChecks": 62,
+    "protectedFilesChecks": 0,
+    "privatePipeChecks": 0,
+    "nativeServiceChecks": 0,
+    "nativeExchangeChecks": 0,
+    "nativeRestrictedHostProof": null,
+    "serviceInstalled": false,
+    "volumeOpened": false,
+    "guestLaunched": false
+  },
+  "portableChecks": 2117,
+  "typecheckExitCode": 0,
+  "buildCleanup": {
+    "verified": true,
+    "filesRemoved": 206,
+    "bytesRemoved": 3688439,
+    "ownedRootRemoved": true,
+    "at": "2026-11-09T11:16:20.315162+00:00"
+  },
+  "originalFailureEvidence": "native-ui-timing-failure-summary.json",
+  "unchanged": [
+    "original test manifest and commands",
+    "45-second UI file deadlines and 2-second UI waits",
+    "output bounds and skip allowances",
+    "exclusive lock file identities",
+    "QUERY token access 8 and process access 0x101000",
+    "installed app and saved workspaces"
+  ],
+  "nativeAcceptance": "Pending normal-push CI; local builds and Linux tests do not establish Windows performance or pipe behavior.",
+  "references": [
+    "https://learn.microsoft.com/en-us/windows/win32/ipc/anonymous-pipe-operations",
+    "https://learn.microsoft.com/en-us/dotnet/api/system.io.stream.readbyte"
+  ]
+}

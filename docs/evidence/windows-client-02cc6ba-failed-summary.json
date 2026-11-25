@@ -1,0 +1,37 @@
+{
+  "schema": "switchyard-windows-client-failed-summary/v1",
+  "runId": 42332519898,
+  "jobId": 128282235500,
+  "sourceCommit": "02cc6ba46c503a699cbc2bcd1d55b85382ef193c",
+  "mergeCommit": "966b8b7bfaf227f290d90662a416aa008b85aa7e",
+  "artifactId": 13557798467,
+  "artifactSha256": "cbc0b27239806cd779f23454af0d5a39cc8a9a15c67e2fbc84b5a2f55d1faf03",
+  "artifactBytes": 2781,
+  "receiptSha256": "bf780a20fbb485b55115e338b03cb905cff78d3e4941bd528ca8684ce33f799f",
+  "archiveExtracted": false,
+  "archiveStoredLocally": false,
+  "sourceAndMergeTree": "aa7fd8b0ddab99456086dd199f48e84957eb6ef8",
+  "sourceAndMergeTreesVerifiedEqual": true,
+  "originalCommandsBoundsAndSkipsVerified": true,
+  "childAndTreeCleanupVerified": true,
+  "nativeReceipt": "0df3ab88-1ec7-42c0-b2a2-732ac4f6136f",
+  "totals": {
+    "required": 7,
+    "passed": 6,
+    "failed": 1,
+    "tests": 93,
+    "passedTests": 92,
+    "failedTests": 1,
+    "skippedTests": 0,
+    "cancelledTests": 0,
+    "todoTests": 0
+  },
+  "success": false,
+  "failure": "Cold-start selected Work policy was bypassed by earlier request-UUID validation in Windows native-focus dispatch. Expected prohibited; received Native focus needs an exact request UUID.",
+  "interpretation": "The run failed. It does not establish interactive native focus or complete Windows acceptance.",
+  "privateReceipt": {
+    "name": "windows-client-02cc6ba-native.json",
+    "sha256": "84cfde7efe6f7a9c035a9b6afef115f4dd31c452416c46e2263705276f13c555"
+  },
+  "workflowUrl": "https://github.com/SquirmyWormy275/strathex-switchyard/actions/runs/42332519898"
+}

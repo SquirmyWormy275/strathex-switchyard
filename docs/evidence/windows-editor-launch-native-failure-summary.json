@@ -1,0 +1,70 @@
+{
+  "schema": "switchyard-windows-editor-launch-native-failure-summary/v1",
+  "sourceCommit": "961ecb36036ae40f67f0685bb6bfbd6f815d10ed",
+  "mergeCommit": "32ffdb07e0f10241345607ace19bb0d09d49afb3",
+  "tree": "747912034fb89d8e415f7db6adb29cccfefac616",
+  "workflowRun": 42363954706,
+  "job": 128378129076,
+  "artifact": {
+    "id": 13571162316,
+    "bytes": 4716,
+    "sha256": "912c6f300e0a4eb789168327110fba2f87fe77073baf51780f2fba47dc013fa7"
+  },
+  "receipt": {
+    "id": "3ec8099f-a642-41a6-a297-5e6ec23aef19",
+    "sha256": "2bfdac75ef00fc07fb1e93cbce0a31b4b6feea84ad7f111a600f54e23396281f"
+  },
+  "success": false,
+  "totals": {
+    "required": 25,
+    "passed": 24,
+    "failed": 1,
+    "tests": 223,
+    "passedTests": 223,
+    "failedTests": 0,
+    "skippedTests": 0,
+    "cancelledTests": 0,
+    "todoTests": 0
+  },
+  "acceptedGroups": [
+    {
+      "file": "tools/layout-studio/windows-editor-endpoint.test.mjs",
+      "passed": 8,
+      "durationMs": 4647,
+      "cleanupVerified": true
+    },
+    {
+      "file": "apps/vscode-extension/test/studio-windows-editor-files.test.ts",
+      "passed": 1,
+      "durationMs": 292,
+      "cleanupVerified": true
+    },
+    {
+      "file": "apps/vscode-extension/test/studio-windows-editor-launch.test.ts",
+      "passed": 7,
+      "durationMs": 12450,
+      "cleanupVerified": true
+    }
+  ],
+  "failure": {
+    "file": "tools/layout-studio/windows-coding-editor-connections.test.mjs",
+    "firstFailedTest": 9,
+    "reason": "Signed instance observation refused during concurrent launcher acknowledgement; the group later reached its original timeout.",
+    "timeoutMs": 120000,
+    "completeTapSummary": false,
+    "ownedTreeTermination": {
+      "strategy": "taskkill-owned-tree",
+      "completed": true,
+      "supervisorExitCode": 0,
+      "supervisorError": null
+    },
+    "fixtureCleanupCompleted": true
+  },
+  "originalCommandsBoundsAndCleanupVerified": true,
+  "limits": [
+    "The 223 passing tests exclude the timed-out group because its final TAP summary never completed.",
+    "The fixed native endpoint fixture and actual private/shared/link/path checks passed; the complete client lane is not accepted.",
+    "A local controlled regression reproduces concurrent durable/in-memory journal publication refusal; corrected Windows composition must pass before claiming the native failure repaired.",
+    "Live provider tasks, accounts, interactive IDE behavior and hardware remain outside these synthetic checks."
+  ]
+}

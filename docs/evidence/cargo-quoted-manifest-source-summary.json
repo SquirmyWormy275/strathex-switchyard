@@ -1,0 +1,129 @@
+{
+  "schema": "switchyard-cargo-quoted-manifest-source/v1",
+  "at": "2026-11-07T01:34:12.052149+00:00",
+  "baseSource": "66a921b9226fd1031bd5d3567d61aeea0689be41",
+  "sourceFiles": {
+    "tools/layout-studio/shield-scanner-engine.mjs": "6ceb739fcf1215c7012bdb03fe7f532eec7d1e8185f4c77701abb20af4771148",
+    "tools/layout-studio/repository-shield.mjs": "3eaac8062d1e5f00cf1af157e495b0906f565067a3ed76d9a924da4f08ddf8ef",
+    "tools/layout-studio/cargo-archive.test.mjs": "8600a14c4d7781334a8c5cc07a988118ac489fdbf42148e740006a648b5e7ffb",
+    "tools/layout-studio/test-support/shield-scanner-fixture.mjs": "e0a2d704ce0ba16531780a953906e2c0880d193f0586f291266e2434d29c6433",
+    "tools/layout-studio/test-support/cargo-archive-fixture.mjs": "8abadb363e9a1dc7939233ab8dd999026a0c42d66f47f3a30b17340f77d5e001",
+    "tools/layout-studio/test-support/npm-archive-fixture.mjs": "dbc8aa1f1cec3d022e5489778c929c86a017af6c4575844c3da93372ee7c76f5",
+    "tools/layout-studio/test-support/assert-cargo-archive-shield.mjs": "2785709c8d1e16a288ea357e4ff9c8488e9b8d6b0a71c430663be062c872431a",
+    "tools/layout-studio/repository-shield-cargo-archives.test.mjs": "5e9c6b8d683a65f46f6166e5545c356b8e5ddcb86d7fb2c0931866e8af93cab0",
+    "tools/layout-studio/repository-windows-shield-cargo-archives.test.mjs": "365f9046d35aa27934acf9c11e8db180f2b8287fca9b63ef8c6682150ed8561a",
+    "scripts/generate-cargo-archive-oracle.py": "67cb5c634c9e3d44f65d8663b5f674803d5cb8fe317965746a1e39ef9e5a939d",
+    "scripts/fixtures/cargo-archive-oracle.json": "17b13bc217a3f6f36fcc3b0bbedc41edd55ff304627d4ce852afd70d4587524e",
+    "scripts/verify-cargo-inventory-host.mjs": "e17dd1fc010990476e33f75eee4d8404b76587ef18172efe160fdb8442b27543",
+    "scripts/verify-python-inventory-host.mjs": "1b3a2b83bc1ed3e139c6e9050a011a709b94f69bcf799a878a157fc333264429"
+  },
+  "receipts": [
+    {
+      "name": "isolated-test-3d691727-bc8e-4a45-a846-5adfacac773d.json",
+      "sha256": "b8e91f5671ef946c5bba0707c96f138e68334e410e6e00e8655eff0835b0abcd",
+      "success": false,
+      "totals": {
+        "required": 1,
+        "passed": 0,
+        "failed": 1,
+        "tests": 7,
+        "passedTests": 6,
+        "failedTests": 1,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "name": "isolated-test-de1542f6-4a14-4954-8a80-d831e7e66845.json",
+      "sha256": "caf382fa3606bae814b4bc928312083cd4a9890f340de9e2e9c1386b3f0a0964",
+      "success": true,
+      "totals": {
+        "required": 1,
+        "passed": 1,
+        "failed": 0,
+        "tests": 7,
+        "passedTests": 7,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "name": "isolated-test-870918cc-da81-44c2-928c-f8e689e1f35c.json",
+      "sha256": "99cbfcc8addde48fbbc924e484787dddf93ac85e06da4ce19e97e6cfeb692447",
+      "success": true,
+      "totals": {
+        "required": 6,
+        "passed": 6,
+        "failed": 0,
+        "tests": 64,
+        "passedTests": 64,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "name": "isolated-test-b1fef4fd-ffa2-4ba0-b098-835dba383315.json",
+      "sha256": "8fd5edd6465f4f13c2034d7d8aeb8d967a4873bfe784eca778dd025713e56401",
+      "success": true,
+      "totals": {
+        "required": 4,
+        "passed": 4,
+        "failed": 0,
+        "tests": 32,
+        "passedTests": 32,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    }
+  ],
+  "distinctFocusedGroups": 10,
+  "distinctFocusedPasses": 96,
+  "independentReference": {
+    "python": "3.15.2",
+    "libraries": [
+      "tomllib",
+      "tarfile.USTAR_FORMAT",
+      "gzip"
+    ],
+    "cases": 58,
+    "supportedCases": 31
+  },
+  "actualLinuxCargoJourneys": 6,
+  "windowsCargoGuestDoubles": 6,
+  "typecheck": "passed",
+  "originalPackageBounds": "passed",
+  "cleanup": {
+    "everyChildVerified": true,
+    "everyTreeVerified": true,
+    "emptyOwnedRootRemoved": true
+  },
+  "effects": {
+    "cargoInvocations": 0,
+    "archiveExtractions": 0,
+    "packageExecutions": 0,
+    "newDependencyDownloads": 0,
+    "providerRequests": 0,
+    "accountChanges": 0,
+    "hardwareOperations": 0
+  },
+  "failureNotes": [
+    "The original archive inspector refused supported literal-string input in the expanded independent reference cases; the original failed receipt remains retained."
+  ],
+  "limitations": [
+    "This is a closed manifest grammar, not a complete TOML parser or Cargo resolver.",
+    "Array/inline tables, dotted field definitions, multiline strings and eight-digit Unicode escapes remain unsupported.",
+    "Target predicates are parsed as literal table keys and never evaluated.",
+    "Installed source acceptance and actual Windows guest/provider/hardware validation remain separate."
+  ],
+  "privateReceipt": {
+    "name": "cargo-quoted-manifest-source.json",
+    "sha256": "0a91a6146b8d66e057817b8f173a2f90927c460062a33b2770aa10544f7b69ec"
+  }
+}

@@ -1,0 +1,42 @@
+{
+  "schema": "switchyard-host-action-observation-summary/v1",
+  "scope": "separately opted-in local execution metadata; frontend exposure and external/IDE streams remain unfinished",
+  "receipt": "isolated-test-20f21f35-f7ca-4aa5-9a49-0260a020044d.json",
+  "success": true,
+  "totals": {
+    "required": 7,
+    "passed": 7,
+    "failed": 0,
+    "tests": 66,
+    "passedTests": 66,
+    "failedTests": 0,
+    "skippedTests": 0,
+    "cancelledTests": 0,
+    "todoTests": 0
+  },
+  "allChildCleanup": true,
+  "allProcessTreeTerminationComplete": true,
+  "typecheckPassed": true,
+  "sourceSha256": {
+    "tools/layout-studio/host-action-observation.mjs": "6bdb77d1bcc07ded278372a7113829306a6ff65c00b1a5ca1f8521e11b7c7588",
+    "tools/layout-studio/repository-effect-journal.mjs": "36ba67a8aa1600bf1a44d5dadf36ace2a0fc8b40854c349c4d825fddc51e1a27",
+    "tools/layout-studio/suite.mjs": "ff79355746f26319285e77dc7b02083fbbb709e8b4c47e1bbc4ff2ea243a9da7",
+    "tools/layout-studio/workflow.mjs": "1007d11ef9bc9d4a9ed6fe914a5768d856b4deb364d4b66dc61db714ab4923bd",
+    "scripts/verify-shield-host.mjs": "30f7a83c2ff72d4e0d1bacf51195f0c858e57f78320c310ce31a071f602efe7d"
+  },
+  "encryptedRollbackTested": true,
+  "windowsGuestDoubled": true,
+  "installedNativeAcceptance": false,
+  "newProviderRequests": 0,
+  "additionalStateTransactions": 0,
+  "recordingSource": "host-action-events",
+  "existingAgentConsentExpanded": false,
+  "frontendChanged": false,
+  "hardwareOpened": false,
+  "originalFailedReceiptsRetained": [
+    "isolated-test-2fe05125-2ccc-4081-819b-970764888486.json",
+    "isolated-test-42fe960b-6075-4df8-84bc-d365a58d417f.json",
+    "isolated-test-3e54e2f5-ffa0-4286-9710-8711a29ec3b1.json"
+  ],
+  "corrections": "Fixtures now compare audit deltas after bootstrap, close services before removing state, retain observation timestamps, and distinguish ordinary command results from gate-bearing receipts."
+}

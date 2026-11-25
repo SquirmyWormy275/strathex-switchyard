@@ -1,0 +1,52 @@
+{
+  "schema": "switchyard-linux-ci-and-interruption-summary/v1",
+  "date": "2026-11-24",
+  "acceptedCI": {
+    "sourceCommit": "6e6a134e667d14e2a6ffd458a5ca2c0812a8c94c",
+    "mergeCommit": "50d37737d8d04c4370ee6ca3235f8f5326b84540",
+    "sourceTree": "656a9c26969ab7d394619444ccba36800e48a246",
+    "workflow": 45488706967,
+    "job": 138784897815,
+    "conclusion": "success",
+    "testSummaries": 307,
+    "reportedTotals": {
+      "tests": 2623,
+      "pass": 2591,
+      "fail": 0,
+      "skipped": 32,
+      "cancelled": 0,
+      "todo": 0
+    },
+    "limits": "Original workflow bounds: 75-minute job, 300-second source-file limit. This is not a completed 495-group isolated receipt.",
+    "checks": [
+      "typecheck",
+      "source test loop",
+      "Linux source and suite packaging",
+      "real Secret Service installed smoke",
+      "canonical generated source"
+    ]
+  },
+  "interruptedLocal": {
+    "sourceCommit": "65b5aacc8df8ebb1cb7f592eafff2d3c2000ba86",
+    "runId": "cc90e062-e67b-4e4b-9d61-8a56ef5f4f8c",
+    "lastStartedGroup": 284,
+    "requiredGroups": 495,
+    "finalReceipt": false,
+    "accepted": false,
+    "reason": "Workstation restart at 2026-11-24 13:47:52 America/Los_Angeles.",
+    "cleanup": {
+      "removedFiles": 21,
+      "removedBytes": 8603,
+      "ownedRootAbsent": true,
+      "originalThreeWorktreesPreserved": true,
+      "inventorySha256": "e0b1b3806d5bdd8b9fc2c1dff144f76cc4a692e29635a72acb3f2577839fe671"
+    }
+  },
+  "installed": {
+    "sourceCommit": "65b5aacc8df8ebb1cb7f592eafff2d3c2000ba86",
+    "postRestartNormalLaunch": "ready",
+    "linuxRuntimeUnchanged": true,
+    "postRestartSavedWorkspaceRead": "CREDENTIAL_PROCESS_TIMEOUT: OS keyring unlock requested after restart; no state reset or replacement key."
+  },
+  "nativeWindows": "Latest shortcut property readback remains pending; no interactive Windows acceptance."
+}

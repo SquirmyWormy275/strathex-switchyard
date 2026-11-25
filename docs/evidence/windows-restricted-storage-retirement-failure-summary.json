@@ -1,0 +1,23 @@
+{
+  "schema": "switchyard-restricted-storage-retirement-failure/v1",
+  "sourceCommit": "5ec16fe9725c5ba20dec7b4a7a55451989f670f9",
+  "workflowRun": 42346369644,
+  "job": 128325074973,
+  "overallWorkflowPassed": false,
+  "restrictedOwnerCompletedChecks": 7,
+  "restrictedOwnerRequiredChecks": 8,
+  "failedPhase": "native-exit-and-fixture-retirement",
+  "failureCategory": "AssertionError",
+  "childExitCode": 2,
+  "originalFixturePreserved": true,
+  "queryTokenAccessMask": 8,
+  "limitation": "The retained proof does not identify which owner or final assertion failed. Diagnostics must distinguish durable stop flags, exact guardian retirement and original directory identity without changing acceptance conditions.",
+  "privateReceiptSha256": "17b5d97e3806b9ade769af1820244ad8722d9a47a374d2f83e4b3d1062e0afae",
+  "artifact": {
+    "id": 13563093431,
+    "bytes": 5627,
+    "sha256": "f5a46000ef55b2369fa5ebd4f91aba5ab332befc6422df547f42299389a9eebb",
+    "archiveReadInMemoryOnly": true
+  },
+  "success": false
+}

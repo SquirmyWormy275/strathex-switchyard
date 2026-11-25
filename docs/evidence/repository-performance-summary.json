@@ -1,0 +1,148 @@
+{
+  "schema": "switchyard-repository-performance-summary/v1",
+  "sourceCommit": "b48d4042d4fc8fb990c7c0654022a27d64e451a7",
+  "receipt": "repository-performance-1793904728312.json",
+  "receiptSha256": "9bc19482773c37b26ca5a3fa3af7bb94004cf04e807bce22758f17865b3939ea",
+  "syntheticAction": "shield_change_scan",
+  "phases": [
+    {
+      "name": "fixture",
+      "ms": 2778
+    },
+    {
+      "name": "review",
+      "ms": 1339
+    },
+    {
+      "name": "apply",
+      "ms": 15189
+    },
+    {
+      "name": "cleanup",
+      "ms": 128
+    }
+  ],
+  "metrics": [
+    {
+      "name": "authority.resolve",
+      "count": 10,
+      "ms": 11301
+    },
+    {
+      "name": "inspection.capture",
+      "count": 10,
+      "ms": 11004
+    },
+    {
+      "name": "store.snapshot",
+      "count": 1045,
+      "ms": 2517
+    },
+    {
+      "name": "store.update:repository-probe-exit",
+      "count": 120,
+      "ms": 2517
+    },
+    {
+      "name": "store.update:repository-probe-ready",
+      "count": 120,
+      "ms": 2452
+    },
+    {
+      "name": "store.authorize",
+      "count": 777,
+      "ms": 1930
+    },
+    {
+      "name": "store.update:repository-effect-journal",
+      "count": 27,
+      "ms": 706
+    },
+    {
+      "name": "store.update:repository-probe-scratch-cleaned",
+      "count": 10,
+      "ms": 303
+    },
+    {
+      "name": "authority.assertCurrent",
+      "count": 19,
+      "ms": 162
+    },
+    {
+      "name": "store.update:repository-execution-reserve",
+      "count": 1,
+      "ms": 46
+    },
+    {
+      "name": "store.update:repository-execution-staging",
+      "count": 1,
+      "ms": 34
+    },
+    {
+      "name": "store.update:repository-execution-native-exit",
+      "count": 1,
+      "ms": 33
+    },
+    {
+      "name": "store.update:repository-execution-review",
+      "count": 1,
+      "ms": 26
+    },
+    {
+      "name": "store.update:repository-execution-admission-result",
+      "count": 1,
+      "ms": 24
+    },
+    {
+      "name": "store.update:repository-execution-ready",
+      "count": 1,
+      "ms": 23
+    },
+    {
+      "name": "authority.close",
+      "count": 1,
+      "ms": 19
+    },
+    {
+      "name": "store.update:repository-execution-admit",
+      "count": 1,
+      "ms": 18
+    },
+    {
+      "name": "store.update:execution-checkpoint-binding",
+      "count": 1,
+      "ms": 18
+    },
+    {
+      "name": "store.update:repository-execution-staging-reserve",
+      "count": 1,
+      "ms": 17
+    },
+    {
+      "name": "store.update:task-authority-shutdown",
+      "count": 1,
+      "ms": 16
+    },
+    {
+      "name": "store.update:repository-execution-result",
+      "count": 1,
+      "ms": 13
+    },
+    {
+      "name": "inspection.close",
+      "count": 1,
+      "ms": 3
+    }
+  ],
+  "nestedMetricDurationsOverlap": true,
+  "isolatedProgramAndGuardianExitVerified": true,
+  "onlyAsyncMethodsInstrumented": true,
+  "productionPerformanceFixImplemented": false,
+  "scannerTimeoutCauseConfirmed": false,
+  "failedDiagnosticWrappersRetained": [
+    "repository-performance-1793904614180.json",
+    "repository-performance-1793904676903.json"
+  ],
+  "failedDiagnosticCause": "The temporary profiler initially wrapped a synchronous ledger factory in an async function. The successful run instruments only async methods; these diagnostic failures do not establish product failures.",
+  "profilingRootsAndScriptRemoved": true
+}

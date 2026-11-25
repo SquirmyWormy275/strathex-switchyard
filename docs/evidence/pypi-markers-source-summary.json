@@ -1,0 +1,129 @@
+{
+  "schema": "switchyard-pypi-markers-source-summary/v1",
+  "baseCommit": "fc521c6c24a438b786da837ffc39c386bc7f1276",
+  "sourceFiles": {
+    "tools/layout-studio/shield-scanner-engine.mjs": "010f2ab6460f5bbcccd928b422be54917296a92cef11306987e13ec75fa295b8",
+    "tools/layout-studio/repository-shield.mjs": "85ee133be969cb71c4ca2d1df752a73e935d529bcfb6b70ff161c607e6070ce2",
+    "tools/layout-studio/shield-scanner-engine.test.mjs": "51f4b278b34e34921e056a17f03efb1d66c034688c5d0a2fd5f055b0a0c7c40f",
+    "tools/layout-studio/repository-shield-pypi.test.mjs": "93e15af234e8e7728c2de4b8294ad83f4bb4e6cf83159ad5118def96f842c3b7",
+    "tools/layout-studio/repository-windows-shield-pypi.test.mjs": "ed2a25412cd769db87c5ff57f4cdf05374c459672bfe23e9db52aa9fd1ace073",
+    "tools/layout-studio/test-support/assert-pypi-shield.mjs": "062f44d0ae1117e7242153a7d1f3c9a27ec10ca485ddb95c6b3287925c697fd1",
+    "tools/layout-studio/test-support/shield-scanner-fixture.mjs": "e0a2d704ce0ba16531780a953906e2c0880d193f0586f291266e2434d29c6433",
+    "scripts/run-isolated-tests.mjs": "8d3942ffaec13b777f886fb0e20621b04cf444b48f598b888b7d002cd2c0aa8b",
+    "scripts/generate-pypi-marker-oracle.py": "648bfbddc00d98010cfb80fc203f2269351aea6c97f8a563d8a3819eb9e737e5",
+    "scripts/fixtures/pypi-marker-oracle.json": "862e6d35e49d68357e42c5d802e1cee6f6525adaaac931aa215df559aa34f3de"
+  },
+  "invalidInitialSelection": {
+    "name": "isolated-test-536c0789-481a-4039-94cf-76aa942b502c.json",
+    "sha256": "1e6eaa158d26ada596f2988ed645b6c7e1c1f51b5df57e0f502c4d9bac4e9890",
+    "success": false,
+    "totals": {
+      "required": 1,
+      "passed": 0,
+      "failed": 1,
+      "tests": 1,
+      "passedTests": 1,
+      "failedTests": 0,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    }
+  },
+  "beforeImplementation": {
+    "name": "isolated-test-1ffdc4b8-f3c1-49c5-aeee-28c3ea85cc1d.json",
+    "sha256": "6508beef1db5296d59ee781af917718fd93d7470c1f0d8061369d0ec082361b9",
+    "success": false,
+    "totals": {
+      "required": 2,
+      "passed": 0,
+      "failed": 2,
+      "tests": 2,
+      "passedTests": 0,
+      "failedTests": 2,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    }
+  },
+  "initialUnitPass": {
+    "name": "isolated-test-1f3fe790-77e6-4d8e-87dc-6c90e04ef3ec.json",
+    "sha256": "674c5feafe03dce9a759c9e0b3d4c1492ba59802afd94a2491a001c2bf1e4f50",
+    "success": true,
+    "totals": {
+      "required": 1,
+      "passed": 1,
+      "failed": 0,
+      "tests": 36,
+      "passedTests": 36,
+      "failedTests": 0,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    }
+  },
+  "focused": {
+    "name": "isolated-test-df4429cc-5b16-4231-bf5b-1ac49fa80459.json",
+    "sha256": "9af8be4bb1f628b49eff79b035a2509a7fc2083b0e62cffaa7b8a868d6b95f0f",
+    "success": true,
+    "totals": {
+      "required": 8,
+      "passed": 8,
+      "failed": 0,
+      "tests": 115,
+      "passedTests": 115,
+      "failedTests": 0,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    }
+  },
+  "acceptedDistinctTests": 115,
+  "newTests": 8,
+  "oracle": {
+    "cases": 87,
+    "pipVersion": "26.2.2",
+    "packagingVersion": "26.2",
+    "sources": [
+      {
+        "module": "pip._internal.req.req_file",
+        "sha256": "7661814b167d763d5e3aad8d5eff786e8af4bb59fc3f8f80be624bfaf63322c1"
+      },
+      {
+        "module": "pip._vendor.packaging.requirements",
+        "sha256": "43e05d107556e4aefce46057b7b45c3f8504b1d20a5a8585aa5ac78d1e16579d"
+      },
+      {
+        "module": "pip._vendor.packaging.markers",
+        "sha256": "422c4155c6fd0f61e3c04622ba1a4d91baa4f739cf45b53cccd5f4911d5122b5"
+      },
+      {
+        "module": "pip._vendor.packaging.utils",
+        "sha256": "33bf8930a89cdac3f562d57ff1a5bb795181fb1dc00ee282892aec55e09dd94a"
+      }
+    ],
+    "markersEvaluated": false
+  },
+  "newActualLinuxScannerJourneys": 2,
+  "newWindowsGuestDoubleJourneys": 2,
+  "artifactMarkerCombinations": 6,
+  "typecheckPassed": true,
+  "originalPackageBudgetPassed": true,
+  "allChildAndTreeCleanupVerified": true,
+  "ownedFocusedRootRemoved": true,
+  "literalValuesOmittedFromReports": true,
+  "environmentEvaluated": false,
+  "conditionalApplicabilityVerified": false,
+  "dependencyResolutionPerformed": false,
+  "installedChanged": false,
+  "nativeWindowsAccepted": false,
+  "modelRequests": 0,
+  "liveAccountChanges": 0,
+  "hardwareOperations": 0,
+  "limits": [
+    "The initial exact-name selector matched no tests and was rejected; it accepts zero cases.",
+    "Only declared pins are inventoried. Conditions are parsed and digested, never evaluated.",
+    "Unknown/context-dependent variables, duplicate normalized names and unsupported syntax refuse the whole file.",
+    "All results remain incomplete; matching conditional pin advisories are not proof of installed applicability.",
+    "Actual Linux scan execution uses the existing isolated fixture; Windows guest execution and native task identity are doubled where declared."
+  ]
+}

@@ -1,0 +1,41 @@
+{
+  "schema": "switchyard-restricted-child-event-native-summary/v1",
+  "sourceHead": "6f7e5952315cc617f63763cf20677daabe461a7f",
+  "executionMerge": "b37cb86c7e6624a1217f35e8a4d05b78f693d72b",
+  "runId": 42142720013,
+  "restrictedJobId": 127646712010,
+  "workflowAccepted": false,
+  "otherSuccessfulJobs": 55,
+  "nativeQueryStatus": "completed",
+  "nativeQueryHandlesClosedVerified": true,
+  "retainedMatchingEvents": 0,
+  "actualMatchingEventParserWitnessAvailable": false,
+  "restrictedPrimaryChildAccepted": false,
+  "restrictedChildExitCode": 3221225794,
+  "restrictedChildExitName": "STATUS_DLL_INIT_FAILED",
+  "resultAvailable": false,
+  "priorMetadataChecks": 13,
+  "priorExchangeChecks": 31,
+  "priorJavascriptOwnerChecks": 8,
+  "nativePortableParserCases": 12,
+  "nativeNormalAndDeletionHeaderCases": 1541,
+  "artifacts": [
+    {
+      "id": 13469505202,
+      "archiveSha256": "ecb59cfc6aeee72a01883b2198e1d2298637c082b93481ac91f0d60f823e5a26",
+      "receipt": "windows-protocol-6f7-native.json",
+      "receiptSha256": "84525079f138dc5fd3ee7bf000ac5b3f1fec9a60fc56cb062f91dc88f0696921"
+    },
+    {
+      "id": 13468079355,
+      "archiveSha256": "e2118b68a55e70aa267ed89cda6ad8968096a98a629b62be2c492c17ab471bae",
+      "receipt": "windows-restricted-owner-6f7-native.json",
+      "receiptSha256": "8645a7bba333778007e3623842f3d375367f81db42944a69fe54bab1e28993f9"
+    }
+  ],
+  "limits": [
+    "The bounded query executed and closed its handles but retained no exact PID/birth match. This does not establish that no relevant event exists elsewhere.",
+    "Native DLL-initialization repair remains unfinished software; no hardware or account absence explains this failure.",
+    "Earlier original child failures and their protected installations remain preserved."
+  ]
+}

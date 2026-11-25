@@ -1,0 +1,422 @@
+{
+  "bomFormat": "CycloneDX",
+  "specVersion": "1.6",
+  "version": 1,
+  "metadata": {
+    "tools": {
+      "components": [
+        {
+          "type": "application",
+          "name": "switchyard-baseline-scanner",
+          "version": "1"
+        }
+      ]
+    },
+    "properties": [
+      {
+        "name": "switchyard:scope",
+        "value": "reviewed-inputs"
+      },
+      {
+        "name": "switchyard:repository-scope",
+        "value": "unverified"
+      },
+      {
+        "name": "switchyard:dependency-graph",
+        "value": "not-collected"
+      },
+      {
+        "name": "switchyard:publisher-provenance",
+        "value": "not-verified"
+      },
+      {
+        "name": "switchyard:dependency-manifest:package-lock.json",
+        "value": "sha256:14e618db2aab0afc5a5499228d69408712cfa839ed181d042aabba3f5c203368"
+      }
+    ]
+  },
+  "components": [
+    {
+      "type": "library",
+      "bom-ref": "switchyard:3af64a4959311ca657696cb182fb3dd391cfc38b6a8a903c422fd7813c3d7784",
+      "name": "@strathex/switchyard-companion",
+      "version": "0.2.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "UNLICENSED"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "switchyard:ecosystem",
+          "value": "npm"
+        },
+        {
+          "name": "switchyard:spdx-list-version",
+          "value": "3.29.0"
+        },
+        {
+          "name": "switchyard:spdx-identifiers-listed",
+          "value": "false"
+        },
+        {
+          "name": "switchyard:spdx-identifiers-deprecated",
+          "value": "false"
+        },
+        {
+          "name": "switchyard:lockfile",
+          "value": "package-lock.json"
+        },
+        {
+          "name": "switchyard:package-location",
+          "value": "node_modules/@strathex/switchyard-companion"
+        },
+        {
+          "name": "switchyard:installed-as",
+          "value": "@strathex/switchyard-companion"
+        },
+        {
+          "name": "switchyard:source-kind",
+          "value": "workspace-link"
+        },
+        {
+          "name": "switchyard:workspace-path",
+          "value": "apps/windows-companion"
+        },
+        {
+          "name": "switchyard:workspace-lock-metadata-sha256",
+          "value": "0e20e2cace15f3a8dc7e804a916cff0bc118ea93271fa618c097cee5484523e7"
+        },
+        {
+          "name": "switchyard:workspace-source",
+          "value": "not-verified"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "switchyard:1710e864557f0370e02dd6a303b68c0fb5a7d99acfc8797873aef54c30e01322",
+      "name": "@strathex/switchyard-linux-companion",
+      "version": "0.1.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "UNLICENSED"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "switchyard:ecosystem",
+          "value": "npm"
+        },
+        {
+          "name": "switchyard:spdx-list-version",
+          "value": "3.29.0"
+        },
+        {
+          "name": "switchyard:spdx-identifiers-listed",
+          "value": "false"
+        },
+        {
+          "name": "switchyard:spdx-identifiers-deprecated",
+          "value": "false"
+        },
+        {
+          "name": "switchyard:lockfile",
+          "value": "package-lock.json"
+        },
+        {
+          "name": "switchyard:package-location",
+          "value": "node_modules/@strathex/switchyard-linux-companion"
+        },
+        {
+          "name": "switchyard:installed-as",
+          "value": "@strathex/switchyard-linux-companion"
+        },
+        {
+          "name": "switchyard:source-kind",
+          "value": "workspace-link"
+        },
+        {
+          "name": "switchyard:workspace-path",
+          "value": "apps/linux-companion"
+        },
+        {
+          "name": "switchyard:workspace-lock-metadata-sha256",
+          "value": "962847e80725f1e254200290938e2240df83b233e5afb2f3c778fd5f26bc1775"
+        },
+        {
+          "name": "switchyard:workspace-source",
+          "value": "not-verified"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "switchyard:569b9030ad2c166e1f71d9b1016a41ba467cfa90574d3671e1c48f4c9d41b33b",
+      "name": "@strathex/switchyard-provider-adapter-host",
+      "version": "0.1.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "UNLICENSED"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "switchyard:ecosystem",
+          "value": "npm"
+        },
+        {
+          "name": "switchyard:spdx-list-version",
+          "value": "3.29.0"
+        },
+        {
+          "name": "switchyard:spdx-identifiers-listed",
+          "value": "false"
+        },
+        {
+          "name": "switchyard:spdx-identifiers-deprecated",
+          "value": "false"
+        },
+        {
+          "name": "switchyard:lockfile",
+          "value": "package-lock.json"
+        },
+        {
+          "name": "switchyard:package-location",
+          "value": "node_modules/@strathex/switchyard-provider-adapter-host"
+        },
+        {
+          "name": "switchyard:installed-as",
+          "value": "@strathex/switchyard-provider-adapter-host"
+        },
+        {
+          "name": "switchyard:source-kind",
+          "value": "workspace-link"
+        },
+        {
+          "name": "switchyard:workspace-path",
+          "value": "apps/provider-adapter-host"
+        },
+        {
+          "name": "switchyard:workspace-lock-metadata-sha256",
+          "value": "7771936e26e5818c1866d659ac58cf83593bf1a35e54be09d69d05836962b303"
+        },
+        {
+          "name": "switchyard:workspace-source",
+          "value": "not-verified"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "switchyard:e949b3968b4183740b81713286c715749653bdc880335f3188f207ad9a44a66c",
+      "name": "@strathex/switchyard-vscode",
+      "version": "0.1.0",
+      "licenses": [
+        {
+          "license": {
+            "name": "UNLICENSED"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "switchyard:ecosystem",
+          "value": "npm"
+        },
+        {
+          "name": "switchyard:spdx-list-version",
+          "value": "3.29.0"
+        },
+        {
+          "name": "switchyard:spdx-identifiers-listed",
+          "value": "false"
+        },
+        {
+          "name": "switchyard:spdx-identifiers-deprecated",
+          "value": "false"
+        },
+        {
+          "name": "switchyard:lockfile",
+          "value": "package-lock.json"
+        },
+        {
+          "name": "switchyard:package-location",
+          "value": "node_modules/@strathex/switchyard-vscode"
+        },
+        {
+          "name": "switchyard:installed-as",
+          "value": "@strathex/switchyard-vscode"
+        },
+        {
+          "name": "switchyard:source-kind",
+          "value": "workspace-link"
+        },
+        {
+          "name": "switchyard:workspace-path",
+          "value": "apps/vscode-extension"
+        },
+        {
+          "name": "switchyard:workspace-lock-metadata-sha256",
+          "value": "2f474a5bdf9b5d5f40fd749a444a24fa19306430a7c88e956d3e88433141d6e5"
+        },
+        {
+          "name": "switchyard:workspace-source",
+          "value": "not-verified"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "switchyard:505aea908f86c7543eacd8f608ab031cf3aa5873988e55ee724063cb81d81b81",
+      "name": "@types/node",
+      "version": "24.13.3",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "switchyard:ecosystem",
+          "value": "npm"
+        },
+        {
+          "name": "switchyard:spdx-list-version",
+          "value": "3.29.0"
+        },
+        {
+          "name": "switchyard:spdx-identifiers-listed",
+          "value": "true"
+        },
+        {
+          "name": "switchyard:spdx-identifiers-deprecated",
+          "value": "false"
+        },
+        {
+          "name": "switchyard:lockfile",
+          "value": "package-lock.json"
+        },
+        {
+          "name": "switchyard:package-location",
+          "value": "node_modules/@types/node"
+        },
+        {
+          "name": "switchyard:installed-as",
+          "value": "@types/node"
+        },
+        {
+          "name": "switchyard:integrity-string-sha256",
+          "value": "e13eec962c6820fa4687583a99fca47c3191b20d6bc4f0f84fc99c4f937d98ce"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "switchyard:396e3f34daa47445889dbcf14ef4ca3d46cf06f442ac98dfa4ddbacd9a8f9243",
+      "name": "typescript",
+      "version": "5.9.3",
+      "licenses": [
+        {
+          "license": {
+            "name": "Apache-2.0"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "switchyard:ecosystem",
+          "value": "npm"
+        },
+        {
+          "name": "switchyard:spdx-list-version",
+          "value": "3.29.0"
+        },
+        {
+          "name": "switchyard:spdx-identifiers-listed",
+          "value": "true"
+        },
+        {
+          "name": "switchyard:spdx-identifiers-deprecated",
+          "value": "false"
+        },
+        {
+          "name": "switchyard:lockfile",
+          "value": "package-lock.json"
+        },
+        {
+          "name": "switchyard:package-location",
+          "value": "node_modules/typescript"
+        },
+        {
+          "name": "switchyard:installed-as",
+          "value": "typescript"
+        },
+        {
+          "name": "switchyard:integrity-string-sha256",
+          "value": "79bf46fcdd3146ff8e3ba693aed2cdb3b989b53e4f239f505504d18cc3a25c3f"
+        }
+      ]
+    },
+    {
+      "type": "library",
+      "bom-ref": "switchyard:473f780525414d4a2ea369bb6b63bbadacc169bc38dc6c947fec2bd813d6ee7e",
+      "name": "undici-types",
+      "version": "7.18.2",
+      "licenses": [
+        {
+          "license": {
+            "name": "MIT"
+          }
+        }
+      ],
+      "properties": [
+        {
+          "name": "switchyard:ecosystem",
+          "value": "npm"
+        },
+        {
+          "name": "switchyard:spdx-list-version",
+          "value": "3.29.0"
+        },
+        {
+          "name": "switchyard:spdx-identifiers-listed",
+          "value": "true"
+        },
+        {
+          "name": "switchyard:spdx-identifiers-deprecated",
+          "value": "false"
+        },
+        {
+          "name": "switchyard:lockfile",
+          "value": "package-lock.json"
+        },
+        {
+          "name": "switchyard:package-location",
+          "value": "node_modules/undici-types"
+        },
+        {
+          "name": "switchyard:installed-as",
+          "value": "undici-types"
+        },
+        {
+          "name": "switchyard:integrity-string-sha256",
+          "value": "170dd2fdeda45782775d439b367914d0fe7f3ccf7ba8e575511d7c2eb142da22"
+        }
+      ]
+    }
+  ],
+  "compositions": [
+    {
+      "aggregate": "unknown"
+    }
+  ]
+}

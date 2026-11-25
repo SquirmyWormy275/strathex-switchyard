@@ -1,0 +1,54 @@
+{
+  "schema": "switchyard-runtime-status-diagnostic-source/v1",
+  "at": "2026-11-07T11:53:06.778Z",
+  "baseCommit": "c359cdfbc4b15c6c852986a9a2b36fe6f640d9df",
+  "sourceFiles": {
+    "apps/desktop-hotkeys/RuntimeCommandRunner.cs": "57ba45dfac2bb11f57f27e341c0efe2a5f89e6a7d85944e8d0ff2c1217a994b2",
+    "tools/layout-studio/runtime-command.mjs": "7559d0809817ec98c189ae35a2d8ba00fa25a7314b9bdcfcbea077a387b16844",
+    "tools/layout-studio/runtime-command.test.mjs": "2ced8a4174449e88e8306e3c9fdd94222483b0bd03e921f77163b641ed6215c4",
+    "scripts/windows-broker-owner-proof.mjs": "bb882b1297368d6333616a096f8fe908253d7cefe50a7db131cbcd839e4fbda8",
+    "scripts/windows-descendant-query.mjs": "ab5970bc50bb616c35b3258a22f385d7c435f173650de807456a1bfefb48e160",
+    "scripts/windows-restricted-owner-report.test.mjs": "a37ee8b2357a41bbc7f1c3a5234a450dde36e07a45919bf97d560af69289fd74"
+  },
+  "receipt": {
+    "name": "isolated-test-43c0db10-cc85-4282-9fa1-0d4d077b2de6.json",
+    "sha256": "d437185e3694dbd937085862e27953d4e9980538048e8f0f3cdad0bcf53503e8",
+    "totals": {
+      "required": 3,
+      "passed": 3,
+      "failed": 0,
+      "tests": 53,
+      "passedTests": 53,
+      "failedTests": 0,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    },
+    "originalCleanupVerified": true
+  },
+  "compile": {
+    "sourceFiles": 36,
+    "warnings": 0,
+    "errors": 0,
+    "sourceOnly": true,
+    "removedFiles": 4,
+    "removedBytes": 758554
+  },
+  "scope": {
+    "fixedFailurePhaseOnly": true,
+    "numericNativeCodeOnly": true,
+    "noRawExceptionOrCoordinates": true,
+    "statusFailureStillExit2": true,
+    "unknownRetirementStillRefused": true,
+    "originalProcessAndJobQueriesUnchanged": true,
+    "tokenQueryMask": 8,
+    "noAclOrPrivilegeChange": true,
+    "originalDeadlinesRetained": true,
+    "processQueryImplementationChanged": false
+  },
+  "limitations": [
+    "This improves future failure evidence; it does not establish or fix the intermittent restricted-storage retirement cause.",
+    "Native Windows diagnostic acceptance is pending; the separate c359cdf client pass predates this change.",
+    "No installed application, account, hardware or frontend change is inferred."
+  ]
+}

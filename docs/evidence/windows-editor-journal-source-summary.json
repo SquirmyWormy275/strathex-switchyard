@@ -1,0 +1,103 @@
+{
+  "schema": "switchyard-windows-editor-journal-source-summary/v1",
+  "at": "2026-11-07T08:49:24.881Z",
+  "baseCommit": "2d1cc65d02b498b7211d0d754fcf7dc35ef61a15",
+  "sourceFiles": {
+    ".github/workflows/client-platform.yml": "b435b6ebdd8a178531a8c6f692e85286129c8704a4b2100f275f50104b762abf",
+    "apps/desktop-hotkeys/OwnedStdioRunner.cs": "8a1a4021f4e3f3a5820c4540a0b72578f5f0424c898de926446bda37fa035a00",
+    "apps/desktop-hotkeys/RuntimeCommandRunner.cs": "707abda45e13d70ea7a8a9fa0bb5ab8ac342ae491b9c5590118d3f3ba2047f5b",
+    "deployment/suite/application.test.mjs": "bfff39c8699b6d578edd54a80e1e26fd9d346c708b1707ac27e332e934d4b83b",
+    "deployment/suite/release.test.mjs": "bfdce3a7644ef2be90619ee410e4941e3deacff5cf387ed6c8697d8f8f5863ef",
+    "scripts/run-isolated-tests.mjs": "d7f12e5957ad71f8223e0816d7211514d142dcce26bef96fd35fa16731d02223",
+    "scripts/run-isolated-tests.test.mjs": "6edb77ff1cf097610fa4c193eb9f50b4a793312ce45c991768ce979a3cfa44c5",
+    "scripts/verify-client-platform.mjs": "87a33a55223ab2e734f4115301f5a6f361cdd9ee19d67b43e8647936f9b6d407",
+    "tools/layout-studio/codex-editor-recovery.test.mjs": "c7c7a6a15255d8466eb3c159ed43a49ec14e60d0914ecd087efd780321cabb6f",
+    "tools/layout-studio/codex-editor-relay.mjs": "f3e714807076a5fc870e79edb5e92b4a28e022d8b5977cf290ab1cafb826f40a",
+    "tools/layout-studio/codex-retained-editor-client.mjs": "8c01e115daa41ea67649f1cdccb2bb6fbfbcf6adecfc7c6eba8ed626026665d9",
+    "tools/layout-studio/codex-retained-editor-client.test.mjs": "62d10cd7b554189ec4140758d150850bda5c3fbf88f72fac283ec0e075ad9005",
+    "tools/layout-studio/codex-windows-owner.mjs": "15fd127de59f0f21334e7132eb748ed7968cc268101a82183464135f56487007",
+    "tools/layout-studio/codex-windows-tasks.mjs": "c9d9afd24f6941a39d4eeec1230940a05a36d3496172fb6d8ac5a49c75e8d030",
+    "tools/layout-studio/codex-windows-tasks.test.mjs": "18250705c3f7ad16da8dc6ec5cf4ed435d408dcefd75b776d53436c7ec0624aa",
+    "tools/layout-studio/coding-editor-authorizations.test.mjs": "ee485ff79a93024780f0a11b286453eb0377f71129cebeb43eb958900f221d94",
+    "tools/layout-studio/coding-editor-connections.test.mjs": "134fd8ecb7ed502d7644d09c70bd2bc4e84a70511f4f2d7ae676b60b68c4eecf",
+    "tools/layout-studio/coding-editor-journal.mjs": "41507138d377c28ea979d60f0fdf6ecf91bf36098e10d31a3a3c8a1a1f56e979",
+    "tools/layout-studio/coding-editor-journal.test.mjs": "215c1a729feb1686f75a4abe776561eeb42c1cddc683323e7fb471ab702f1ed3",
+    "tools/layout-studio/coding-task-owners.test.mjs": "9498fb2ba26aae1cd3ffde67e573f6747dce428c350632a75bca118f763e0aff",
+    "tools/layout-studio/editor-observation.mjs": "09b1abb1a78f81a3ba013e28ff7a89242c2ff8ce2a83122ed173168336dfb14a",
+    "tools/layout-studio/editor-observation.test.mjs": "335e4d1904cbc0b45fa8f05aa429d3b73fffe35746457ace514d3518709e157c",
+    "tools/layout-studio/suite.test.mjs": "18d65cf5a39999ae18be36a9eb2662f29823e9710aef941e2f31f6ab76972521",
+    "tools/layout-studio/test-support/codex-windows-stdio-fixture.cjs": "06709fe0f6de17b4e77ad720a7fd9b1e8ca98c2fe750d03923f5516f227d2d9f",
+    "tools/layout-studio/windows-codex-editor-connection.test.mjs": "56ac0f649857190b702d743d1873a0ef61e87154503c281d8ab5832e2e9e0de5",
+    "tools/layout-studio/windows-editor-journal-contract.mjs": "6b381af620e14c764d6a124206f7c0591e0af6732f25daaf8e7419e28936157d",
+    "tools/layout-studio/windows-editor-journal.test.mjs": "1c049990fb287c557062a269528f67d733f99405296c939352659a4687be664f",
+    "tools/layout-studio/windows-owned-stdio.mjs": "d336c610168dec5b4a6fea716880ec9f43914c7abfedfc74636f483d99f9a426"
+  },
+  "receipts": [
+    {
+      "name": "isolated-test-fbefa78c-1a4c-4103-af73-4685cda37d2d.json",
+      "sha256": "a9cf16f3d671439af2b4060bd3bf6d7492792b11153838b4fd98cc1f415f6931",
+      "totals": {
+        "required": 38,
+        "passed": 38,
+        "failed": 0,
+        "tests": 165,
+        "passedTests": 164,
+        "failedTests": 0,
+        "skippedTests": 1,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    }
+  ],
+  "groups": 38,
+  "passedTests": 164,
+  "skippedTests": 1,
+  "originalCommandsBoundsSkipsAndCleanupVerified": true,
+  "typecheck": {
+    "command": "npm run typecheck",
+    "node": "24.14.0",
+    "passed": true
+  },
+  "scope": {
+    "windowsNativeHostCoordinatesValidated": true,
+    "originalJobBindingRetained": true,
+    "logicalClientRetirementSeparateFromProcessExit": true,
+    "closedIngressCapabilityHashAndPeerCoordinates": true,
+    "consumedPermitAndNoReplayPreserved": true,
+    "recoveryRequiresOriginalHostAndIndependentRetirementFacts": true,
+    "protectedRecordSubstitutionRefused": true,
+    "uncertainQueryHelpersRemainExplicit": true,
+    "privacyConsentAndEncryptedJournalExercised": true,
+    "linuxJournalRecoveryAndRoutesRegressionsPassed": true
+  },
+  "nativeProcessEvidence": "windows-editor-target-native-summary.json",
+  "retainedFailure": {
+    "receipt": "isolated-test-bb37d5af-9e94-4412-8fa4-40499ac0b971.json",
+    "sha256": "258391c80b5184e113152217633fec51a2921409d3f8ed6d1c577fa847a4ca7c",
+    "meaning": "An observation fixture lacked its identity and current timestamps. The corrected fixture passes through the unchanged protected-state validation and recording rules.",
+    "correctedReceipt": "isolated-test-fbefa78c-1a4c-4103-af73-4685cda37d2d.json",
+    "originalChildAndTreeCleanupVerified": true
+  },
+  "effects": {
+    "liveModelPrompts": 0,
+    "liveProviderTasks": 0,
+    "accountChanges": 0,
+    "hardwareOpened": false,
+    "frontendChanged": false,
+    "installedApplicationChanged": false,
+    "newDependencies": false,
+    "newCompilation": false
+  },
+  "limitations": [
+    "Windows journal tests use actual encrypted state and kernel leases with explicit native process/owner and recovery-verifier doubles.",
+    "The earlier Windows target/process/registry composition passes native CI at 2d1cc65; this later journal contract is pending Windows execution.",
+    "The Windows lifecycle must still retain all original query-helper ownership, implement native host/helper recovery, and connect Suite editor routes and VS Code launching.",
+    "The journal starts no process or socket and grants no terminal/task/model permission; no live accounts or hardware are claimed."
+  ],
+  "cleanup": {
+    "originalChildAndTreeRetirementVerified": true,
+    "noCompilerOrBundleStagingCreated": true,
+    "fixtureRootsRemoved": true
+  },
+  "success": true
+}

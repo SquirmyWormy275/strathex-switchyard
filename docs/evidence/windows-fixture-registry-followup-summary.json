@@ -1,0 +1,77 @@
+{
+  "schema": "switchyard-windows-fixture-registry-followup/v1",
+  "test": "apps/windows-companion/test/scanner-fixtures.test.ts",
+  "unchangedTestSha256": "be89990cc65ce31f04ce69fc80fba280fe3873f76f3d26c26606a3085711d1d5",
+  "attempts": [
+    {
+      "sourceCommit": "2ab67fca616955f359eb8df23183e7935b235ed6",
+      "receipt": "windows-fixture-registry-2ab67fc-13548972295-0.json",
+      "receiptSha256": "8ab5a800667d0d3162d7a677904b1a4780acde1e01b7a4f9009936ae608620ff",
+      "totals": {
+        "required": 1,
+        "passed": 0,
+        "failed": 1,
+        "tests": 20,
+        "passedTests": 19,
+        "failedTests": 1,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "success": false,
+      "allChildAndTreeCleanupVerified": true,
+      "childDeadlineMs": 45000,
+      "pythonDeadlineMs": 5000
+    },
+    {
+      "sourceCommit": "39db1fe6ca5f7dce4737d4847e794354b8bc63c9",
+      "receipt": "windows-fixture-registry-39db1fe-13549836065.json",
+      "receiptSha256": "3c84b0fe3f5029c3d5a6b73a4755a34841806b5a41e3dd5341d704cc9c359373",
+      "totals": {
+        "required": 1,
+        "passed": 1,
+        "failed": 0,
+        "tests": 20,
+        "passedTests": 20,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "success": true,
+      "allChildAndTreeCleanupVerified": true,
+      "childDeadlineMs": 45000,
+      "pythonDeadlineMs": 5000
+    }
+  ],
+  "failedWorkflow": 42311845282,
+  "failedJob": 128215396897,
+  "failedArtifact": 13548972295,
+  "failedArtifactSha256": "2e364245c03d876b44148f9782ecfe62e405941709bca0ac770ce2a469b277aa",
+  "failedMerge": "a34dc255e6ebe86843f8b9947894b21b011626e7",
+  "failedSourceAndMergeTree": "50822da9576acc45e2a0d42b85c5b6e77f9d0a01",
+  "followupWorkflow": 42312687735,
+  "followupJob": 128218122970,
+  "followupArtifact": 13549836065,
+  "followupArtifactSha256": "df88b2f08ed252f8043b2c7434899a65c78e3ad2c64edf1e4e3b29c4435e654c",
+  "followupMerge": "2234dbac67a17994d52c1330b7ec1df7941f4996",
+  "followupSourceAndMergeTree": "10e3684a9e90f6c9b54ce9e1ce708c8cdb507dab",
+  "failure": "spawnSync python.exe ETIMEDOUT in the native directory spelling fixture",
+  "causeEstablished": false,
+  "repairClaimed": false,
+  "deadlinesChanged": false,
+  "runtimeOrAccountChanges": false,
+  "zipRetained": false,
+  "followupOverallWorkflowGreen": false,
+  "cancelledOtherJobs": [
+    {
+      "id": 128218123655,
+      "lane": "pypi-scanner"
+    },
+    {
+      "id": 128218124869,
+      "lane": "osv-scanner"
+    }
+  ],
+  "cancelledJobsAcceptedChecks": 0
+}

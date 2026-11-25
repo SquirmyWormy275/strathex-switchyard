@@ -1,0 +1,67 @@
+{
+  "schema": "switchyard-linux-complete-summary/v1",
+  "sourceCommit": "701f915478f6cbd788216c927cac4f047370d2e3",
+  "receipt": "isolated-test-b3d1791f-e729-492c-955c-30f23b4f262d.json",
+  "receiptSha256": "0199f79e376b0eb3f1240a3e962cbc409731cd0a07298b330119771ef926d31f",
+  "totals": {
+    "required": 260,
+    "passed": 260,
+    "failed": 0,
+    "tests": 1724,
+    "passedTests": 1713,
+    "failedTests": 0,
+    "skippedTests": 11,
+    "cancelledTests": 0,
+    "todoTests": 0
+  },
+  "allChildAndTreeCleanupVerified": true,
+  "ownedCleanupReceipt": "linux-701f915-cleanup-1793970096597.json",
+  "ownedCleanup": {
+    "schema": "switchyard-owned-linux-checkout-cleanup/v1",
+    "source": "701f915478f6cbd788216c927cac4f047370d2e3",
+    "runReceipt": "isolated-test-b3d1791f-e729-492c-955c-30f23b4f262d.json",
+    "runAccepted": true,
+    "allChildAndTreeCleanupVerified": true,
+    "exactRootIdentityVerified": true,
+    "dependencyAliasesVerifiedRemoved": true,
+    "ownedBuildsRemoved": true,
+    "ownedBuildInventory": {
+      "apps/linux-companion/dist": {
+        "files": 284,
+        "bytes": 3901753,
+        "manifestSha256": "45419195f09c75fc5c827af25b42c2b7fd44f1e8b98f47934a5f583b5cae092c"
+      },
+      "apps/provider-adapter-host/dist": {
+        "files": 192,
+        "bytes": 2966212,
+        "manifestSha256": "5da5a084869a1080c96a0a12651184df260ed32ea5d726d440068cdf797fda14"
+      },
+      "apps/vscode-extension/dist": {
+        "files": 34,
+        "bytes": 993751,
+        "manifestSha256": "280def62085860e447c6d415829522e8c8841d40e5fd5276c7cc87c8df3aba1f"
+      },
+      "apps/windows-companion/dist": {
+        "files": 268,
+        "bytes": 3884786,
+        "manifestSha256": "1ace2b0cb8221d142529368ea4aa57def68bb5e100b1a7a55946ffa858fb7802"
+      },
+      "packages/protocol/dist": {
+        "files": 4,
+        "bytes": 20153,
+        "manifestSha256": "afd543b262827278ff70d0f377306c02931ce467dbf4f1176d524295a9a810fc"
+      }
+    },
+    "checkoutRemoved": true,
+    "rootRemoved": true,
+    "markerRemoved": true,
+    "ownedTestParentRemoved": true
+  },
+  "scope": "Complete Linux manifest from immutable published 701f915 source, including editor lifecycle history, retained Terminal composition, exact retirement and Cargo prerelease/build matching.",
+  "limits": [
+    "Eleven declared Windows-only skips; no Windows restricted-owner or native guest acceptance is inferred.",
+    "Real Linux carriers use synthetic providers/terminals. No native account, TUI, model or keyboard effect ran.",
+    "The later Windows lock-path canonicalization has separate focused evidence.",
+    "Installed source remains 5a2c324. Frozen frontend and hardware/account acceptance remain separate."
+  ]
+}

@@ -1,0 +1,72 @@
+{
+  "schema": "switchyard-claude-task-version-admission/v1",
+  "sourceParent": "84738d6dff9e96e9b3c5da724309aaccf905a26e",
+  "sourceFiles": {
+    "tools/layout-studio/claude-coding.mjs": "46ed20a000d31ab78c72ba146fda25416b13b9cbec9bb548c0605f7e076ea02a",
+    "tools/layout-studio/claude-coding.test.mjs": "cb84ee04c192e475381ff1861d305d477d6765631fa906327c81e47502cca448",
+    "scripts/verify-agent-security-host.mjs": "20f6489df012dfe3d28683b914471b2166d2fe5425e6f31f921124d9cbb5e6f4"
+  },
+  "previousAdapterSha256": "3f74227a37a54551074288e6bca17c4270c08958edae5a37ec7560cb68340a96",
+  "originalFailure": "The task adapter's broad version range advertised native task controls for unreviewed 2.1.309. The regression failed at discovery before attempting task creation.",
+  "correction": "Use the existing shared exact reviewed version list for task discovery, account/inventory checks, creation, text reservation and cleanup. Refuse unknown revisions before subsequent native commands; preserve existing owned task records and uncertain cleanup behavior.",
+  "reviewedVersions": [
+    "2.1.308",
+    "2.1.317",
+    "2.1.319"
+  ],
+  "rejectedFixtureVersions": [
+    "2.1.309",
+    "2.1.318",
+    "2.1.320",
+    "2.1.9999",
+    "2.1.319-preview"
+  ],
+  "receipts": [
+    {
+      "id": "ba658740-e55a-4bc8-b2ee-cb28f759177f",
+      "sha256": "e1caa1d3e088af2cd1f4f6fb42556deeb44f43d6475d9650d74b2cf1d4400494",
+      "success": false,
+      "totals": {
+        "required": 1,
+        "passed": 0,
+        "failed": 1,
+        "tests": 19,
+        "passedTests": 18,
+        "failedTests": 1,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "id": "61ce46d4-ed81-4260-a567-7b326ac46ac1",
+      "sha256": "b5b8063b4a3d77549e6f7d905540944a9258f8da868bccb62e40643edc25ac42",
+      "success": true,
+      "totals": {
+        "required": 6,
+        "passed": 6,
+        "failed": 0,
+        "tests": 94,
+        "passedTests": 94,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    }
+  ],
+  "acceptedGroups": 6,
+  "acceptedTests": 94,
+  "skippedTests": 0,
+  "typecheck": true,
+  "originalCommandsBoundsAndCleanupVerified": true,
+  "liveTaskOperations": 0,
+  "modelRequests": 0,
+  "loginChanges": 0,
+  "frontendChanged": false,
+  "limitations": [
+    "The native CLI is doubled in these task/discovery regressions. Actual 2.1.319 metadata/help acceptance is recorded separately; no native model, task or terminal operation is accepted.",
+    "This tightens the existing adapter contract; it does not implement Claude terminal attachment or broaden provider containment.",
+    "Installed adoption and native Windows execution of this later regression remain separate until verified."
+  ]
+}

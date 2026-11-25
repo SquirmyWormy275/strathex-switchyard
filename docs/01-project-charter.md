@@ -62,7 +62,9 @@ The first stable release must demonstrate:
 
 ## Constraints
 
-- Primary environment: Windows with VS Code, PowerShell, Git, and multiple coding-agent sessions.
+- Primary agent environment: the owner's Omarchy Linux workstation with native ChatGPT/Codex, Claude, VS Code, Foot, Git, and multiple task surfaces. An exact provider signal is required before Switchyard reports a task as blocked or finished.
+- Portable typing environment: a Windows work laptop or another Windows PC must accept the commissioned B122 as an ordinary USB keyboard without installing Switchyard software or configuring an account. Agent controls are optional, per-user host capabilities and remain unavailable until that host is explicitly provisioned.
+- Preserve the current 22-control, 65-assignment chord contract while collecting workflow and physical evidence. Reassessment may change implementation priority and presentation without silently remapping a chord.
 - Hardware: Model F Labs B122 with programmable RP2040 Leyden Jar controller and relegendable keys.
 - The B122 may expose signals beyond what every application accepts consistently; host-level interpretation is therefore part of the design.
 - Safety and attribution take precedence over convenience and visual polish.

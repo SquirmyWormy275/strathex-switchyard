@@ -1,0 +1,24 @@
+{
+  "schema": "switchyard-editor-target-preparation/v1",
+  "basis": "8321e5666c803bf220d3b972bb26ae45b859f67c",
+  "receipt": "isolated-test-d5c5f6d8-e075-4f7f-8956-6e7abcdf857a.json",
+  "groups": 4,
+  "passedTests": 75,
+  "allChildAndTreeCleanupVerified": true,
+  "typecheck": true,
+  "sourceSha256": {
+    "tools/layout-studio/coding-task-owners.mjs": "3a3071845dfca64e7ad5c48291d77c131991a081be5d94045b29da1ff475bf0c",
+    "tools/layout-studio/codex-owned-listener.mjs": "5791901549bd1d158572b354053bbec8cf513e02e9d64ab1c622cc363245deda",
+    "tools/layout-studio/suite.mjs": "99a9a8913625d41af2171426f370664b4fba4766d5136374de33dcc98d45d233"
+  },
+  "observations": [
+    "Original Unix metadata connection remains usable after alias replacement; fresh editor-target inspection refuses the replaced alias.",
+    "Target metadata requires original successful load, current account/repository/policy, exact endpoint and idle observation.",
+    "Asynchronous load, policy and endpoint substitutions refuse delivery. Unauthenticated and unrelated effect fields are rejected."
+  ],
+  "limits": [
+    "Target digest is metadata, not an authority credential. No terminal creation, second resume, new provider task or model prompt.",
+    "Authenticated editor consumer, effect authorization and exact terminal/native attachment acknowledgement remain unfinished.",
+    "Installed application remains 4b5e3cc; complete Linux checkpoint 359a825 precedes these focused source changes."
+  ]
+}

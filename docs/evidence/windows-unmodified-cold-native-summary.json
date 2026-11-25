@@ -1,0 +1,277 @@
+{
+  "schema": "switchyard-windows-unmodified-cold-native/v1",
+  "sourceCommit": "7e5c4952f78a899b624fb486d8f43912c8b19bc3",
+  "executionCommit": "0cad9b42c88ce5074a21501fe43a33e5b5202024",
+  "sourceAndExecutionTree": "1b366f9481f2330936f80a851de8337dd9209b38",
+  "runId": 42243443001,
+  "jobId": 127979853626,
+  "artifactId": 13517042894,
+  "archiveBytes": 4472,
+  "archiveSha256": "568579b5127d5a116c3673187eb842b8e2eb2b16352276cd4de74fff17972425",
+  "zipSavedLocally": false,
+  "privateReceipt": "windows-cold-comparison-7e-native.json",
+  "coldExecutableSha256": "71421241e5b7b24e6a423941c782537fe172ec18cd33243d078cb1f951c2fece",
+  "originalCold": {
+    "schema": "switchyard-cold-restricted-random/v5",
+    "executableSha256": "71421241e5b7b24e6a423941c782537fe172ec18cd33243d078cb1f951c2fece",
+    "waitResult": 0,
+    "exitCode": 0,
+    "reportValid": true,
+    "report": {
+      "systemStatus": 0,
+      "providerOpenStatus": 0,
+      "providerStatus": 0,
+      "providerCloseStatus": 0,
+      "handlesClosedVerified": true,
+      "buffersClearedVerified": true,
+      "firstApi": "legacy-cryptoapi",
+      "legacy": {
+        "providerOpened": true,
+        "providerOpenError": 0,
+        "generated": true,
+        "generateError": 0,
+        "providerCloseError": 0,
+        "handlesClosedVerified": true,
+        "buffersClearedVerified": true
+      },
+      "enhancedProvider": {
+        "providerOpened": true,
+        "providerOpenError": 0,
+        "generated": true,
+        "generateError": 0,
+        "providerCloseError": 0,
+        "handlesClosedVerified": true,
+        "buffersClearedVerified": true
+      },
+      "providerLookups": {
+        "user": {
+          "succeeded": true,
+          "error": 0,
+          "providerClass": "strong",
+          "bufferClearedVerified": true
+        },
+        "machine": {
+          "succeeded": true,
+          "error": 0,
+          "providerClass": "strong",
+          "bufferClearedVerified": true
+        }
+      },
+      "selfTokenAccess": {
+        "query": {
+          "opened": true,
+          "error": 0,
+          "closeError": 0,
+          "handlesClosedVerified": true
+        },
+        "queryDuplicate": {
+          "opened": false,
+          "error": 5,
+          "closeError": null,
+          "handlesClosedVerified": true
+        },
+        "queryDuplicateImpersonate": {
+          "opened": false,
+          "error": 5,
+          "closeError": null,
+          "handlesClosedVerified": true
+        }
+      },
+      "emptyJobs": {
+        "anonymous": {
+          "opened": true,
+          "createError": 0,
+          "createdNew": true,
+          "querySucceeded": true,
+          "queryError": 0,
+          "activeProcesses": 0,
+          "closeError": 0,
+          "handlesClosedVerified": true
+        },
+        "local": {
+          "opened": true,
+          "createError": 0,
+          "createdNew": true,
+          "querySucceeded": true,
+          "queryError": 0,
+          "activeProcesses": 0,
+          "closeError": 0,
+          "handlesClosedVerified": true
+        },
+        "global": {
+          "opened": true,
+          "createError": 0,
+          "createdNew": true,
+          "querySucceeded": true,
+          "queryError": 0,
+          "activeProcesses": 0,
+          "closeError": 0,
+          "handlesClosedVerified": true
+        }
+      }
+    },
+    "primaryTokenVerified": true,
+    "tokenRecheckedAfterExit": true,
+    "treeExitVerified": true,
+    "processHandlesClosedVerified": true,
+    "creatorQuotaRestoredVerified": true,
+    "standardIo": {
+      "schema": "switchyard-restricted-child-stdio/v1",
+      "standardHandles": 3,
+      "inheritanceRestricted": true,
+      "stdinEof": true,
+      "stdoutBytes": 0,
+      "stderrBytes": 0,
+      "outputBounded": true,
+      "handlesClosedVerified": true,
+      "drainsCompleted": true,
+      "stderr": {
+        "category": "empty",
+        "function": null,
+        "code": null,
+        "sourceFile": null,
+        "sourceLine": null
+      }
+    },
+    "nodeStartupAccepted": false
+  },
+  "unmodifiedCold": {
+    "schema": "switchyard-cold-restricted-random/v5",
+    "executableSha256": "71421241e5b7b24e6a423941c782537fe172ec18cd33243d078cb1f951c2fece",
+    "waitResult": 0,
+    "exitCode": 0,
+    "reportValid": true,
+    "report": {
+      "systemStatus": 0,
+      "providerOpenStatus": 0,
+      "providerStatus": 0,
+      "providerCloseStatus": 0,
+      "handlesClosedVerified": true,
+      "buffersClearedVerified": true,
+      "firstApi": "legacy-cryptoapi",
+      "legacy": {
+        "providerOpened": false,
+        "providerOpenError": 5,
+        "generated": null,
+        "generateError": null,
+        "providerCloseError": null,
+        "handlesClosedVerified": true,
+        "buffersClearedVerified": true
+      },
+      "enhancedProvider": {
+        "providerOpened": false,
+        "providerOpenError": 5,
+        "generated": null,
+        "generateError": null,
+        "providerCloseError": null,
+        "handlesClosedVerified": true,
+        "buffersClearedVerified": true
+      },
+      "providerLookups": {
+        "user": {
+          "succeeded": true,
+          "error": 0,
+          "providerClass": "strong",
+          "bufferClearedVerified": true
+        },
+        "machine": {
+          "succeeded": true,
+          "error": 0,
+          "providerClass": "strong",
+          "bufferClearedVerified": true
+        }
+      },
+      "selfTokenAccess": {
+        "query": {
+          "opened": false,
+          "error": 5,
+          "closeError": null,
+          "handlesClosedVerified": true
+        },
+        "queryDuplicate": {
+          "opened": false,
+          "error": 5,
+          "closeError": null,
+          "handlesClosedVerified": true
+        },
+        "queryDuplicateImpersonate": {
+          "opened": false,
+          "error": 5,
+          "closeError": null,
+          "handlesClosedVerified": true
+        }
+      },
+      "emptyJobs": {
+        "anonymous": {
+          "opened": true,
+          "createError": 0,
+          "createdNew": true,
+          "querySucceeded": true,
+          "queryError": 0,
+          "activeProcesses": 0,
+          "closeError": 0,
+          "handlesClosedVerified": true
+        },
+        "local": {
+          "opened": false,
+          "createError": 5,
+          "createdNew": false,
+          "querySucceeded": null,
+          "queryError": null,
+          "activeProcesses": null,
+          "closeError": null,
+          "handlesClosedVerified": true
+        },
+        "global": {
+          "opened": false,
+          "createError": 5,
+          "createdNew": false,
+          "querySucceeded": null,
+          "queryError": null,
+          "activeProcesses": null,
+          "closeError": null,
+          "handlesClosedVerified": true
+        }
+      }
+    },
+    "primaryTokenVerified": true,
+    "tokenRecheckedAfterExit": true,
+    "treeExitVerified": true,
+    "processHandlesClosedVerified": true,
+    "creatorQuotaRestoredVerified": true,
+    "standardIo": {
+      "schema": "switchyard-restricted-child-stdio/v1",
+      "standardHandles": 3,
+      "inheritanceRestricted": true,
+      "stdinEof": true,
+      "stdoutBytes": 0,
+      "stderrBytes": 0,
+      "outputBounded": true,
+      "handlesClosedVerified": true,
+      "drainsCompleted": true,
+      "stderr": {
+        "category": "empty",
+        "function": null,
+        "code": null,
+        "sourceFile": null,
+        "sourceLine": null
+      }
+    },
+    "nodeStartupAccepted": false
+  },
+  "actualGuardianFailure": {
+    "waitResult": 0,
+    "exitCode": 2,
+    "resultAvailable": true,
+    "childReportedSuccess": false,
+    "ownerReportedSuccess": false,
+    "completedChecks": 0,
+    "failedPhase": "probe-identity-created-native-job-create-code5-qdenied",
+    "failureCategory": "Error",
+    "stateLockFailure": null
+  },
+  "restrictedOwnerAccepted": false,
+  "broaderFixtureRemoved": false,
+  "newRightsGranted": false,
+  "finding": "In the same pinned cold image, withholding its existing QUERY-only allowance denies self-query, legacy CryptoAPI and Local/Global named Job creation with error 5; anonymous Job creation and CNG still succeed. The original child with its existing allowance succeeds in all three Job namespaces. Both cold children verify token restrictions, process exit, pipe/handle cleanup and creator privilege restoration. The actual descendant guardian remains denied and the owner remains zero of eight; this comparison is not a repair or complete fixture cleanup."
+}

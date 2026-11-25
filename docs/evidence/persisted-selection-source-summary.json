@@ -1,0 +1,82 @@
+{
+  "schema": "switchyard-persisted-selection-source-summary/v1",
+  "baseCommit": "67270542181bebbc5b434f596e94e6deaf010d7e",
+  "sourceFiles": {
+    "tools/layout-studio/suite-store.mjs": "976ccb9e34d28a2e61b7de5c862f3cfad5c6adb6ba90a9f69a255684502f5d3e",
+    "tools/layout-studio/suite.mjs": "f4990bd6b82d8fa1972913eee76fbbcdc55fbfe8ef8cd61c187d33981d9eab74",
+    "tools/layout-studio/role-dispatch.test.mjs": "354a8ccdd52f6f0624152b7a974d789289a10423e759884c035d85d72acfef56"
+  },
+  "receipts": [
+    {
+      "id": "da421c3a-a7c1-4028-aab8-02f834a0fa33",
+      "kind": "original-regressions",
+      "sha256": "60a51672a070cb2805bd7043a8778a22e517235e643c9644f44764ee2f6f7d32",
+      "totals": {
+        "required": 1,
+        "passed": 0,
+        "failed": 1,
+        "tests": 16,
+        "passedTests": 14,
+        "failedTests": 2,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "originalManifestCommandsBoundsSkipsAndCleanupVerified": true
+    },
+    {
+      "id": "6a111115-90ca-4ad4-a4de-eba7b8720d07",
+      "kind": "corrected",
+      "sha256": "13b4a4d3c8f514a13599ccf20222397429b0230097f806706df3fd087365798c",
+      "totals": {
+        "required": 1,
+        "passed": 1,
+        "failed": 0,
+        "tests": 16,
+        "passedTests": 16,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "originalManifestCommandsBoundsSkipsAndCleanupVerified": true
+    },
+    {
+      "id": "5c9cce28-4da9-47e8-adce-a406f525c57e",
+      "kind": "accepted",
+      "sha256": "401cbb1a0dfbed551b0b1e95a10b69968470e9c627c1528772459a8b17c57747",
+      "totals": {
+        "required": 7,
+        "passed": 7,
+        "failed": 0,
+        "tests": 112,
+        "passedTests": 111,
+        "failedTests": 0,
+        "skippedTests": 1,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "originalManifestCommandsBoundsSkipsAndCleanupVerified": true
+    }
+  ],
+  "accepted": {
+    "groups": 7,
+    "passedTests": 111,
+    "skippedTests": 1
+  },
+  "typechecks": {
+    "root": true,
+    "vscode": true
+  },
+  "scope": [
+    "Every deliberate store selection writes a fresh generation, including a same-name selection. Existing string-returning callers remain compatible.",
+    "Physical dispatch captures the exact persisted selection digest and rechecks it at its existing effect/result boundaries; independent stores cannot hide a committed away-and-back selection.",
+    "Absent and legacy records are read without migration or writes. A fresh request after a peer round trip uses the final selection normally.",
+    "Local departure-attempt generation still fences failed transitions. Already queued commands preserve their original authenticated session; stale result history refuses."
+  ],
+  "limitations": [
+    "This adds persisted change detection; it does not hold a global selection lease across an external native operation or detect manual restoration of byte-identical old selection files.",
+    "No real workspace selection, native provider/window, account, model, keyboard or frontend operation was used; encrypted temporary stores and authenticated synthetic agent messages are explicit.",
+    "The correction postdates installed 384cf8b, complete Linux 0c7d918 and native Windows client 0bb7fd4."
+  ]
+}

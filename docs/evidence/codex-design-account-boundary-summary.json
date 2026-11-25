@@ -1,0 +1,28 @@
+{
+  "schema": "switchyard-codex-design-account-boundary-summary/v1",
+  "sourceParentCommit": "6d298cfdbeda88463f1936e172d997a584365207",
+  "sourceSha256": {
+    "tools/layout-studio/agents.mjs": "a97576191a1b9fa3e728e6f503047d31f7c5da72f3554a9dad718f0f2ff25284",
+    "tools/layout-studio/codex-turn.mjs": "9563d8b8b47870d7bec4e5c06c4a4e706f2a8377eda1c2ba13dcbf04f4083680",
+    "tools/layout-studio/codex-submissions.mjs": "7be8e8126f3ab741ea8f8f80037acb2904288f35f0598b21b9e1572ddeb56361",
+    "scripts/run-isolated-tests.mjs": "ed4886c194e946cbc4c8bebb8db94e43ed47d0a973e513ec3b5e61969041b2b0"
+  },
+  "receipt": "isolated-test-d2086c94-c13d-4229-85e0-60f43d13fdd0.json",
+  "receiptSha256": "3afcc82903bd3fa4932a704ddd1e681eb060212bb02dcb9365a7ea47ce49b958",
+  "groups": 7,
+  "checks": 80,
+  "allChildCleanup": true,
+  "typecheckPassed": true,
+  "designerPersistenceRaces": [
+    "closed connection",
+    "changed epoch with restored fingerprint"
+  ],
+  "draftAndNativeSessionIdentityRetained": true,
+  "lateReplySaved": false,
+  "replacementPromptSubmitted": false,
+  "actualAccountSwitchPerformed": false,
+  "runnerHelpAndInvalidArgsDoNotLaunchManifest": true,
+  "abortedHarnessRunReceipt": "accidental-full-run-abort-1793911186821.json",
+  "abortedHarnessProcessesAndScratchRetired": true,
+  "fullSuitePassClaimed": false
+}

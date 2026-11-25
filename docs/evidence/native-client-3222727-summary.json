@@ -1,0 +1,439 @@
+{
+  "schema": "switchyard-native-client-3222727/v1",
+  "at": "2026-11-09T11:22:56.930641+00:00",
+  "sourceCommit": "3222727b258b542d200d056817c3473d2da760ab",
+  "mergeCommit": "708dcba9d4a589e18885c76f755a3158c128589a",
+  "sourceTree": "f1f70c3a5d0cda46d7878629f5fc8f984ce6839c",
+  "workflowRunId": 42604386508,
+  "jobId": 129118530980,
+  "artifactId": 13667843357,
+  "archiveSha256": "1b35b87b101e35947c20b713a55cb95b86ffe2248c306c147f02057a1bf1b5f6",
+  "receiptRunId": "13896838-e0e4-49bc-970d-8fe5be3bd8d1",
+  "receiptSha256": "f8424350f6e0d48d874b8e7ff9b7de6dafecffe2e12e407284db92e418215604",
+  "totals": {
+    "required": 31,
+    "passed": 31,
+    "failed": 0,
+    "tests": 362,
+    "passedTests": 362,
+    "failedTests": 0,
+    "skippedTests": 0,
+    "cancelledTests": 0,
+    "todoTests": 0
+  },
+  "children": [
+    {
+      "file": "scripts/vscode-windows-runtime.test.mjs",
+      "durationMs": 431,
+      "effectiveTimeoutMs": 45000,
+      "tests": {
+        "total": 5,
+        "passed": 5,
+        "failed": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      }
+    },
+    {
+      "file": "deployment/suite/release.test.mjs",
+      "durationMs": 9941,
+      "effectiveTimeoutMs": 45000,
+      "tests": {
+        "total": 5,
+        "passed": 5,
+        "failed": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      }
+    },
+    {
+      "file": "tools/layout-studio/suite.test.mjs",
+      "durationMs": 38196,
+      "effectiveTimeoutMs": 120000,
+      "tests": {
+        "total": 37,
+        "passed": 37,
+        "failed": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      }
+    },
+    {
+      "file": "tools/layout-studio/integrations.test.mjs",
+      "durationMs": 2107,
+      "effectiveTimeoutMs": 45000,
+      "tests": {
+        "total": 17,
+        "passed": 17,
+        "failed": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      }
+    },
+    {
+      "file": "tools/layout-studio/role-dispatch.test.mjs",
+      "durationMs": 38893,
+      "effectiveTimeoutMs": 45000,
+      "tests": {
+        "total": 27,
+        "passed": 27,
+        "failed": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      }
+    },
+    {
+      "file": "tools/layout-studio/guided-role-choices.test.mjs",
+      "durationMs": 18318,
+      "effectiveTimeoutMs": 45000,
+      "tests": {
+        "total": 9,
+        "passed": 9,
+        "failed": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      }
+    },
+    {
+      "file": "tools/layout-studio/role-ui.test.mjs",
+      "durationMs": 15255,
+      "effectiveTimeoutMs": 45000,
+      "tests": {
+        "total": 14,
+        "passed": 14,
+        "failed": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      }
+    },
+    {
+      "file": "tools/layout-studio/native-focus-ui.test.mjs",
+      "durationMs": 26983,
+      "effectiveTimeoutMs": 45000,
+      "tests": {
+        "total": 18,
+        "passed": 18,
+        "failed": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      }
+    },
+    {
+      "file": "tools/layout-studio/connection-ui.test.mjs",
+      "durationMs": 4551,
+      "effectiveTimeoutMs": 45000,
+      "tests": {
+        "total": 3,
+        "passed": 3,
+        "failed": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      }
+    },
+    {
+      "file": "tools/layout-studio/client-launch.test.mjs",
+      "durationMs": 11747,
+      "effectiveTimeoutMs": 45000,
+      "tests": {
+        "total": 10,
+        "passed": 10,
+        "failed": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      }
+    },
+    {
+      "file": "tools/layout-studio/physical-intent.test.mjs",
+      "durationMs": 12068,
+      "effectiveTimeoutMs": 45000,
+      "tests": {
+        "total": 11,
+        "passed": 11,
+        "failed": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      }
+    },
+    {
+      "file": "tools/layout-studio/native-focus-gateway.test.mjs",
+      "durationMs": 8577,
+      "effectiveTimeoutMs": 45000,
+      "tests": {
+        "total": 11,
+        "passed": 11,
+        "failed": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      }
+    },
+    {
+      "file": "tools/layout-studio/windows-native-focus.test.mjs",
+      "durationMs": 37487,
+      "effectiveTimeoutMs": 45000,
+      "tests": {
+        "total": 28,
+        "passed": 28,
+        "failed": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      }
+    },
+    {
+      "file": "tools/layout-studio/windows-terminal-process.test.mjs",
+      "durationMs": 3690,
+      "effectiveTimeoutMs": 120000,
+      "tests": {
+        "total": 11,
+        "passed": 11,
+        "failed": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      }
+    },
+    {
+      "file": "tools/layout-studio/windows-editor-endpoint.test.mjs",
+      "durationMs": 4658,
+      "effectiveTimeoutMs": 120000,
+      "tests": {
+        "total": 8,
+        "passed": 8,
+        "failed": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      }
+    },
+    {
+      "file": "tools/layout-studio/windows-terminal-peer.test.mjs",
+      "durationMs": 4341,
+      "effectiveTimeoutMs": 120000,
+      "tests": {
+        "total": 6,
+        "passed": 6,
+        "failed": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      }
+    },
+    {
+      "file": "tools/layout-studio/editor-websocket-frames.test.mjs",
+      "durationMs": 190,
+      "effectiveTimeoutMs": 45000,
+      "tests": {
+        "total": 5,
+        "passed": 5,
+        "failed": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      }
+    },
+    {
+      "file": "tools/layout-studio/windows-editor-ingress.test.mjs",
+      "durationMs": 3360,
+      "effectiveTimeoutMs": 120000,
+      "tests": {
+        "total": 7,
+        "passed": 7,
+        "failed": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      }
+    },
+    {
+      "file": "tools/layout-studio/windows-codex-editor-connection.test.mjs",
+      "durationMs": 446,
+      "effectiveTimeoutMs": 45000,
+      "tests": {
+        "total": 9,
+        "passed": 9,
+        "failed": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      }
+    },
+    {
+      "file": "tools/layout-studio/windows-owned-stdio.test.mjs",
+      "durationMs": 5425,
+      "effectiveTimeoutMs": 120000,
+      "tests": {
+        "total": 12,
+        "passed": 12,
+        "failed": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      }
+    },
+    {
+      "file": "tools/layout-studio/codex-windows-tasks.test.mjs",
+      "durationMs": 27003,
+      "effectiveTimeoutMs": 120000,
+      "tests": {
+        "total": 14,
+        "passed": 14,
+        "failed": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      }
+    },
+    {
+      "file": "tools/layout-studio/codex-retained-editor-client.test.mjs",
+      "durationMs": 356,
+      "effectiveTimeoutMs": 45000,
+      "tests": {
+        "total": 12,
+        "passed": 12,
+        "failed": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      }
+    },
+    {
+      "file": "tools/layout-studio/windows-editor-journal.test.mjs",
+      "durationMs": 33448,
+      "effectiveTimeoutMs": 45000,
+      "tests": {
+        "total": 15,
+        "passed": 15,
+        "failed": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      }
+    },
+    {
+      "file": "tools/layout-studio/windows-editor-recovery.test.mjs",
+      "durationMs": 3288,
+      "effectiveTimeoutMs": 120000,
+      "tests": {
+        "total": 8,
+        "passed": 8,
+        "failed": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      }
+    },
+    {
+      "file": "tools/layout-studio/windows-coding-editor-connections.test.mjs",
+      "durationMs": 79681,
+      "effectiveTimeoutMs": 120000,
+      "tests": {
+        "total": 9,
+        "passed": 9,
+        "failed": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      }
+    },
+    {
+      "file": "apps/windows-companion/test/repository-runtime.test.ts",
+      "durationMs": 4178,
+      "effectiveTimeoutMs": 45000,
+      "tests": {
+        "total": 14,
+        "passed": 14,
+        "failed": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      }
+    },
+    {
+      "file": "apps/vscode-extension/test/codex-windows-terminal.test.ts",
+      "durationMs": 240,
+      "effectiveTimeoutMs": 45000,
+      "tests": {
+        "total": 3,
+        "passed": 3,
+        "failed": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      }
+    },
+    {
+      "file": "apps/vscode-extension/test/studio-windows-task-client.test.ts",
+      "durationMs": 822,
+      "effectiveTimeoutMs": 45000,
+      "tests": {
+        "total": 15,
+        "passed": 15,
+        "failed": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      }
+    },
+    {
+      "file": "apps/vscode-extension/test/studio-windows-native.test.ts",
+      "durationMs": 335,
+      "effectiveTimeoutMs": 45000,
+      "tests": {
+        "total": 5,
+        "passed": 5,
+        "failed": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      }
+    },
+    {
+      "file": "apps/vscode-extension/test/studio-windows-editor-launch.test.ts",
+      "durationMs": 19143,
+      "effectiveTimeoutMs": 45000,
+      "tests": {
+        "total": 13,
+        "passed": 13,
+        "failed": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      }
+    },
+    {
+      "file": "apps/vscode-extension/test/studio-windows-editor-files.test.ts",
+      "durationMs": 300,
+      "effectiveTimeoutMs": 45000,
+      "tests": {
+        "total": 1,
+        "passed": 1,
+        "failed": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      }
+    }
+  ],
+  "audit": {
+    "originalManifest": true,
+    "commandsBoundsSkips": true,
+    "sourceTreeMatchesMerge": true,
+    "serialOrder": true,
+    "outputBounds": true,
+    "childTreeCleanup": true,
+    "completeWindowsAcceptance": false
+  },
+  "scope": "Native Windows client/owned transport/protected-state checks, with explicit provider/window doubles where declared. Includes retained legacy-history account drift regressions. No live provider, account change, graphical IDE, device or URI acceptance. Predates f4dcc79 lease input correction."
+}

@@ -1,0 +1,35 @@
+{
+  "schema": "switchyard-shortcut-input-stages/v1",
+  "sourceFiles": {
+    "deployment/suite/shortcut.ps1": "9190cbf47a8da73cf42b2dc5a1779d5a66996330fdff9d904d049a8e8cfbeb83",
+    "deployment/suite/shortcut-process.mjs": "3c894f8f9ab0f9f9aa728221ab5ae0a4b92309916fa51396e5595d2919743715",
+    "deployment/suite/shortcut-process.test.mjs": "3f460f18980e2e92a55bea43f3d1878ab6d4ff12f6efb43b5e1d9aa89bbeb9a3"
+  },
+  "receiptId": "6f8ea02b-e818-43d2-af89-dc660354e760",
+  "receiptSha256": "0d9f8a33f24041d6efa5289f1c207684d3459670bd3c93da3ee62c3bae3c81ad",
+  "totals": {
+    "required": 18,
+    "passed": 18,
+    "failed": 0,
+    "tests": 33,
+    "passedTests": 33,
+    "failedTests": 0,
+    "skippedTests": 0,
+    "cancelledTests": 0,
+    "todoTests": 0
+  },
+  "originalCommandsBoundsSkipsAndCleanupVerified": true,
+  "originalNativeFailure": "native-96ac214-failures-summary.json",
+  "change": "Two closed progress stages distinguish completed stdin reading and completed JSON decoding before exact path validation. No native output or path enters timeout diagnostics.",
+  "preserved": [
+    "Original 10000ms execution deadline",
+    "Original 8192-byte request and 1024-byte response bounds",
+    "Exact shortcut readback and joined process exit before temporary removal",
+    "No automatic replay or fallback"
+  ],
+  "validation": "All original diagnostic fragmentation, fixed-stage-only timeout, excess/reordered output and owned writer lifecycle assertions pass, with the exhaustive stage loop covering both additions. Installation and release contracts also pass.",
+  "limitations": [
+    "This narrows the location of a future Windows failure; it does not fix or accept the original native timeout.",
+    "No native Windows shortcut or desktop launcher was changed by these Linux checks."
+  ]
+}

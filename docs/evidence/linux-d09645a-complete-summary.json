@@ -1,0 +1,55 @@
+{
+  "schema": "switchyard-full-linux-source-summary/v1",
+  "sourceCommit": "d09645a138f6b3a15bf0982c4685099b8a049efb",
+  "sourceTree": "f3d46e2f33d1af5f521b173f4334e0d7d82e5aa4",
+  "verificationReceipt": "isolated-test-8c70d77b-1999-407e-aeff-3dea8bf27b77.json",
+  "verificationReceiptSha256": "88db9fe0bae9c75014890aefe687ca3bdba59a8725f6fcbef5cba68d1a716c5e",
+  "success": true,
+  "totals": {
+    "required": 326,
+    "passed": 326,
+    "failed": 0,
+    "tests": 2029,
+    "passedTests": 2013,
+    "failedTests": 0,
+    "skippedTests": 16,
+    "cancelledTests": 0,
+    "todoTests": 0
+  },
+  "allChildAndTreeCleanupVerified": true,
+  "cleanupReceipt": "linux-d09645a-cleanup-1794029288930.json",
+  "cleanup": {
+    "schema": "switchyard-owned-full-linux-cleanup/v1",
+    "sourceCommit": "d09645a138f6b3a15bf0982c4685099b8a049efb",
+    "verificationReceipt": "isolated-test-8c70d77b-1999-407e-aeff-3dea8bf27b77.json",
+    "generatedFiles": 788,
+    "generatedBytes": 11803414,
+    "generatedDirectories": [
+      "apps/linux-companion/dist",
+      "apps/provider-adapter-host/dist",
+      "apps/vscode-extension/dist",
+      "apps/windows-companion/dist",
+      "packages/protocol/dist"
+    ],
+    "dependencyAliasCount": 9,
+    "trackedTreeClean": true,
+    "testChildrenExited": true,
+    "testParentEmpty": true,
+    "rootIdentityVerified": true,
+    "testParentIdentityVerified": true,
+    "worktreeRemoved": true,
+    "rootRemoved": true,
+    "testParentRemoved": true,
+    "markerRemoved": true,
+    "otherWorktreesPreserved": true,
+    "dependencyAliasIdentityAndTargetVerified": true,
+    "cleanupPlanSha256": "421cb3b4d2eca0c620d5a11e988b9c249383c06e5ee568b4f9a805b4f7492471"
+  },
+  "providersAndWindowsGuestsDoubledWhereDeclared": true,
+  "installedChanged": false,
+  "originalManifestCommandsBoundsAndSkipsVerified": true,
+  "limitations": [
+    "Scanner recipe draft assembly was implemented after this source; it requires separate focused and installed evidence.",
+    "Interactive Windows, provider account and physical hardware acceptance remain separate."
+  ]
+}

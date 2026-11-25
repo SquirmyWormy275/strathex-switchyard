@@ -1,0 +1,35 @@
+{
+  "schema": "switchyard-active-editor-return-summary/v1",
+  "basis": "47a49c8fe077e5d6e8fca34b709c63749df8a6e6",
+  "sourceSha256": {
+    "apps/vscode-extension/src/studio-editor-launch.ts": "3fcedfc68442cf89c0fa95e1a87bb376b5482f89d12f1400a44fc430866f277b",
+    "apps/vscode-extension/src/studio-task-client.ts": "0e9ddbca43c3384dddb472ef3f7a3133b177e0ef03257efdc84e5eabb0de57ed",
+    "tools/layout-studio/coding-editor-authorizations.mjs": "486e802581b9a00df202e9591f72e1d63c48476e5fcfa99fa563c6d037c7d090",
+    "tools/layout-studio/coding-task-owners.mjs": "fac615d784614d9d343108dea8ad2c290c79b426a136067eee6a5460a44e1a5e",
+    "tools/layout-studio/instance.mjs": "2e3c42928a6c2c51815531ada965a25007e14104ac584688d69ed15756dac84e",
+    "tools/layout-studio/suite.mjs": "d69de87fd78ac40b4a7458e1d8d9c39cb4f303946f187d27a1ef556c4c1ae76d",
+    "apps/vscode-extension/test/studio-editor-launch.test.ts": "a15d15b604f47713db93119f3d3b71e99e001e1c1baec227fd9d7d5bf183a055",
+    "apps/vscode-extension/test/studio-task-client.test.ts": "f4e09c4195e7714c1cc5523ded5f94a7800ec033ecea24e05abf9aba5151bd75",
+    "tools/layout-studio/coding-editor-authorizations.test.mjs": "ee485ff79a93024780f0a11b286453eb0377f71129cebeb43eb958900f221d94",
+    "tools/layout-studio/coding-task-owners.test.mjs": "9d389ff2593d42b8faba94a525b1bd18847dad89c2f4356900274306660038ff",
+    "scripts/run-isolated-tests.mjs": "f7052a8760f71e57afc08581ad5812279e587427ae8a8b4df708319db396b1a3"
+  },
+  "focused": {
+    "receipt": "isolated-test-52ac3884-6114-4f31-ac46-071b5840cf7d.json",
+    "groups": 5,
+    "passedTests": 60,
+    "allChildAndTreeCleanupVerified": true
+  },
+  "typecheck": true,
+  "extensionBuild": true,
+  "compiledReceipt": "editor-active-return-compiled-1793951998285.json",
+  "compiledCommonJsLoadAndClosedFocusRefusal": true,
+  "generatedOutputRemoved": true,
+  "behavior": "The signed return route requires the exact consumed editor authorization and current original owner/load/account/repository/socket/policy. It permits idle or active task metadata and returns only the retained Terminal object without a new grant, task resume or journal mutation. Initial launches remain idle-only.",
+  "limits": [
+    "Real signed HTTP, encrypted state and Linux kernel leases compose with controlled provider/editor doubles. No live model, provider task or terminal was opened.",
+    "Creation expiry does not revoke return to an existing object; original scope, consumed-record integrity and current context must still verify.",
+    "No consumed grant or no retained exact terminal means refusal. Closed, same-title and foreign-editor objects cannot create a replacement.",
+    "Command wiring and native terminal/account/task acknowledgement remain unfinished. Metadata or focus is not attachment evidence."
+  ]
+}

@@ -1,0 +1,76 @@
+{
+  "schema": "switchyard-codex-0167-contract-summary/v1",
+  "baseCommit": "5033c18a2085cbe8fc045d642f50b4ed35516dff",
+  "sourceFiles": {
+    "tools/layout-studio/agents.mjs": "d2a937442c189f314d7b42c4f4b41a09931673827e755d504652baddcf62d754",
+    "tools/layout-studio/codex-requests.mjs": "43736911d5f429d85db960e1e0d6dcd99e5310d1bd2b46f6453bc3300ee6e093",
+    "tools/layout-studio/codex-turn.mjs": "4072a8dd330a8ac2923a890878efbd5be6d5940cfe0d076e11ab90d1f54c42bf",
+    "tools/layout-studio/codex-submissions.mjs": "6aaabf0145983639965507d258d6b964f1a42301555f3995580723d381be3ffa",
+    "tools/layout-studio/suite.test.mjs": "f185fb32836858345ca6bf0ceaecbb175971a2af2f07c41519c767c83b344308",
+    "tools/layout-studio/codex-stdio-tasks.test.mjs": "250b0a753536cd6ceb384cef9150c0be88388959c238326c3884f684ef0497a4",
+    "tools/layout-studio/codex-submissions.test.mjs": "97d8112abb4b0f21cc0043f64a4f37624f3fcd8c4c0dc72d9c2d7a01908433c3",
+    "tools/layout-studio/codex-editor-relay.test.mjs": "d63ec674e062c2dcbd85684d3408fd2ae72d024c5599dc16ae6ad57f27d10d20"
+  },
+  "receipt": {
+    "name": "isolated-test-be6ab3ab-6dae-4b4b-9b7b-4fc6eac81129.json",
+    "sha256": "a17a2af1cf36bbf0496b338b789f56c06c6105baf2a4623423cdbbb1e64e7209"
+  },
+  "accepted": {
+    "required": 12,
+    "passed": 12,
+    "failed": 0,
+    "tests": 154,
+    "passedTests": 152,
+    "failedTests": 0,
+    "skippedTests": 2,
+    "cancelledTests": 0,
+    "todoTests": 0
+  },
+  "originalCommandsBoundsSkipsAndCleanupVerified": true,
+  "contract": {
+    "exactVersions": [
+      "0.166.0",
+      "0.167.0"
+    ],
+    "disabledFeatureCount": 42,
+    "readbackRequired": true,
+    "noFutureVersionRange": true,
+    "observedVersionBoundIntoTextReview": true,
+    "upgradeRequiresNewReview": true,
+    "unverifiedAccountAndToolRequestsStillRefused": true
+  },
+  "nativeEvidence": "codex-0167-native-config-summary.json",
+  "review": {
+    "addedFlags": [
+      "tui_extensions_statusline",
+      "code_mode_host_output_truncation",
+      "interrupt_on_cancel",
+      "apps_early_resource_discovery",
+      "suppress_model_change_announcements",
+      "incremental_exec_tools",
+      "gcp_setup_wizard"
+    ],
+    "changedDefault": "deferred_tool_world_state: false to true; explicitly disabled",
+    "configurationChanges": "Gateway credential storage, provider capability, telemetry delta and plugin app fields do not add authority under the fixed first-party route and disabled tools/plugins/apps.",
+    "sources": [
+      "https://learn.chatgpt.com/docs/app-server",
+      "https://github.com/openai/codex/blob/rust-v0.166.0/codex-rs/features/src/lib.rs",
+      "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/features/src/lib.rs",
+      "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/core/config.schema.json"
+    ]
+  },
+  "limitations": [
+    "Actual 0.167 proof covers initialization and effective configuration in an empty, network-isolated home only.",
+    "Live account/task/model behavior and native TUI handoff remain unaccepted.",
+    "0.166 retains its earlier native evidence; its handling of additional boolean overrides was reviewed in source and synthetic checks, not a new native 0.166 run.",
+    "Installed application is unchanged."
+  ],
+  "effects": {
+    "frontendChanged": false,
+    "installedChanged": false,
+    "liveProviderTasks": 0,
+    "modelPrompts": 0,
+    "hardwareOpened": false,
+    "newDependencies": false
+  }
+}

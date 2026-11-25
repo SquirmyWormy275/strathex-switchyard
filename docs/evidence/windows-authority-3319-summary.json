@@ -1,0 +1,43 @@
+{
+  "schema": "switchyard-native-windows-authority-summary/v1",
+  "pullRequestHeadCommit": "3319f922d17e70ec30eaf3422cff5599262cb08c",
+  "executionMergeLabel": "2e597ad4b72d6a9fa5f02ccc15ba264633755512",
+  "runId": 42118172630,
+  "jobId": 127563252290,
+  "artifactId": 13456923452,
+  "artifactSha256": "6a98a7d7e393d3212d78e24cdd09f356d0de8f00fa76f55c436dfd3d4d5cbb2d",
+  "archiveDigestVerified": true,
+  "receipt": "windows-policy-authority-3319-native.json",
+  "receiptSha256": "2563d81c8d462a32bcfdc107cb0d0c98b49496b82ed3667315acab4475ac6078",
+  "groups": 3,
+  "checks": 31,
+  "allChildCleanup": true,
+  "children": [
+    {
+      "file": "scripts/run-isolated-tests.test.mjs",
+      "checks": 19,
+      "ms": 5020,
+      "boundMs": 45000
+    },
+    {
+      "file": "tools/layout-studio/task-authority.test.mjs",
+      "checks": 9,
+      "ms": 159978,
+      "boundMs": 240000
+    },
+    {
+      "file": "tools/layout-studio/receipt-authority-state.test.mjs",
+      "checks": 3,
+      "ms": 50500,
+      "boundMs": 240000
+    }
+  ],
+  "allOriginalAuthorityAndNewStateCasesRetained": true,
+  "nativeStepMinutes": 12,
+  "deadlineRaised": false,
+  "scenarioFilteredOrWaived": false,
+  "allSixPolicyWorkflowJobsSucceeded": true,
+  "guestExecutionDoubled": true,
+  "interactiveWindowsUacGuestDeviceAccountAcceptance": false,
+  "earlier9dcAttemptRemainsFailed": true
+}

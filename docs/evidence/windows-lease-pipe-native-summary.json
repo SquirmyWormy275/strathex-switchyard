@@ -1,0 +1,59 @@
+{
+  "schema": "switchyard-windows-lease-pipe-native/v1",
+  "sourceCommit": "4faa8a1a9e1fcfbfc2402b1ea4e8d51dd93657fe",
+  "restrictedOwner": {
+    "sourceCommit": "4faa8a1a9e1fcfbfc2402b1ea4e8d51dd93657fe",
+    "executionCommit": "8f6ca2f703928c71d991d01d98714f5c5caad675",
+    "sourceAndExecutionTree": "beb8c6a72782898249d256583059b3a6a06a5d0f",
+    "runId": 42227181558,
+    "artifactId": 13506905589,
+    "archiveBytes": 4255,
+    "archiveSha256": "5d651b3fc780c5ea2ca94501bf75e092e49bae79ebbbbaae982b489601dcaa03",
+    "zipSavedLocally": false,
+    "jobId": 127923884665,
+    "privateReceipt": "windows-pipe-owner-4faa-native.json",
+    "helperSha256": "438f1f3c1f2f51cd1de401b9fd65cfd7ab880538b943c1b7f00233e797c5912d",
+    "failure": {
+      "waitResult": 0,
+      "exitCode": 2,
+      "resultAvailable": true,
+      "childReportedSuccess": false,
+      "ownerReportedSuccess": false,
+      "completedChecks": 0,
+      "failedPhase": "read-only-probe",
+      "failureCategory": "Error",
+      "stateLockFailure": null
+    },
+    "ordinaryOwnerChecks": 8,
+    "restrictedMetadataChecks": 13,
+    "restrictedNativeExchangeChecks": 31,
+    "finding": "Both protected state initialization and the subsequent mode update complete before the failure phase advances to read-only-probe. The complete original owner still exits 2 with zero of eight checks."
+  },
+  "ordinaryNativeLeases": {
+    "sourceCommit": "4faa8a1a9e1fcfbfc2402b1ea4e8d51dd93657fe",
+    "executionCommit": "8f6ca2f703928c71d991d01d98714f5c5caad675",
+    "sourceAndExecutionTree": "beb8c6a72782898249d256583059b3a6a06a5d0f",
+    "runId": 42227181558,
+    "artifactId": 13506631001,
+    "archiveBytes": 1128,
+    "archiveSha256": "97430fa7fb2b8548cb20a2e37bb14fe6d12e6499e2069ba46c72c567c1cfc52b",
+    "zipSavedLocally": false,
+    "privateReceipt": "windows-pipe-leases-4faa-native.json",
+    "totals": {
+      "required": 2,
+      "passed": 2,
+      "failed": 0,
+      "tests": 25,
+      "passedTests": 24,
+      "failedTests": 0,
+      "skippedTests": 1,
+      "cancelledTests": 0,
+      "todoTests": 0
+    },
+    "allChildAndTreeCleanupVerified": true,
+    "scope": "Version 2 actual Windows pipe/kernel path, partial header/command/release EOF, idle/held/contended EOF, ordinary-file input refusal, original file replacement/hard-link/malformed-release, parent crash and detached-owner cleanup."
+  },
+  "restrictedStateInitialized": true,
+  "restrictedModeUpdatePassed": true,
+  "restrictedOwnerAccepted": false
+}

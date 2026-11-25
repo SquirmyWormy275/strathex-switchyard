@@ -1,0 +1,58 @@
+{
+  "schema": "switchyard-owned-codex-guardian-summary/v1",
+  "nativeCliVersion": "0.166.0",
+  "nativeExecutableSha256": "b8a11fedf24b2dfb59a70c9e52b030f9a508dcd49cd2dd0d41956f4c785156b8",
+  "receipt": "codex-owned-guardian-1793926725978.json",
+  "receiptSha256": "a2776a036b7416c4ae93dfe0571c0c275d5fcc88230012017476c022b1b1d5f0",
+  "acceptedScope": "owned-listener-effective-configuration-and-parent-loss",
+  "checks": [
+    "exact private socket belongs to the pinned native executable in the owned guardian session",
+    "effective native Unix configuration retains all disabled tools, hooks, MCP entries and first-party route",
+    "two read-only account snapshots match without a login, refresh, thread or model request",
+    "abrupt owned parent loss independently retires guardian, native process and every owned session member"
+  ],
+  "matchingAccountReads": 2,
+  "effectiveNativeConfigurationRestricted": true,
+  "parentLossTreeExitVerified": true,
+  "ownedSocketAliasRootAndMarkerRetired": true,
+  "modelPromptsSubmitted": 0,
+  "threadCreated": false,
+  "accountLoginLogoutOrSwitch": false,
+  "globalDaemonCommandUsed": false,
+  "frontendChanged": false,
+  "productionCodexTransport": "restricted-stdio-unchanged",
+  "continuousUnixAccountFenceImplemented": false,
+  "fullStudioTaskIdeAttachmentImplemented": false,
+  "softwareReceipt": "isolated-test-01f71bf5-c14f-4b93-a6a9-1c943a9af4e9.json",
+  "softwareGroups": 2,
+  "softwarePassedTests": 18,
+  "allChildAndTreeCleanupVerified": true,
+  "earlierFailedReceipt": "codex-owned-guardian-1793926565756.json",
+  "earlierFailure": "All four native checks passed but cleanup refused a dangling native socket alias. Original result remains failed.",
+  "earlierExactCleanupReceipt": "codex-guardian-first-failed-cleanup-1793926636112.json",
+  "limits": [
+    "This is a source verifier; production task and design transports remain restricted stdio.",
+    "Two matching account snapshots do not provide continuous account-event fencing.",
+    "Full Studio-to-IDE attachment remains unfinished software."
+  ],
+  "sourceSha256": {
+    "apps/vscode-extension/src/codex-daemon-status.cjs": "9785b5021665fcc366da80ca3aa8678cda098c01a5872238be2e46aae502fbc2",
+    "scripts/codex-daemon-status.test.mjs": "c9b58d003e765baef2b040527f3d592b9cc9f241485f269fb6984996757dce25",
+    "scripts/verify-codex-owned-listener.mjs": "0e49ef777a3278842a8977013ed56baab9bd8e65bb688a0dc6daa031802712c0"
+  },
+  "readOnlyOptionsFollowup": {
+    "receipt": "codex-owned-guardian-1793927053046.json",
+    "receiptSha256": "646d730e4192ad1980ae165a848e0fde7890dcb56d8652f3bbc250288496daa8",
+    "nativeChecks": 4,
+    "effectiveConfigurationAndParentLossAccepted": true,
+    "ownedCleanupVerified": true,
+    "softwareReceipt": "isolated-test-022ea0bb-c65a-4276-b064-34f9246ace33.json",
+    "completeSoftwareFilePassedTests": 2,
+    "inheritedOrExplicitMutationFollowupForwarded": false,
+    "sourceSha256": {
+      "apps/vscode-extension/src/codex-daemon-status.cjs": "9cd3bb26fa6091834c9ca0d5cb9d2295a7cb5250e6111808d1570820fa9f7544",
+      "scripts/codex-daemon-status.test.mjs": "7576b3a351766f00defb0e97efe46f02c181484d1cddba79f4cc5acea361ea78",
+      "scripts/verify-codex-owned-listener.mjs": "0e49ef777a3278842a8977013ed56baab9bd8e65bb688a0dc6daa031802712c0"
+    }
+  }
+}

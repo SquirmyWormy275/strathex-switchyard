@@ -1,0 +1,911 @@
+{
+  "schema": "switchyard-complete-windows-source-followup/v1",
+  "sourceCommit": "4db5948e63df68501b56ac4d6690f3a86cf001e4",
+  "mergeCommit": "29faa91ee774e760c62e658e676df3cc916d79c1",
+  "sourceTree": "3c4d0b86eaa8f6f59ec07897d4ed25888d63693e",
+  "runId": 42461208384,
+  "scope": {
+    "platform": "win32",
+    "sourceCommit": "29faa91ee774e760c62e658e676df3cc916d79c1",
+    "sourceTree": "3c4d0b86eaa8f6f59ec07897d4ed25888d63693e",
+    "nodeVersion": "24.14.0",
+    "nodeExecutable": "C:\\hostedtoolcache\\windows\\node\\24.14.0\\x64\\node.exe",
+    "nodeSha256": "63c259c81e5d472b5f11c8d506070130cb04a1ecf84b80377a34ed6ec9048088",
+    "pythonVersion": "3.13.3",
+    "pythonExecutable": "C:\\hostedtoolcache\\windows\\Python\\3.13.3\\x64\\python.exe",
+    "pythonSha256": "d87063e5597f257004c731b66c59c56c91038861c6877b1a3dca6b8c4e919125",
+    "helperSha256": "0906adafb506daece1c9a46d4c6ed9d8ba714cca4c5661112eac3ecfbbfe1637",
+    "dotnetManifestSha256": "9387431f821c8af70705752e6d8a9d16ec88e374167bd415c742db3a319c0387"
+  },
+  "completeOriginalReceiptSetVerified": true,
+  "pinnedSourceManifestReconstruction": {
+    "unchangedRunnerSchedulerCostsAndToolchainVerified": true,
+    "unchangedScenarioManifestVerified": true,
+    "npmCliFromPinnedWindowsNodeDirectory": true
+  },
+  "workflowCollectorAcceptance": "accepted",
+  "manifestSha256": "cc4cd1d1eb5cea40b54b93bb53580141dfecb77be2536fdb9ae2ea92bc3d50da",
+  "totals": {
+    "required": 462,
+    "passed": 462,
+    "failed": 0,
+    "tests": 3156,
+    "passedTests": 2910,
+    "failedTests": 0,
+    "skippedTests": 246,
+    "cancelledTests": 0,
+    "todoTests": 0
+  },
+  "cohorts": [
+    {
+      "shard": "1",
+      "receiptId": "da1fe142-7dbc-4191-b218-ffa50710ba8a",
+      "receiptSha256": "9bb002d1930c9f09ff4a26cbcf82ac25ea5cc54d800c5a67e18304bc9b10daa3",
+      "totals": {
+        "required": 21,
+        "passed": 21,
+        "failed": 0,
+        "tests": 143,
+        "passedTests": 126,
+        "failedTests": 0,
+        "skippedTests": 17,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "shard": "2",
+      "receiptId": "2e917d45-5cb0-41ea-a18b-fbc3ed8389d8",
+      "receiptSha256": "a3bf17276bc9baf44879e8afdd009160e0fac353d38c7e22ca65d4dde6d3b24f",
+      "totals": {
+        "required": 21,
+        "passed": 21,
+        "failed": 0,
+        "tests": 154,
+        "passedTests": 98,
+        "failedTests": 0,
+        "skippedTests": 56,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "shard": "3",
+      "receiptId": "a6d0731a-c176-4637-b5ca-6bd19ff69793",
+      "receiptSha256": "a545b34516d8a98c6392b897cbeb4d19e99b6fd74ee17948ecdd56598e6219e5",
+      "totals": {
+        "required": 23,
+        "passed": 23,
+        "failed": 0,
+        "tests": 165,
+        "passedTests": 141,
+        "failedTests": 0,
+        "skippedTests": 24,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "shard": "4",
+      "receiptId": "76a38a9d-44f3-414e-aba4-129344edd6d5",
+      "receiptSha256": "760b2e93e6646eae45d009496a94009af7caa64776094b45da32c80b8d6ad557",
+      "totals": {
+        "required": 22,
+        "passed": 22,
+        "failed": 0,
+        "tests": 147,
+        "passedTests": 133,
+        "failedTests": 0,
+        "skippedTests": 14,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "shard": "5",
+      "receiptId": "dff56752-ccf8-4c7e-a6dc-02dfe403733c",
+      "receiptSha256": "f5cc93ccce40f977a6d793be5cd3e429bafbd43e2c05c96abcaca6b9baad90a5",
+      "totals": {
+        "required": 22,
+        "passed": 22,
+        "failed": 0,
+        "tests": 117,
+        "passedTests": 112,
+        "failedTests": 0,
+        "skippedTests": 5,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "shard": "6",
+      "receiptId": "11dc9519-36c4-4852-b32b-557020243351",
+      "receiptSha256": "617a41893a54b9f2feda8465b1b6d9b435666b916733820ae79c0e83daa5c6e3",
+      "totals": {
+        "required": 19,
+        "passed": 19,
+        "failed": 0,
+        "tests": 152,
+        "passedTests": 142,
+        "failedTests": 0,
+        "skippedTests": 10,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "shard": "7",
+      "receiptId": "af6fd449-a8c9-466f-bba0-0af8ce19cbef",
+      "receiptSha256": "83c1ff5173d32232c6cef22fac88d8b4e36c1c0037745a22bb4626b23fe25d95",
+      "totals": {
+        "required": 22,
+        "passed": 22,
+        "failed": 0,
+        "tests": 122,
+        "passedTests": 117,
+        "failedTests": 0,
+        "skippedTests": 5,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "shard": "8",
+      "receiptId": "c1f13028-8223-4532-ae26-6ac94b9f8835",
+      "receiptSha256": "f0f61cc6714b60c3a90bf7ab15fcc98800d0b1ec8a36363b1813eed3cc3cf688",
+      "totals": {
+        "required": 22,
+        "passed": 22,
+        "failed": 0,
+        "tests": 149,
+        "passedTests": 136,
+        "failedTests": 0,
+        "skippedTests": 13,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "shard": "9",
+      "receiptId": "6351695d-c095-4ce7-b962-31ba8ceeadcc",
+      "receiptSha256": "bab4ebac2bf2ad9cb79baa932ff4c7079b022eca24f6b576dc1afde55c2637dc",
+      "totals": {
+        "required": 22,
+        "passed": 22,
+        "failed": 0,
+        "tests": 138,
+        "passedTests": 131,
+        "failedTests": 0,
+        "skippedTests": 7,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "shard": "10",
+      "receiptId": "55827ae9-626e-40ca-a419-f62bf1f243f4",
+      "receiptSha256": "2b914e9e25e827761d1eb872bd0faf08102f466c6512a8419a5458468733d068",
+      "totals": {
+        "required": 23,
+        "passed": 23,
+        "failed": 0,
+        "tests": 183,
+        "passedTests": 181,
+        "failedTests": 0,
+        "skippedTests": 2,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "shard": "11",
+      "receiptId": "3c6e19d0-9952-430d-8bd3-f87a923c448a",
+      "receiptSha256": "446c66a10c38056e73294778e6ef27c67558deecf243760ccfc416f4310da18a",
+      "totals": {
+        "required": 21,
+        "passed": 21,
+        "failed": 0,
+        "tests": 159,
+        "passedTests": 154,
+        "failedTests": 0,
+        "skippedTests": 5,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "shard": "12",
+      "receiptId": "d29a0e10-d5de-43dd-bed1-cc6b4b62f6c1",
+      "receiptSha256": "830cc33975a94bc15375ca7c1a78e6cd25d6fc18957c39a33141e5169da7843f",
+      "totals": {
+        "required": 23,
+        "passed": 23,
+        "failed": 0,
+        "tests": 141,
+        "passedTests": 120,
+        "failedTests": 0,
+        "skippedTests": 21,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "shard": "13",
+      "receiptId": "792d95bf-0605-4c9d-81e9-f3183c88321e",
+      "receiptSha256": "023385e5c4ba90de8ba6b9205ae0a794a39a6873311d65e60e6d8bebcd934b5c",
+      "totals": {
+        "required": 23,
+        "passed": 23,
+        "failed": 0,
+        "tests": 135,
+        "passedTests": 132,
+        "failedTests": 0,
+        "skippedTests": 3,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "shard": "14",
+      "receiptId": "ad76e295-3841-4fd4-9858-37ec7898c165",
+      "receiptSha256": "c08dc21699330dc87761da7c7f3bd0b29b9fd5df79c5368dd2e76fc21f41d326",
+      "totals": {
+        "required": 23,
+        "passed": 23,
+        "failed": 0,
+        "tests": 176,
+        "passedTests": 153,
+        "failedTests": 0,
+        "skippedTests": 23,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "shard": "15",
+      "receiptId": "b428cc2f-3f31-4b80-abe6-ecb234e44da6",
+      "receiptSha256": "1cc76e4fb20eea8284baf22ba6c181081a00cf3a53930d6da5e412729e2ff171",
+      "totals": {
+        "required": 25,
+        "passed": 25,
+        "failed": 0,
+        "tests": 186,
+        "passedTests": 184,
+        "failedTests": 0,
+        "skippedTests": 2,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "shard": "16",
+      "receiptId": "7613cbe0-1ac5-49d7-a778-e099134c762f",
+      "receiptSha256": "cfb8ced883fa2d9121ebdb199e869f07a3a5e4740fdd75469e7de898f51d9cd6",
+      "totals": {
+        "required": 25,
+        "passed": 25,
+        "failed": 0,
+        "tests": 150,
+        "passedTests": 145,
+        "failedTests": 0,
+        "skippedTests": 5,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "shard": "17",
+      "receiptId": "a6b8753e-4419-4c4a-bc36-e30554124aa4",
+      "receiptSha256": "d572cfe9bfa1d5cdc3375677db71dc7aeebae6f640fce8f28df45ed0b6375027",
+      "totals": {
+        "required": 23,
+        "passed": 23,
+        "failed": 0,
+        "tests": 193,
+        "passedTests": 183,
+        "failedTests": 0,
+        "skippedTests": 10,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "shard": "18",
+      "receiptId": "befa63a7-d766-4532-9599-1d0a1742c31f",
+      "receiptSha256": "5273e0ea880e0933833cd1edcf314356add9955677b5072b4c60e7c976f3d811",
+      "totals": {
+        "required": 24,
+        "passed": 24,
+        "failed": 0,
+        "tests": 121,
+        "passedTests": 116,
+        "failedTests": 0,
+        "skippedTests": 5,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "shard": "19",
+      "receiptId": "64d6c7f2-a6f7-4651-95d6-a2ab9d50066c",
+      "receiptSha256": "ff6c0965a7d40c0d74373ebf6403cc35bed1d41b6a0267c4586b42ebb0f52635",
+      "totals": {
+        "required": 21,
+        "passed": 21,
+        "failed": 0,
+        "tests": 96,
+        "passedTests": 94,
+        "failedTests": 0,
+        "skippedTests": 2,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "shard": "20",
+      "receiptId": "691cad6e-09df-4f63-9cc5-b94d22ee9ad2",
+      "receiptSha256": "eac39c44d485d16de6014b0638f8258038ac6270742f5ed2afbb232a31d06e5c",
+      "totals": {
+        "required": 24,
+        "passed": 24,
+        "failed": 0,
+        "tests": 317,
+        "passedTests": 300,
+        "failedTests": 0,
+        "skippedTests": 17,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "shard": "assembly",
+      "receiptId": "f7768402-038c-4f5b-af3a-12a7282a8d5e",
+      "receiptSha256": "2fe13fd3d726c6167e8190bffb3ef0eed9f03b260bbb3b88a040dfb5c2410adf",
+      "totals": {
+        "required": 13,
+        "passed": 13,
+        "failed": 0,
+        "tests": 12,
+        "passedTests": 12,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    }
+  ],
+  "artifacts": [
+    {
+      "artifactId": 13610510001,
+      "shard": "16",
+      "envelopeSha256": "11f0995c60875b5068b61380d906cab92db31adb3ebf14c4f4a54415ecca33d4",
+      "receiptSha256": "cfb8ced883fa2d9121ebdb199e869f07a3a5e4740fdd75469e7de898f51d9cd6",
+      "archiveSha256": "8135828b01c42fdd554e27d206c03d72d572c8f6a090390d0afc9994b6ea8ae4",
+      "archiveBytes": 4504
+    },
+    {
+      "artifactId": 13609892427,
+      "shard": "17",
+      "envelopeSha256": "2983f50fe51317765c8b646fe75a3cb9bdf1631e97e3c6eb8f327a7b9098306a",
+      "receiptSha256": "d572cfe9bfa1d5cdc3375677db71dc7aeebae6f640fce8f28df45ed0b6375027",
+      "archiveSha256": "f10bfeb95d16f1700fc6ede4e4c642d545d9269a03eb2ea831dfe07add22839e",
+      "archiveBytes": 4242
+    },
+    {
+      "artifactId": 13610570122,
+      "shard": "5",
+      "envelopeSha256": "b529e487cdea5e450604c10918904e84edaa51593d08b20432a237f0ddcd3c19",
+      "receiptSha256": "f5cc93ccce40f977a6d793be5cd3e429bafbd43e2c05c96abcaca6b9baad90a5",
+      "archiveSha256": "c924b5d4491fdbd2d2c3f4181a3bbc179bd9d0c25bec67250d54dfdc50564705",
+      "archiveBytes": 4067
+    },
+    {
+      "artifactId": 13610470924,
+      "shard": "8",
+      "envelopeSha256": "459b864b63e8f466dde4e1b9b64701980315da981a4b69e8f0c0f5615078ee59",
+      "receiptSha256": "f0f61cc6714b60c3a90bf7ab15fcc98800d0b1ec8a36363b1813eed3cc3cf688",
+      "archiveSha256": "9107bf4d84477fd89e7a17e582be31b78d27ec85c751145c12f23175660e34cd",
+      "archiveBytes": 4222
+    },
+    {
+      "artifactId": 13610430862,
+      "shard": "19",
+      "envelopeSha256": "98a892f2c9dad98271ab58080e149fa50226453c1b49479e333a85d060970d65",
+      "receiptSha256": "ff6c0965a7d40c0d74373ebf6403cc35bed1d41b6a0267c4586b42ebb0f52635",
+      "archiveSha256": "ce9190bb7892a6dbcad4627294f8949ef0e651538a20f734f2f365deafc1c3b3",
+      "archiveBytes": 4125
+    },
+    {
+      "artifactId": 13610400201,
+      "shard": "10",
+      "envelopeSha256": "bda889705a27fd15cec5ea8e61052d03631135db020e1deb243e5528d2beb339",
+      "receiptSha256": "2b914e9e25e827761d1eb872bd0faf08102f466c6512a8419a5458468733d068",
+      "archiveSha256": "db5fb848ee86168b27356e5a15b2972f903924df000c82f57380fec26698603f",
+      "archiveBytes": 4251
+    },
+    {
+      "artifactId": 13610380756,
+      "shard": "12",
+      "envelopeSha256": "018ec60ddaa8d52d0c2cc757e25c5b8be6fbaa886aaa3c5b0247c013e379ff2c",
+      "receiptSha256": "830cc33975a94bc15375ca7c1a78e6cd25d6fc18957c39a33141e5169da7843f",
+      "archiveSha256": "3d887525cb240a00f778d0c701f7d0aff05f2a97f75fc0054628ca35c9db5418",
+      "archiveBytes": 4343
+    },
+    {
+      "artifactId": 13610316085,
+      "shard": "18",
+      "envelopeSha256": "135f4236d94cb6b2f81da20011723f8eb5fb22f89f37496a2b7695831e81e12a",
+      "receiptSha256": "5273e0ea880e0933833cd1edcf314356add9955677b5072b4c60e7c976f3d811",
+      "archiveSha256": "4c89446c5e3f3441fc6f50b649e1d9e1da90c12d56a211e73a344b6d84e15369",
+      "archiveBytes": 4379
+    },
+    {
+      "artifactId": 13610081972,
+      "shard": "13",
+      "envelopeSha256": "c937060790d1e72a5c74a8ca3e4e4b1712c0f97851fb9faa77df0391973abc19",
+      "receiptSha256": "023385e5c4ba90de8ba6b9205ae0a794a39a6873311d65e60e6d8bebcd934b5c",
+      "archiveSha256": "450b70d1a6b023938fbc4429aca792a3857844b335c1fb292b39039545697ab9",
+      "archiveBytes": 4299
+    },
+    {
+      "artifactId": 13610012280,
+      "shard": "11",
+      "envelopeSha256": "a4993305f3d36feb4e69fe8ddddc506a4e3177cd2a16c18661be51fc36793cc6",
+      "receiptSha256": "446c66a10c38056e73294778e6ef27c67558deecf243760ccfc416f4310da18a",
+      "archiveSha256": "96f53c341738eb2e84233091d0c5a17a2afc1107feedd5e8a4ef067958645d0c",
+      "archiveBytes": 3974
+    },
+    {
+      "artifactId": 13609977366,
+      "shard": "assembly",
+      "envelopeSha256": "7f92e7f2ad14b69059cb575088f5033c38e501add82d2b855387c6e054305ab2",
+      "receiptSha256": "2fe13fd3d726c6167e8190bffb3ef0eed9f03b260bbb3b88a040dfb5c2410adf",
+      "archiveSha256": "3e71b0f61e6cb74e3363cf8dc7c4b9502653e2e4bf9591413906460cb696ffa0",
+      "archiveBytes": 3236
+    },
+    {
+      "artifactId": 13609952209,
+      "shard": "15",
+      "envelopeSha256": "30df1a110ef120966101b1676e888e8f1c37ecc78379e6b811a2956faba5710f",
+      "receiptSha256": "1cc76e4fb20eea8284baf22ba6c181081a00cf3a53930d6da5e412729e2ff171",
+      "archiveSha256": "71f17185e3a68fd72a5013437dc5456886c58b33ad4973cb071e22e45fde7395",
+      "archiveBytes": 4443
+    },
+    {
+      "artifactId": 13609584105,
+      "shard": "7",
+      "envelopeSha256": "0717b0a4baf6c2dfd6249541bfba3912262f77e80b0395c2ad4b41073ac23079",
+      "receiptSha256": "83c1ff5173d32232c6cef22fac88d8b4e36c1c0037745a22bb4626b23fe25d95",
+      "archiveSha256": "c2c7c69bca3a3d069784b00b484c267d17a7c516104e73cc7de182e04f8fd549",
+      "archiveBytes": 4105
+    },
+    {
+      "artifactId": 13609552634,
+      "shard": "9",
+      "envelopeSha256": "dca3c63540c00001143cf5740a2687f68786dfd35cfa34d79501b00999be24a7",
+      "receiptSha256": "bab4ebac2bf2ad9cb79baa932ff4c7079b022eca24f6b576dc1afde55c2637dc",
+      "archiveSha256": "3622a151e265e2e26c29fdcbd050967cf0c289536fbd652912ef07e1f1806540",
+      "archiveBytes": 4032
+    },
+    {
+      "artifactId": 13609453274,
+      "shard": "20",
+      "envelopeSha256": "4f3d16eaa202da3ee2f1c4356412c2c9931b1e517d56faf2ad3e20bacaf002d8",
+      "receiptSha256": "eac39c44d485d16de6014b0638f8258038ac6270742f5ed2afbb232a31d06e5c",
+      "archiveSha256": "9cde5d0a163ba4fde5a479d065484a5fae19cb41fb18881200d84ad6d263dc8d",
+      "archiveBytes": 4575
+    },
+    {
+      "artifactId": 13609019874,
+      "shard": "1",
+      "envelopeSha256": "5a363c57ce471371bb1abf1df3f53b23737fa7913e8094451ef7c71bf913fc49",
+      "receiptSha256": "9bb002d1930c9f09ff4a26cbcf82ac25ea5cc54d800c5a67e18304bc9b10daa3",
+      "archiveSha256": "82fac58aee76a39d2853eda06a80a4bfbdf241087ba1ed0c8a7eaa267410070d",
+      "archiveBytes": 3926
+    },
+    {
+      "artifactId": 13610585486,
+      "shard": "4",
+      "envelopeSha256": "cabfeed60f0cb004846e74c9c1ed190b751bbd4d00b7020b472732d5937fc768",
+      "receiptSha256": "760b2e93e6646eae45d009496a94009af7caa64776094b45da32c80b8d6ad557",
+      "archiveSha256": "b224025c47d2fa21cd36ca2599fdd96b3a65aa52bb76b8acbb883afb080564a4",
+      "archiveBytes": 4136
+    },
+    {
+      "artifactId": 13610132708,
+      "shard": "6",
+      "envelopeSha256": "248b917d3bf7c215131af8fe8ea0856691c1e84544371494876e13c3ae3aef4a",
+      "receiptSha256": "617a41893a54b9f2feda8465b1b6d9b435666b916733820ae79c0e83daa5c6e3",
+      "archiveSha256": "6d8162cb8b1fb36cda17d4fc68652a5056eecd364350c1079e4c2e02511f4d7c",
+      "archiveBytes": 3619
+    },
+    {
+      "artifactId": 13609774916,
+      "shard": "14",
+      "envelopeSha256": "4bc39550a8bd7e87a26127c01f2ff046ecccbcf98b93a2687fdaf40841cbfbe7",
+      "receiptSha256": "c08dc21699330dc87761da7c7f3bd0b29b9fd5df79c5368dd2e76fc21f41d326",
+      "archiveSha256": "26034f14f085577f04a193e3359531faea09b428e57d29d9c8464fd9f648c0cf",
+      "archiveBytes": 4276
+    },
+    {
+      "artifactId": 13609734070,
+      "shard": "2",
+      "envelopeSha256": "e84c326e167186116dc0016d6df7f4398af9f058077426b468f3d028f742cf0a",
+      "receiptSha256": "a3bf17276bc9baf44879e8afdd009160e0fac353d38c7e22ca65d4dde6d3b24f",
+      "archiveSha256": "2aac43f0a6d025747e15e7d1835cba68a8efb135143d98471faec5f00730cead",
+      "archiveBytes": 3968
+    },
+    {
+      "artifactId": 13610013192,
+      "shard": "3",
+      "envelopeSha256": "0db6ed05fa6168af437464b1e877faab30af708a97f437ff8e0bf0539648641a",
+      "receiptSha256": "a545b34516d8a98c6392b897cbeb4d19e99b6fd74ee17948ecdd56598e6219e5",
+      "archiveSha256": "c95f61674bd246d1ab00807af361d89e900583425dad7e13632f051b4b8c91a3",
+      "archiveBytes": 4287
+    }
+  ],
+  "declaredSkips": [
+    {
+      "file": "scripts/install-workflow-shortcut.test.mjs",
+      "pattern": null,
+      "count": 2
+    },
+    {
+      "file": "tools/layout-studio/repository-shield-workspaces.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/repository-shield.test.mjs",
+      "pattern": null,
+      "count": 2
+    },
+    {
+      "file": "tools/layout-studio/codex-editor-ingress-owner.test.mjs",
+      "pattern": null,
+      "count": 9
+    },
+    {
+      "file": "packages/control-plane/test/git-inspector.test.ts",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/repository-shield-python-records.test.mjs",
+      "pattern": null,
+      "count": 2
+    },
+    {
+      "file": "tools/layout-studio/repository-shield-python-wheels.test.mjs",
+      "pattern": null,
+      "count": 2
+    },
+    {
+      "file": "tools/layout-studio/task-history-inputs.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/repository-shield-index.test.mjs",
+      "pattern": null,
+      "count": 3
+    },
+    {
+      "file": "tools/layout-studio/repository-shield-pypi-artifacts.test.mjs",
+      "pattern": null,
+      "count": 2
+    },
+    {
+      "file": "tools/layout-studio/codex-unix-tasks.test.mjs",
+      "pattern": null,
+      "count": 6
+    },
+    {
+      "file": "apps/linux-companion/test/linux-user-presence.test.ts",
+      "pattern": null,
+      "count": 2
+    },
+    {
+      "file": "tools/layout-studio/repository-shield-ignored-trees.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/state-lock.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/repository-shield-exceptions.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/linux-namespace-budget.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/repository-shield-history.test.mjs",
+      "pattern": null,
+      "count": 3
+    },
+    {
+      "file": "tools/layout-studio/scanner-history-review.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/coding-editor-connections.test.mjs",
+      "pattern": null,
+      "count": 10
+    },
+    {
+      "file": "tools/layout-studio/codex-unix-transport.test.mjs",
+      "pattern": null,
+      "count": 6
+    },
+    {
+      "file": "apps/linux-companion/test/linux-isolation.test.ts",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/repository-receipt-authority.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/repository-shield-licenses.test.mjs",
+      "pattern": null,
+      "count": 2
+    },
+    {
+      "file": "tools/layout-studio/repository-ignored-scanner-inputs.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/coding-task-owners.test.mjs",
+      "pattern": "the editor client authenticates the real Studio route and reads original protected target metadata without another native effect",
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/repository-execution.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "apps/vscode-extension/test/studio-editor-session.test.ts",
+      "pattern": null,
+      "count": 2
+    },
+    {
+      "file": "tools/layout-studio/repository-recovery.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/repository-shield-cargo-artifacts.test.mjs",
+      "pattern": null,
+      "count": 2
+    },
+    {
+      "file": "apps/linux-companion/test/linux-lifecycle.test.ts",
+      "pattern": null,
+      "count": 2
+    },
+    {
+      "file": "tools/layout-studio/scanner-recipe-draft.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/runtime.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/repository-pipeline.test.mjs",
+      "pattern": null,
+      "count": 5
+    },
+    {
+      "file": "scripts/codex-daemon-status.test.mjs",
+      "pattern": null,
+      "count": 2
+    },
+    {
+      "file": "apps/vscode-extension/test/studio-terminal-process.test.ts",
+      "pattern": null,
+      "count": 5
+    },
+    {
+      "file": "tools/layout-studio/repository-shield-cargo.test.mjs",
+      "pattern": null,
+      "count": 4
+    },
+    {
+      "file": "tools/layout-studio/scanner-review.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/scanner-mixed-review.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/codex-editor-recovery.test.mjs",
+      "pattern": null,
+      "count": 3
+    },
+    {
+      "file": "apps/windows-companion/test/authenticated-pipe.test.ts",
+      "pattern": null,
+      "count": 2
+    },
+    {
+      "file": "apps/vscode-extension/test/controller.test.ts",
+      "pattern": null,
+      "count": 3
+    },
+    {
+      "file": "apps/linux-companion/test/linux-process-supervisor.test.ts",
+      "pattern": null,
+      "count": 3
+    },
+    {
+      "file": "tools/layout-studio/configuration.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/linux-temporary-workspace.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/repository-shield-npm-archives.test.mjs",
+      "pattern": null,
+      "count": 2
+    },
+    {
+      "file": "tools/layout-studio/codex-editor-ingress.test.mjs",
+      "pattern": null,
+      "count": 13
+    },
+    {
+      "file": "tools/layout-studio/repository-shield-osv-source.test.mjs",
+      "pattern": null,
+      "count": 8
+    },
+    {
+      "file": "tools/layout-studio/repository-shield-pypi.test.mjs",
+      "pattern": null,
+      "count": 6
+    },
+    {
+      "file": "tools/layout-studio/task-index-inputs.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/repository-shield-artifacts.test.mjs",
+      "pattern": null,
+      "count": 2
+    },
+    {
+      "file": "apps/vscode-extension/test/named-pipe-transport.test.ts",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "apps/linux-companion/test/linux-repository-runtime.test.ts",
+      "pattern": null,
+      "count": 6
+    },
+    {
+      "file": "tools/layout-studio/repository-execution-supervisor.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/repository-validation-policy.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/scanner-index-review.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/repository-pipeline-fixtures.test.mjs",
+      "pattern": null,
+      "count": 2
+    },
+    {
+      "file": "tools/layout-studio/runtime-command-suspended.test.mjs",
+      "pattern": null,
+      "count": 5
+    },
+    {
+      "file": "apps/vscode-extension/test/studio-task-client.test.ts",
+      "pattern": null,
+      "count": 12
+    },
+    {
+      "file": "apps/provider-adapter-host/test/linux-path-security.test.ts",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/repository-effects.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/repository-commits.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/repository-temporary-build.test.mjs",
+      "pattern": null,
+      "count": 2
+    },
+    {
+      "file": "tools/layout-studio/repository-shield-cargo-archives.test.mjs",
+      "pattern": null,
+      "count": 2
+    },
+    {
+      "file": "tools/layout-studio/runtime-command.test.mjs",
+      "pattern": null,
+      "count": 15
+    },
+    {
+      "file": "tools/layout-studio/codex-owned-listener.test.mjs",
+      "pattern": null,
+      "count": 13
+    },
+    {
+      "file": "apps/vscode-extension/test/studio-editor-launch.test.ts",
+      "pattern": null,
+      "count": 22
+    },
+    {
+      "file": "tools/layout-studio/scanner-recipe-save.test.mjs",
+      "pattern": null,
+      "count": 22
+    },
+    {
+      "file": "tools/layout-studio/coding-task-owners.test.mjs",
+      "pattern": "protected task registry composes the actual owned Unix listener and bridge while the provider is a controlled double",
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/owned-process.test.mjs",
+      "pattern": null,
+      "count": 1
+    }
+  ],
+  "originalManifestCommandsBoundsSkipsAndCleanupVerified": true,
+  "packageAcceptance": false,
+  "limitations": [
+    "This accepts the complete distributed source at 4db5948, including exact Claude version admission, both native status-consent corrections and the native package fixture corrections. Full package acceptance remains separate.",
+    "This source predates the explicit directory-junction recovery assertion at 6089285; its separate native acceptance is now recorded in windows-package-db24634-tests-summary.json.",
+    "Earlier intermittent native focus, restricted-storage retirement and host-action settlement failures remain preserved; this passing follow-up does not prove their causes are resolved.",
+    "No interactive Windows account, desktop, guest, microphone or hardware acceptance is claimed."
+  ],
+  "nativeCollector": {
+    "jobId": 128674177410,
+    "artifactId": 13610348561,
+    "archiveBytes": 2613,
+    "archiveSha256": "afbedd51ddc279301f416ada7fb940c5d1d2e5a976e0357752ce51d7ce5a80d6",
+    "summarySha256": "b7da86668732f01e3dde933334f43a50f9f514ba01f25e667e7d4e47d3c2af6b",
+    "exactAuditedScopeCohortsManifestAndTotalsMatched": true
+  },
+  "workflowJobsPassed": 23
+}

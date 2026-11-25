@@ -1,0 +1,368 @@
+{
+  "schema": "switchyard-scanner-recipe-save-source-summary/v1",
+  "at": "2026-11-07T05:52:37.335Z",
+  "baseCommit": "bb5097f2e2ec64d7028946ceb3c423f002517e89",
+  "sourceFiles": {
+    "apps/windows-companion/src/repository-inputs.ts": "d88df1c10b8e3e860e798ed4d220ad54b099a621f68e550a9f8a8a6a2c288576",
+    "apps/windows-companion/src/scanner-fixtures.ts": "31f4eafa61ec9cb8092b37adf62735eab74b3f35ef41c91763e493640268acb3",
+    "apps/windows-companion/test/scanner-fixtures.test.ts": "358a1eeed8048f9dbe149faa71b90a859b511c58c52a0b2c0af5d248c8b50217",
+    "deployment/suite/installation.test.mjs": "9d9f10b0591817d1c23abaf87efacf79b695d14934a5b4e09537a1a4aa36779f",
+    "deployment/suite/release.mjs": "605cb67229dc23a77df5c47107605d841df559493bb50a5a5499b83c969cd147",
+    "deployment/suite/release.test.mjs": "bfdce3a7644ef2be90619ee410e4941e3deacff5cf387ed6c8697d8f8f5863ef",
+    "deployment/suite/test-support/fixture.mjs": "2689dd64366544cbe221645eca4858ea2780c0cd094e6069c231d99225cf3a0e",
+    "packages/control-plane/src/confirmations.ts": "6b38a60448f8916f48a06ed660cb8c2c1b1c691606a416d0a4ae017394853e71",
+    "packages/control-plane/test/confirmations.test.ts": "d3731146c9720d04986e7c4452f2cbfdf155f79cc8b48c684aec9753e4fa076d",
+    "scripts/run-isolated-tests.mjs": "ce7676a8b299c846fef796d8565d964288faa8ccf6ab05fadf361a6f9d97c138",
+    "scripts/run-isolated-tests.test.mjs": "6df1b38811e6ee963e117b658dda2a8014fa77c69c7f899828d97530e04d125c",
+    "scripts/verify-agent-security-host.mjs": "209d8e8ef0e17fbc382d7848c0b8db1f59b3b8c5b3fd27c01db63e601a493e13",
+    "scripts/windows-backend-shards.test.mjs": "2025ce872294426df0bab0c3b5fa367c9d2a18471568a3a4043109f55eae6234",
+    "scripts/windows-scenario-groups.test.mjs": "513550b7b199fb410c9ce3cffdb94b84dfa041cf3a4e7962162eb0e5a1ca3d9f",
+    "tools/layout-studio/legend-export.mjs": "fa81e07f3a6954b2de91298c285d48b4b4f807334ea5a6cdc018345656681db0",
+    "tools/layout-studio/legend-export.test.mjs": "990e0960a5f28eb5015d204e2272369d0d338ff993aae8d376786a9d790bb26e",
+    "tools/layout-studio/legend-template.mjs": "763cf5cffbdb1f1aff84f9ae0ae2010cabbb480223ffc4fec00eb66d8d3e7b41",
+    "tools/layout-studio/repository-shield.mjs": "486d8432f3a6afd8e9a8b16ca12bf502945775ee53747bda4880ca2ebb60c3ca",
+    "tools/layout-studio/scanner-fixture-invalidation.test.mjs": "c8ace6c94c73d232d1ae5c1577d15db14544608d3c76b2657993acbc73f7ddb2",
+    "tools/layout-studio/scanner-fixture-removal.test.mjs": "4b336348a99bccbc01116856bb7192ac3c04f30ec51c76ad34126c5781993499",
+    "tools/layout-studio/scanner-fixtures.mjs": "56340103c4f01295212acc3ffb3cb1043932af6c2f36b2863ce8af6f59ca2d9f",
+    "tools/layout-studio/scanner-fixtures.test.mjs": "f7f758b1b2b2f3cb958c42baa3143b6da979c8690a69fa5f257d96aa5c2df9ea",
+    "tools/layout-studio/scanner-history-review.test.mjs": "786503ed3b9eeab43f85fce35e9322713223f53f51587b4db39d4b17647fd704",
+    "tools/layout-studio/scanner-index-review.test.mjs": "22749b1d735fff5720a06c19bea00ba2279662cee828f542c1d284c54c403232",
+    "tools/layout-studio/scanner-recipe-draft.mjs": "1432be0b12ae745a8d0a97afc7f82c79428fb44b9e64757c2bcf0155d558061f",
+    "tools/layout-studio/scanner-recipe-draft.test.mjs": "bd77662a2ccd546e439d2127b8ecbbffcb244f9915f7ab21b4c36855d154432b",
+    "tools/layout-studio/scanner-recipe-files.mjs": "5007e2acb71bc81e6e54e399bc08aeea721d09ef5f82e6848125bec1cd879e94",
+    "tools/layout-studio/scanner-recipe-save.mjs": "4d1115121ecf7d9cc588f836a02146d7f1d1fd92f67c80d394b278c7874f13c0",
+    "tools/layout-studio/scanner-recipe-save.test.mjs": "2e1d8cc7940b3e76129c7892ea115ecd9d2e6ea19b434954b70d6dfcbaf2ef23",
+    "tools/layout-studio/scanner-review.test.mjs": "4e38267c6568dd6d9f57f96cb8b8fbb622dd1dd59828e09d8080e5a093bfc1af",
+    "tools/layout-studio/shield-scanner-engine.mjs": "18910cd38711a7facbdc053cd725a721c1a0cacdf62c2be81587cf4173aedc64",
+    "tools/layout-studio/suite.mjs": "539fec49fdd6249d7d824b7d4b3f02e0c81dfc064554dfbc6bd923920a7a284f",
+    "tools/layout-studio/suite.test.mjs": "18d65cf5a39999ae18be36a9eb2662f29823e9710aef941e2f31f6ab76972521",
+    "tools/layout-studio/task-authority-ignored-inputs.test.mjs": "698731e6edfb5a404fd0b785f0428f517e93ff7f0fabdc59ec542dfc22ad80cf",
+    "tools/layout-studio/task-authority-ignored-trees.test.mjs": "33da04d08c6af41e0ac9a994cc30a1272dbb1f051b57cb8369fc8932b3477cba",
+    "tools/layout-studio/task-authority.mjs": "9e15c66aea7394eed38719353f48e1eaf3f14dcec8ca29e25f4d16d77659ab80",
+    "tools/layout-studio/task-authority.test.mjs": "97ac82bba826d37c3913ef3c4653c762577e241ff5620848602706d7697ff3ae",
+    "tools/layout-studio/test-support/repository-shield-fixture.mjs": "e6be112389c80937b6f6bd4d04b41290326e63da9120f5b7dd5d3c30b2af6904",
+    "tools/layout-studio/test-support/scanner-draft-fixture.mjs": "37b99c677b7d627d2663bf2ac343eca0a217ead1b24f47607e1800170b1ba6d6",
+    "tools/layout-studio/test-support/task-authority-fixture.mjs": "6e951c3aa0da586268f4f3086dff752e15d1b7b9961f560f02cad0f2c0e35d23"
+  },
+  "initial": {
+    "name": "isolated-test-941cb9e6-4c2a-424a-b100-30efffc31760.json",
+    "sha256": "a9d3c2f74e63c10ae1a674bd782afd7d611e21b8a1b5a7685878188a0957018d",
+    "success": false,
+    "totals": {
+      "required": 2,
+      "passed": 1,
+      "failed": 1,
+      "tests": 33,
+      "passedTests": 32,
+      "failedTests": 1,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    }
+  },
+  "broaderFocused": {
+    "name": "isolated-test-aa1c8dc5-fbdb-4423-a830-36af9185a3d2.json",
+    "sha256": "2f005ee136a3ec918bb63c28a318569dd1aa138f571f3a69bbbc2465525aca10",
+    "success": false,
+    "totals": {
+      "required": 34,
+      "passed": 32,
+      "failed": 2,
+      "tests": 212,
+      "passedTests": 210,
+      "failedTests": 2,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    }
+  },
+  "compressedExportRegression": {
+    "name": "isolated-test-ab1b08c0-bd9a-4b1d-a22a-36c0c46db9f6.json",
+    "sha256": "770308c81e278a3236222a9da694a1686ac23a4f29869bc9afd6dbfe5c587e05",
+    "success": false,
+    "totals": {
+      "required": 21,
+      "passed": 20,
+      "failed": 1,
+      "tests": 65,
+      "passedTests": 64,
+      "failedTests": 1,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    }
+  },
+  "correctedPackaging": {
+    "name": "isolated-test-1613df3c-9856-4f05-88a7-796b471cab9f.json",
+    "sha256": "dd8d161ff69cd906239b15b60a91b2bbb2147e56a1653531aa61cc241ac13a4a",
+    "success": true,
+    "totals": {
+      "required": 21,
+      "passed": 21,
+      "failed": 0,
+      "tests": 65,
+      "passedTests": 65,
+      "failedTests": 0,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    }
+  },
+  "finalDistinctGroups": 35,
+  "finalDistinctTests": 221,
+  "acceptedGroupSources": [
+    {
+      "receipt": "isolated-test-1613df3c-9856-4f05-88a7-796b471cab9f.json",
+      "file": "scripts/windows-backend-shards.test.mjs"
+    },
+    {
+      "receipt": "isolated-test-1613df3c-9856-4f05-88a7-796b471cab9f.json",
+      "file": "scripts/run-isolated-tests.test.mjs"
+    },
+    {
+      "receipt": "isolated-test-1613df3c-9856-4f05-88a7-796b471cab9f.json",
+      "file": "scripts/windows-scenario-groups.test.mjs"
+    },
+    {
+      "receipt": "isolated-test-1613df3c-9856-4f05-88a7-796b471cab9f.json",
+      "file": "deployment/suite/release.test.mjs"
+    },
+    {
+      "receipt": "isolated-test-1613df3c-9856-4f05-88a7-796b471cab9f.json",
+      "file": "deployment/suite/installation.test.mjs",
+      "pattern": "installation keeps current and one rollback version, records dated backups, preserves data and removes only owned entries",
+      "timeoutMs": 120000
+    },
+    {
+      "receipt": "isolated-test-1613df3c-9856-4f05-88a7-796b471cab9f.json",
+      "file": "deployment/suite/installation.test.mjs",
+      "pattern": "unowned or edited desktop entries and corrupted new releases preserve the current application",
+      "timeoutMs": 120000
+    },
+    {
+      "receipt": "isolated-test-1613df3c-9856-4f05-88a7-796b471cab9f.json",
+      "file": "deployment/suite/installation.test.mjs",
+      "pattern": "a failed persistent write restores every earlier launcher and the exact previous installation record",
+      "timeoutMs": 120000
+    },
+    {
+      "receipt": "isolated-test-1613df3c-9856-4f05-88a7-796b471cab9f.json",
+      "file": "deployment/suite/installation.test.mjs",
+      "pattern": "forced owner exit leaves a durable journal; another installer restores the exact before state without touching unrelated files",
+      "timeoutMs": 120000
+    },
+    {
+      "receipt": "isolated-test-1613df3c-9856-4f05-88a7-796b471cab9f.json",
+      "file": "deployment/suite/installation.test.mjs",
+      "pattern": "recovery preflights all edits before writing, and respects a committed update whose pending marker survived",
+      "timeoutMs": 120000
+    },
+    {
+      "receipt": "isolated-test-1613df3c-9856-4f05-88a7-796b471cab9f.json",
+      "file": "deployment/suite/installation.test.mjs",
+      "pattern": "active host connections block uninstall before any application stop or persistent mutation",
+      "timeoutMs": 120000
+    },
+    {
+      "receipt": "isolated-test-1613df3c-9856-4f05-88a7-796b471cab9f.json",
+      "file": "deployment/suite/installation.test.mjs",
+      "pattern": "uninstall verifies exact owner exit and restores host connections before removing persistent program entries",
+      "timeoutMs": 120000
+    },
+    {
+      "receipt": "isolated-test-1613df3c-9856-4f05-88a7-796b471cab9f.json",
+      "file": "deployment/suite/installation.test.mjs",
+      "pattern": "a restoration conflict retains all program entries and resumes the previous running application",
+      "timeoutMs": 120000
+    },
+    {
+      "receipt": "isolated-test-1613df3c-9856-4f05-88a7-796b471cab9f.json",
+      "file": "deployment/suite/installation.test.mjs",
+      "pattern": "a second registered instance blocks uninstall without stopping either owner",
+      "timeoutMs": 120000
+    },
+    {
+      "receipt": "isolated-test-1613df3c-9856-4f05-88a7-796b471cab9f.json",
+      "file": "deployment/suite/installation.test.mjs",
+      "pattern": "unconfirmed owner exit leaves a durable removal journal and blocks restoration until recovery",
+      "timeoutMs": 120000
+    },
+    {
+      "receipt": "isolated-test-1613df3c-9856-4f05-88a7-796b471cab9f.json",
+      "file": "deployment/suite/installation.test.mjs",
+      "pattern": "a failed uninstall write restores the owned program and keeps restart recovery durable",
+      "timeoutMs": 120000
+    },
+    {
+      "receipt": "isolated-test-1613df3c-9856-4f05-88a7-796b471cab9f.json",
+      "file": "deployment/suite/installation.test.mjs",
+      "pattern": "a dated verified recovery entry restores an interrupted uninstall even after the main loader was removed",
+      "timeoutMs": 120000
+    },
+    {
+      "receipt": "isolated-test-1613df3c-9856-4f05-88a7-796b471cab9f.json",
+      "file": "deployment/suite/installation.test.mjs",
+      "pattern": "an explicit no-start update stops the previous generation without restarting the new one",
+      "timeoutMs": 120000
+    },
+    {
+      "receipt": "isolated-test-1613df3c-9856-4f05-88a7-796b471cab9f.json",
+      "file": "deployment/suite/installation.test.mjs",
+      "pattern": "the stable installed loader verifies and addresses the actual application across update and rollback",
+      "timeoutMs": 120000
+    },
+    {
+      "receipt": "isolated-test-1613df3c-9856-4f05-88a7-796b471cab9f.json",
+      "file": "deployment/suite/installation.test.mjs",
+      "pattern": "pre-promotion owner loss recovers only verified staging copies and exact incomplete source prefixes",
+      "timeoutMs": 120000
+    },
+    {
+      "receipt": "isolated-test-1613df3c-9856-4f05-88a7-796b471cab9f.json",
+      "file": "deployment/suite/installation.test.mjs",
+      "pattern": "interrupted installation recovery accepts the full release file ceiling plus its manifest and preserves unrelated edits",
+      "timeoutMs": 120000
+    },
+    {
+      "receipt": "isolated-test-aa1c8dc5-fbdb-4423-a830-36af9185a3d2.json",
+      "file": "tools/layout-studio/suite.test.mjs"
+    },
+    {
+      "receipt": "isolated-test-aa1c8dc5-fbdb-4423-a830-36af9185a3d2.json",
+      "file": "tools/layout-studio/scanner-fixtures.test.mjs"
+    },
+    {
+      "receipt": "isolated-test-aa1c8dc5-fbdb-4423-a830-36af9185a3d2.json",
+      "file": "tools/layout-studio/scanner-fixture-invalidation.test.mjs"
+    },
+    {
+      "receipt": "isolated-test-aa1c8dc5-fbdb-4423-a830-36af9185a3d2.json",
+      "file": "tools/layout-studio/scanner-fixture-removal.test.mjs"
+    },
+    {
+      "receipt": "isolated-test-aa1c8dc5-fbdb-4423-a830-36af9185a3d2.json",
+      "file": "tools/layout-studio/scanner-review.test.mjs",
+      "timeoutMs": 120000,
+      "expectedSkipped": 0
+    },
+    {
+      "receipt": "isolated-test-aa1c8dc5-fbdb-4423-a830-36af9185a3d2.json",
+      "file": "tools/layout-studio/scanner-index-review.test.mjs",
+      "timeoutMs": 120000,
+      "expectedSkipped": 0
+    },
+    {
+      "receipt": "isolated-test-aa1c8dc5-fbdb-4423-a830-36af9185a3d2.json",
+      "file": "tools/layout-studio/scanner-history-review.test.mjs",
+      "timeoutMs": 120000,
+      "expectedSkipped": 0
+    },
+    {
+      "receipt": "isolated-test-aa1c8dc5-fbdb-4423-a830-36af9185a3d2.json",
+      "file": "tools/layout-studio/scanner-recipe-draft.test.mjs",
+      "timeoutMs": 120000,
+      "expectedSkipped": 0
+    },
+    {
+      "receipt": "isolated-test-aa1c8dc5-fbdb-4423-a830-36af9185a3d2.json",
+      "file": "tools/layout-studio/scanner-recipe-save.test.mjs",
+      "timeoutMs": 120000,
+      "expectedSkipped": 0
+    },
+    {
+      "receipt": "isolated-test-aa1c8dc5-fbdb-4423-a830-36af9185a3d2.json",
+      "file": "tools/layout-studio/task-authority-ignored-trees.test.mjs",
+      "timeoutMs": 120000
+    },
+    {
+      "receipt": "isolated-test-aa1c8dc5-fbdb-4423-a830-36af9185a3d2.json",
+      "file": "tools/layout-studio/task-authority-ignored-inputs.test.mjs"
+    },
+    {
+      "receipt": "isolated-test-aa1c8dc5-fbdb-4423-a830-36af9185a3d2.json",
+      "file": "tools/layout-studio/task-authority.test.mjs"
+    },
+    {
+      "receipt": "isolated-test-aa1c8dc5-fbdb-4423-a830-36af9185a3d2.json",
+      "file": "packages/control-plane/test/confirmations.test.ts"
+    },
+    {
+      "receipt": "isolated-test-aa1c8dc5-fbdb-4423-a830-36af9185a3d2.json",
+      "file": "apps/windows-companion/test/scanner-fixtures.test.ts",
+      "currentUserProfile": false
+    },
+    {
+      "receipt": "isolated-test-1613df3c-9856-4f05-88a7-796b471cab9f.json",
+      "file": "tools/layout-studio/legend-export.test.mjs"
+    }
+  ],
+  "originalCommandsBoundsSkipsAndCleanupVerified": true,
+  "typecheck": {
+    "command": "npm run typecheck",
+    "node": "24.14.0",
+    "passed": true
+  },
+  "corrections": [
+    "Initial privacy test searched for the substring content and incorrectly matched contentSha256 metadata; it now checks that file content properties are absent.",
+    "The new bounded test group needed registration in the explicit deadline contract. Existing deadlines and skip allowances were unchanged.",
+    "The added save backend exceeded the original full Linux 5 MiB package test. The retained upstream SVG is now losslessly compressed in packages; bounded decoding verifies its original hash, and all three export formats exactly match source output. The size limit, original asset and frozen frontend remain unchanged.",
+    "The full-file-ceiling recovery drill reproduced loss of the compressed SVG when rebuilding an exported package. The builder now accepts only its explicitly declared, exact-hash-verified compressed source and retains all 640 files."
+  ],
+  "scope": {
+    "authenticatedReviewApplyListRoutes": true,
+    "linuxDescriptorAnchoredExclusiveCreation": true,
+    "oneUseExactScopeConfirmation": true,
+    "taskAccountWorkspaceTargetAndFeedRevalidation": true,
+    "encryptedMetadataOnlyProgress": true,
+    "noAuthorityOrScanFromSaving": true,
+    "realLinuxSaveThenFreshAuthorityThenScan": true,
+    "knownCompleteLostAcknowledgementRecoveryWithoutReplay": true,
+    "partialUnknownOrChangedOutputPreserved": true,
+    "kernelLeasePreventsOvertakingActiveOwner": true,
+    "modeAndFeedChangesFenceRemainingWrites": true,
+    "sourceIndexHeadPreserved": true,
+    "allInstallationUpdateRollbackRecoveryScenarios": true,
+    "losslessPackagedTemplateAndAllExportFormats": true
+  },
+  "bounds": {
+    "confirmationMinutes": 5,
+    "retainedSaveRecords": 32,
+    "feedBytes": 2097152,
+    "scannerSourceBytes": 16777216,
+    "sourceFileBytes": 2097152,
+    "controlJsonBytes": 131072,
+    "recipeInputs": 256,
+    "authorityPaths": 256,
+    "templateDecodeBytes": 800000,
+    "originalLinuxPackageBytes": 5242880
+  },
+  "limitations": [
+    "Windows reviewed saving is unfinished implementation and is explicitly refused before native inspection.",
+    "Frontend controls remain frozen; no normal UI save journey is accepted.",
+    "Partial or uncertain repository output is preserved, never automatically deleted or resumed.",
+    "Recovery verifies exact retained ownership/content only; fresh task authority and execution still revalidate task, sources and feed trust.",
+    "Descriptor checks detect observed replacement; no claim isolates a compromised process with the same OS identity.",
+    "Mixed index/history execution, broad security coverage, hardware/account commissioning and complete current-suite acceptance remain separate."
+  ],
+  "effects": {
+    "modelPrompts": 0,
+    "installedNativeTasks": 0,
+    "accountChanges": 0,
+    "hidOpened": false,
+    "frontendChanged": false,
+    "upstreamArtworkChanged": false,
+    "liveInstalledScanner": false,
+    "newRuntimeDownloads": false
+  },
+  "cleanup": {
+    "emptyOwnedParentVerified": true,
+    "removed": true
+  },
+  "success": true,
+  "postTestFormatting": {
+    "file": "tools/layout-studio/test-support/scanner-draft-fixture.mjs",
+    "change": "Removed one trailing blank line; bytes before trailing whitespace are identical.",
+    "testedSha256": "fc6f36b386a0e89787e85d5015782c82beb2f94ff6a58e0a4e1d5d82794d161d",
+    "publishedSha256": "37b99c677b7d627d2663bf2ac343eca0a217ead1b24f47607e1800170b1ba6d6"
+  }
+}

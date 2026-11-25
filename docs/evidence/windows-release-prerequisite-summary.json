@@ -1,0 +1,50 @@
+{
+  "schema": "switchyard-windows-release-prerequisite-summary/v1",
+  "basis": "fb265e7b91750a060e2617a25a8fc3a946bad38c",
+  "sourceSha256": {
+    ".github/workflows/b122-windows.yml": "a34498e4807b6a5a3f9e20a944af11dbd2626b579a3345bc021f7345b1e426a5",
+    ".github/workflows/switchyard-windows-filesystem.yml": "8dd722be5a61864246d86005b4cf075671df03ea6f59a8682b676fdb0674909c",
+    "deployment/suite/test-support/fixture.mjs": "f736ad85b26e4116051b5bbf8b5ce9f682606df839a7c508dbbc95962fc5e4bb",
+    "deployment/windows/Build-B122Release.ps1": "a592b1a097bf55545d703a1a189ff8d5d33c5577f25af68db1d2d94fef71460a",
+    "scripts/verify-windows-storage-contracts.mjs": "fb76f72b6d988df4726d3c10499860e2862c2b168208a11d86cc6500328d1100"
+  },
+  "isolated": {
+    "receipt": "isolated-test-ab65517f-7247-47cf-84e0-5cc5c50a2023.json",
+    "totals": {
+      "required": 8,
+      "passed": 8,
+      "failed": 0,
+      "tests": 113,
+      "passedTests": 113,
+      "failedTests": 0,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    },
+    "allChildAndTreeCleanupVerified": true
+  },
+  "laneFollowup": {
+    "receipt": "isolated-test-20dc87ee-fb60-4408-90ff-57db5019ee4d.json",
+    "totals": {
+      "required": 2,
+      "passed": 2,
+      "failed": 0,
+      "tests": 29,
+      "passedTests": 29,
+      "failedTests": 0,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    },
+    "allChildAndTreeCleanupVerified": true
+  },
+  "typecheckPassed": true,
+  "behavior": [
+    "Verified Windows release builds require one explicit existing Python 3.13.3 image, reject redirected paths, verify version/hash in the isolated environment, add only its directory to PATH and recheck its image after tests. Provenance records its test-only role; no Python bytes are bundled or downloaded.",
+    "On actual Windows, application/installation fixtures bundle the same-source compiled native helper. Linux packaging simulations and the unexecuted setup fixture retain inert placeholders. No test assertion or deadline is removed.",
+    "Independent Windows suite-application and suite-installation lanes select the complete original manifest groups with the same-source helper."
+  ],
+  "nativeAcceptance": "Source 3363e8b passes all five application and sixteen installation/recovery tests on actual Windows with the same-source helper and original deadlines. See windows-336-lifecycle-native-summary.json. The isolated Python prerequisite still awaits a complete release result; restricted Job creation remains failed.",
+  "installedChanged": false,
+  "newDownloads": false
+}

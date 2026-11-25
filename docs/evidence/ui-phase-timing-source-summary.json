@@ -1,0 +1,163 @@
+{
+  "schema": "switchyard-source-evidence/v1",
+  "sourceBefore": "6f9bacca85f2f6484878914e869671a73fe3e5fb",
+  "scope": "Content-free phase measurements in the original scanner/execution UI fixture journeys; production behavior unchanged",
+  "receiptSha256": "b81b8ce4589df9ad48e7111500c5cafef821f48f333ce2a9d7eeea6138ac74d1",
+  "runId": "6d795d05-1ac3-470a-a4c4-a1360888b041",
+  "totals": {
+    "required": 6,
+    "passed": 6,
+    "failed": 0,
+    "tests": 51,
+    "passedTests": 51,
+    "failedTests": 0,
+    "skippedTests": 0,
+    "cancelledTests": 0,
+    "todoTests": 0
+  },
+  "groups": [
+    {
+      "file": "tools/layout-studio/repository-execution.test.mjs",
+      "durationMs": 14669,
+      "counts": {
+        "total": 5,
+        "passed": 5,
+        "failed": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "timeoutMs": 240000,
+      "outputBytes": 1803,
+      "outputDigest": "c4353ea9e54bce25777d180f789b550a53fe0e719e480f5341980ae9fbcc3703",
+      "cleanupCompleted": true
+    },
+    {
+      "file": "tools/layout-studio/scanner-recipe-draft.test.mjs",
+      "durationMs": 15379,
+      "counts": {
+        "total": 12,
+        "passed": 12,
+        "failed": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "timeoutMs": 120000,
+      "outputBytes": 3113,
+      "outputDigest": "ff6d769148e67d431f663b6741d086dafff0eb8de8b3a5c19000e5f957b82629",
+      "cleanupCompleted": true
+    },
+    {
+      "file": "tools/layout-studio/task-authority.test.mjs",
+      "durationMs": 3733,
+      "counts": {
+        "total": 11,
+        "passed": 11,
+        "failed": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "timeoutMs": 45000,
+      "outputBytes": 3308,
+      "outputDigest": "8b49fc4778c41ff0947f8161ce56302b87dbe1e30bdc3b8f619480070b51dc45",
+      "cleanupCompleted": true
+    },
+    {
+      "file": "tools/layout-studio/execution-ui.test.mjs",
+      "durationMs": 12207,
+      "counts": {
+        "total": 7,
+        "passed": 7,
+        "failed": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "timeoutMs": 45000,
+      "outputBytes": 22072,
+      "outputDigest": "994fc26de51f390dc77e8eca6cce3933816665798815765442c7886ea667c61b",
+      "cleanupCompleted": true
+    },
+    {
+      "file": "tools/layout-studio/authority-ui.test.mjs",
+      "durationMs": 3235,
+      "counts": {
+        "total": 9,
+        "passed": 9,
+        "failed": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "timeoutMs": 45000,
+      "outputBytes": 2577,
+      "outputDigest": "ab5d4eba963f77cc3aaf21f9ca03e3f23ef0d03667df02fcf93333f3229dd2f4",
+      "cleanupCompleted": true
+    },
+    {
+      "file": "tools/layout-studio/scanner-ui.test.mjs",
+      "durationMs": 10457,
+      "counts": {
+        "total": 7,
+        "passed": 7,
+        "failed": 0,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "timeoutMs": 45000,
+      "outputBytes": 19019,
+      "outputDigest": "e7838a3c5517b54bcf15ce5f6f07edb046293bda0d96afd6cb000bb333438882",
+      "cleanupCompleted": true
+    }
+  ],
+  "diagnostics": {
+    "enabledIn": [
+      "tools/layout-studio/scanner-ui.test.mjs",
+      "tools/layout-studio/execution-ui.test.mjs"
+    ],
+    "phases": [
+      "setup-git",
+      "store-initialize",
+      "store-snapshot",
+      "store-update",
+      "store-authorize",
+      "guardian-ready",
+      "query-git",
+      "http-request"
+    ],
+    "fields": [
+      "calls",
+      "pending",
+      "failed",
+      "totalMs",
+      "maxMs"
+    ],
+    "maximumReportsPerJourney": 9,
+    "contentExcluded": [
+      "arguments",
+      "results",
+      "exceptions",
+      "paths",
+      "task/account identifiers",
+      "prompts",
+      "source text"
+    ],
+    "interpretation": "Cumulative inclusive wall times. Nested/concurrent phases overlap; totals must not be added."
+  },
+  "unchanged": [
+    "All original UI cases and assertions",
+    "Original per-file deadlines, including both 45-second UI files and 2-second UI observation bound",
+    "Real Git commands and encrypted stores",
+    "Native ownership and cleanup",
+    "No new skips or manual CI actions"
+  ],
+  "auditNote": "First metadata auditor incorrectly assumed every backend group had a 45-second deadline and stopped before writing evidence. Corrected auditor compares each receipt to the unchanged original manifest; backend execution/draft retain 240/120 seconds.",
+  "notAccepted": [
+    "Windows timeout root cause or correction",
+    "Current complete Linux/Windows suites",
+    "Live hardware/accounts/graphical UI"
+  ]
+}

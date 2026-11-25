@@ -1,0 +1,67 @@
+{
+  "schema": "switchyard-windows-canonical-lock-source/v1",
+  "basis": "701f915478f6cbd788216c927cac4f047370d2e3",
+  "sourceSha256": {
+    "tools/layout-studio/state-lock.mjs": "6b1e9fb5b41e73d95057b04418373a2a64bfa0a27902d8218d8bca5e69712e5d",
+    "tools/layout-studio/state-lock.test.mjs": "c5f55a6ba5837b02623352340034f75bcafb01fd977ea8b419783dacf15e225c"
+  },
+  "retainedNativeFailure": {
+    "sourceCommit": "701f915478f6cbd788216c927cac4f047370d2e3",
+    "executionCommit": "4b131da22435565001c83b2ed463c2bfde300764",
+    "sourceAndExecutionTree": "32454845692612776c5db2e403c36d35430cc0f2",
+    "runId": 42220245596,
+    "restrictedJobId": 127900675347,
+    "artifactId": 13504075001,
+    "archiveBytes": 4321,
+    "archiveSha256": "96fd4ab9c825bb97235236b563814df194ecb3da0d62f26d600fe4dd9b12496e",
+    "privateReceipt": "windows-parent-701-native.json",
+    "helperSha256": "6ff4465fc1d7e991c6c0da73cc5bdb261d5fa0a61a36d52eb35ec3d41bc4dda4",
+    "failure": {
+      "waitResult": 0,
+      "exitCode": 2,
+      "resultAvailable": true,
+      "childReportedSuccess": false,
+      "ownerReportedSuccess": false,
+      "completedChecks": 0,
+      "failedPhase": "private-state-initialize",
+      "failureCategory": "Error",
+      "stateLockFailure": {
+        "schema": "switchyard-state-lock-failure/v1",
+        "kind": "child-exit",
+        "phase": "worker-startup",
+        "progress": "lease-input-read",
+        "exitCode": 2,
+        "signal": null,
+        "spawnCode": null
+      }
+    },
+    "ordinaryOwnerChecks": 8,
+    "restrictedMetadataChecks": 13,
+    "restrictedNativeExchangeChecks": 31,
+    "zipSavedLocally": false
+  },
+  "sourceFinding": "The new unconditional request-read marker after Path.GetFullPath equality was not reached; parent-handle opening comes later. .NET normalization expands existing 8.3 names while Node path joining preserves their spelling. The receipt does not export the actual path, so a specific short alias is not claimed as observed.",
+  "correction": "Resolve the existing Windows lock path before pooling/spawn and verify original/canonical bigint volume+file identity, same drive, ordinary file and single link. The native canonical equality, pinned-handle identity and parent-loss checks remain unchanged.",
+  "isolated": {
+    "receipt": "isolated-test-b660b4b6-1d44-4902-a37f-3b983e69b3e7.json",
+    "totals": {
+      "required": 5,
+      "passed": 5,
+      "failed": 0,
+      "tests": 53,
+      "passedTests": 52,
+      "failedTests": 0,
+      "skippedTests": 1,
+      "cancelledTests": 0,
+      "todoTests": 0
+    },
+    "allChildAndTreeCleanupVerified": true
+  },
+  "typecheckPassed": true,
+  "nativeAcceptance": false,
+  "limits": [
+    "The full Linux run is for 701f915 and predates this Windows-only branch correction.",
+    "No token/ACL/privilege/SID/desktop/default-DACL/account/runtime fallback or path-guard weakening.",
+    "Original eight owner checks and Windows lease-file/parent-loss tests still require native acceptance."
+  ]
+}

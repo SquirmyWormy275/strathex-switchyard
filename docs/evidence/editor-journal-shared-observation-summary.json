@@ -1,0 +1,85 @@
+{
+  "schema": "switchyard-editor-journal-shared-observation-summary/v1",
+  "baseCommit": "0594c8d318c1619a063000a06eabc152bb7fba23",
+  "sourceFiles": {
+    "tools/layout-studio/coding-editor-journal.mjs": "c6b37f69edc66a95d088e2c8229d01994a96b98827177785e6ca5cd2a248dcce",
+    "tools/layout-studio/windows-editor-journal.test.mjs": "79dc3dc427c2eae1d86f0bfaf0d1a44dc2d4d5681efb5a533ca1de13b4dee915"
+  },
+  "receipts": [
+    {
+      "receipt": "isolated-test-76bdf5ab-e50c-40ed-88c7-ba600c2fb2fd.json",
+      "sha256": "7fb5fda4a1174739072784d1830560aa290d228a11a3df5d8c107d47314c5cb6",
+      "success": false,
+      "totals": {
+        "required": 1,
+        "passed": 0,
+        "failed": 1,
+        "tests": 14,
+        "passedTests": 13,
+        "failedTests": 1,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "receipt": "isolated-test-369e1960-f5ad-4800-8110-c0365e5a0a8a.json",
+      "sha256": "7b87d5bd3be88e424001a9e09acd0bb86cb131b3a6acacfe4d2ec43878785d90",
+      "success": true,
+      "totals": {
+        "required": 8,
+        "passed": 8,
+        "failed": 0,
+        "tests": 72,
+        "passedTests": 70,
+        "failedTests": 0,
+        "skippedTests": 2,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "receipt": "isolated-test-3bec1bbc-14a7-4101-9923-ce1aaee4c4b8.json",
+      "sha256": "15518706bcb595bc165b2fa0890991bcbf2d8cad500166439ec7b823c84760a4",
+      "success": true,
+      "totals": {
+        "required": 1,
+        "passed": 1,
+        "failed": 0,
+        "tests": 15,
+        "passedTests": 15,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    }
+  ],
+  "accepted": {
+    "groups": 8,
+    "passedTests": 71,
+    "skippedTests": 2,
+    "originalCommandsBoundsSkipsAndCleanupVerified": true
+  },
+  "correction": {
+    "perHandlePublicationQueue": true,
+    "originalMutationKernelLeasesPreserved": true,
+    "overlappingObservationSharesFreshUnfinishedCheck": true,
+    "queuedMutationSeparatesObservationBatch": true,
+    "settledSuccessOrFailureNeverCached": true,
+    "freshFinalPolicyChecked": true
+  },
+  "nativeFailure": "editor-journal-read-queue-native-failure-summary.json",
+  "limitations": [
+    "Corrected native Windows composition is pending; no deadline or access policy changes.",
+    "Full Linux verification remains source 961ecb3 and predates both journal corrections."
+  ],
+  "effects": {
+    "frontendChanged": false,
+    "installedChanged": false,
+    "modelPrompts": 0,
+    "liveProviderTasks": 0,
+    "hardwareOpened": false,
+    "newDependencies": false
+  }
+}

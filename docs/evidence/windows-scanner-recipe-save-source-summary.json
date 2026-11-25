@@ -1,0 +1,419 @@
+{
+  "schema": "switchyard-windows-scanner-recipe-save-source-summary/v1",
+  "at": "2026-11-07T06:16:22.201Z",
+  "baseCommit": "31346365a54cd9286df7ce2482480b0da92c39e6",
+  "sourceFiles": {
+    ".github/workflows/switchyard-windows-filesystem.yml": "f5ccf1d56c13fa7398319b06c4dc334b04dc4ec6f32269a29ec274695368c105",
+    "apps/desktop-hotkeys/BoundedExchangeImage.cs": "5cca580973f3688e8aef5e9c6ef3c5f504d8b3d327997db37bec70eb44e2ca80",
+    "apps/desktop-hotkeys/BoundedExchangeVolume.cs": "590f7e05811f0549e8657a76719cfbc024e9643ae0c44d6e980e696c676ec769",
+    "apps/desktop-hotkeys/BrokerExchangeImage.cs": "c8a1b87a74f161561f1d0cabe5f6a4a5ac21aeb7335f9f3c13c5d759b45aa5fb",
+    "apps/desktop-hotkeys/PipeTextProtocol.cs": "98c1cdb43f0c5993bfa7fad548178d5a469849c8d4b19b26e5ad5c29b655278d",
+    "apps/desktop-hotkeys/Program.cs": "e5a357ce9ef9259dabc7fd4c36ad7e3c6aa4c44c4d5300568ca171e15395b2cc",
+    "apps/desktop-hotkeys/ReviewedHistoryInputs.cs": "28c802f099f22feda73b206ddde2f5927ef69871ded84a0dd82e22d185ecc6a7",
+    "apps/desktop-hotkeys/ReviewedIndexInputs.cs": "372602863793a270b86b9abb74c34a861254dbd281a5f2f3dabb0b395ac763c2",
+    "apps/desktop-hotkeys/ReviewedInputStager.cs": "6645c1aaded54ae0e6c70f684f070c6a8c625f36e7525cc8f776335a7c6b7e24",
+    "apps/desktop-hotkeys/RuntimeCommandRunner.cs": "d272ba2b57d81a3954d3abdecd5cb1373648fce3c1cc8fed23c8fde68941123b",
+    "apps/desktop-hotkeys/RuntimePackageMetadata.cs": "df6f0d2e011471a8a3f65967f630ec8f2d94c388a4d5758d4e9a9e1d4bc9297c",
+    "apps/desktop-hotkeys/RuntimePrivatePipeSecurity.cs": "19b8bb02b7c41b7879223648e3f6edf54652e2b9e13ec5ed8618436390b771e4",
+    "apps/desktop-hotkeys/ScannerRecipeFiles.cs": "b77c96291c1c5bb31db8a44b3b1972aa29e1fecfbacb037f18c53ecf8dbd7b37",
+    "apps/desktop-hotkeys/StateLeaseWorker.cs": "617c6b404179a9289bb9992117807ecbe7beaf77a9da6b8028c621ad7873626a",
+    "apps/desktop-hotkeys/WindowsSandboxCli.cs": "8a8d428e0a4eadf56631b154edce9e95c0ea813e45d8bb8cf0522149046f1030",
+    "apps/desktop-hotkeys/WindowsStorageBroker.cs": "508e30ac285b1c029b39c8c2947aec7625d52e6fce8103c8e6a6f19381a386e4",
+    "apps/desktop-hotkeys/WindowsStorageBrokerBootstrap.cs": "6c2d612447084928a907cf7e3b3fc2837de141f5c21fc82ae0e068676a5866f2",
+    "apps/desktop-hotkeys/WindowsStorageBrokerControl.cs": "148afe8cdbf5ad96841d683e72be7273fcd27ebf730582a8cbe3bbf776148fd9",
+    "apps/desktop-hotkeys/WindowsStorageBrokerDiagnostic.cs": "56545d478055bccc73277ea83a94f3e9904230d38e8bf320ba4c402b6aef4d0d",
+    "apps/desktop-hotkeys/WindowsStorageBrokerExchangeEngine.cs": "e69c8911975ea1fb4e9b32ba999928078099699e3eac0e96afe231c7f21d4aeb",
+    "apps/desktop-hotkeys/WindowsStorageBrokerExchangeFacts.cs": "8dc35f2980e748c8ec08eda60f0e0fc0a764650cdaefe80b243efba5e903ef27",
+    "apps/desktop-hotkeys/WindowsStorageBrokerExchangeFiles.cs": "b0d27292d5cedf07a4e68093d1a67483e53305bee085eb321294f2c5cf04b902",
+    "apps/desktop-hotkeys/WindowsStorageBrokerExchangeJournal.cs": "7603a59e27a8ff6c009c2b0b0b9aab5d8e89f165feaacc15692c50c08aba2908",
+    "apps/desktop-hotkeys/WindowsStorageBrokerExchangeMapping.cs": "9c76c0cd5c41b9ec2525781e11ef7d2f327aa8d76401055c36a0acd2cafa5030",
+    "apps/desktop-hotkeys/WindowsStorageBrokerExchangeProtocol.cs": "e7787821ac2c36acc25ca4ef53ecadcd7c2c32d02e76339a5b7c0c1117e5ae15",
+    "apps/desktop-hotkeys/WindowsStorageBrokerFiles.cs": "05c38bb34ee8aef8a03b4e80b949dfdd2ed5764b7ea99e82baf9e02b6c28938d",
+    "apps/desktop-hotkeys/WindowsStorageBrokerInstallation.cs": "58525c47574e2dcd2d16db9037ebc748d837caae9ca8b38323347aeb1d9a668d",
+    "apps/desktop-hotkeys/WindowsStorageBrokerPipe.cs": "5bf0b6700e4169c6e4547be61a052b835fbd231bbdbfff4033586635d2112023",
+    "apps/desktop-hotkeys/WindowsStorageBrokerProtocol.cs": "cc58058bbb0e108ad7283dc4b37eb467dcf9874b89ef666fd0b956f9fa6dcb3a",
+    "apps/desktop-hotkeys/WindowsStorageBrokerRuntime.cs": "193d5711b021e2dbda39af47fb417eed5f742e6aaafbdb41441f24f8383279a7",
+    "apps/desktop-hotkeys/WindowsStorageBrokerService.cs": "8abc195a6416ef637e77fd37c0aff234ff1d646088ea728dcf7fdebb49e6bd2f",
+    "apps/desktop-hotkeys/WindowsStorageBrokerServiceHeader.cs": "b2ce888b17bdf5f960eef00c89f46fd355fb3368b56c2067fb422b8b9fb72ebf",
+    "apps/desktop-hotkeys/WindowsStoragePrerequisites.cs": "06fea31a24ae5c2dd05df0b8b1eb6c1220f8ca375dc3c19489d6a13c01ac83d3",
+    "apps/windows-companion/provider-desktop-helper/Program.cs": "896fd582826496b0b989f7a9299499df6ce39a1ff6d13527e2a90b58eb46f70f",
+    "apps/windows-companion/sandbox-helper/Program.cs": "445428afc42357c69a16e15679945cdb1a79b336dc0976c4e51d59a0520c4cbe",
+    "apps/windows-companion/test/scanner-fixtures.test.ts": "358a1eeed8048f9dbe149faa71b90a859b511c58c52a0b2c0af5d248c8b50217",
+    "deployment/suite/installation.test.mjs": "9d9f10b0591817d1c23abaf87efacf79b695d14934a5b4e09537a1a4aa36779f",
+    "deployment/suite/release.test.mjs": "bfdce3a7644ef2be90619ee410e4941e3deacff5cf387ed6c8697d8f8f5863ef",
+    "packages/control-plane/test/confirmations.test.ts": "d3731146c9720d04986e7c4452f2cbfdf155f79cc8b48c684aec9753e4fa076d",
+    "scripts/run-isolated-tests.mjs": "0ef8f1dfbb40d28525aa64dc92c6d3b9679b244d4ac9b058bc673c0ff1ed57b9",
+    "scripts/run-isolated-tests.test.mjs": "f2d26b943e101d1f578bf1efb4355ddec5438a92496c0f1b8f914ed42df55875",
+    "scripts/verify-agent-security-host.mjs": "9f15d7408380593b9dceccbbf6a52ce3fda8a36d4eed2d32fd9268a89a7f56b8",
+    "scripts/verify-windows-storage-contracts.mjs": "990ce2524f1c5d0ed7982ab738a6d3bc07f0854b322a825399c52032b69a377b",
+    "scripts/windows-backend-shards.test.mjs": "2025ce872294426df0bab0c3b5fa367c9d2a18471568a3a4043109f55eae6234",
+    "scripts/windows-scenario-groups.test.mjs": "7cda6f1f7323322a254375ff911d83b8eed7e628aa8c4bc55f0acb088d684d05",
+    "tools/layout-studio/legend-export.test.mjs": "990e0960a5f28eb5015d204e2272369d0d338ff993aae8d376786a9d790bb26e",
+    "tools/layout-studio/owned-native-command.mjs": "111ae7ad96adf1a461e3aaa8d73c0c7c698de95e9348ea6b0abc596c1d77261a",
+    "tools/layout-studio/private-fs.test.mjs": "6becd0ef00c52c75c8e583292d33574202421ea6d7a053d94ad54f895ed224b6",
+    "tools/layout-studio/runtime-command-suspended.test.mjs": "2b0e28e8e6f6f6805c30b940db68e46e8eccdf9e4018e0c42e5a12cc4009ac05",
+    "tools/layout-studio/runtime-command.test.mjs": "284608a2595cb4b823a44afce2d45a244023a1f62ad36f3f4e85e3dfadea01d1",
+    "tools/layout-studio/scanner-fixture-invalidation.test.mjs": "c8ace6c94c73d232d1ae5c1577d15db14544608d3c76b2657993acbc73f7ddb2",
+    "tools/layout-studio/scanner-fixture-removal.test.mjs": "4b336348a99bccbc01116856bb7192ac3c04f30ec51c76ad34126c5781993499",
+    "tools/layout-studio/scanner-fixtures.test.mjs": "f7f758b1b2b2f3cb958c42baa3143b6da979c8690a69fa5f257d96aa5c2df9ea",
+    "tools/layout-studio/scanner-history-review.test.mjs": "786503ed3b9eeab43f85fce35e9322713223f53f51587b4db39d4b17647fd704",
+    "tools/layout-studio/scanner-index-review.test.mjs": "22749b1d735fff5720a06c19bea00ba2279662cee828f542c1d284c54c403232",
+    "tools/layout-studio/scanner-recipe-draft.test.mjs": "bd77662a2ccd546e439d2127b8ecbbffcb244f9915f7ab21b4c36855d154432b",
+    "tools/layout-studio/scanner-recipe-save.mjs": "e37944b2e7afc836abb5aed1b42432ed2085db4048e0188aa612b193196cfcd5",
+    "tools/layout-studio/scanner-recipe-save.test.mjs": "5589e1207e89f7106cfbf6f274b86aadc97d25c35997a25063315d5c4b43ba21",
+    "tools/layout-studio/scanner-review.test.mjs": "4e38267c6568dd6d9f57f96cb8b8fbb622dd1dd59828e09d8080e5a093bfc1af",
+    "tools/layout-studio/state-lock.test.mjs": "ae33f45660b028b27c4143c05cad5176ed4ce63664fec27ffae8f3726629a526",
+    "tools/layout-studio/suite.mjs": "539fec49fdd6249d7d824b7d4b3f02e0c81dfc064554dfbc6bd923920a7a284f",
+    "tools/layout-studio/suite.test.mjs": "18d65cf5a39999ae18be36a9eb2662f29823e9710aef941e2f31f6ab76972521",
+    "tools/layout-studio/task-authority-ignored-inputs.test.mjs": "698731e6edfb5a404fd0b785f0428f517e93ff7f0fabdc59ec542dfc22ad80cf",
+    "tools/layout-studio/task-authority-ignored-trees.test.mjs": "33da04d08c6af41e0ac9a994cc30a1272dbb1f051b57cb8369fc8932b3477cba",
+    "tools/layout-studio/task-authority.mjs": "9e15c66aea7394eed38719353f48e1eaf3f14dcec8ca29e25f4d16d77659ab80",
+    "tools/layout-studio/task-authority.test.mjs": "97ac82bba826d37c3913ef3c4653c762577e241ff5620848602706d7697ff3ae",
+    "tools/layout-studio/test-support/scanner-draft-fixture.mjs": "37b99c677b7d627d2663bf2ac343eca0a217ead1b24f47607e1800170b1ba6d6",
+    "tools/layout-studio/windows-reviewed-inputs.test.mjs": "0fa0b9da86cae203c6ffb8f88b3034475ee37b226b530e0731d4b9f5570759bc",
+    "tools/layout-studio/windows-scanner-recipe-files.mjs": "e848e40afdfd0ab2cc9a4fff466d009a5fa42bf2f6e79138035038888a9b1019",
+    "tools/layout-studio/windows-scanner-recipe-files.test.mjs": "f08d360bebcca2502b1f3e2adbae07619b11732c62f5722db385ab22428cc799"
+  },
+  "initial": {
+    "name": "isolated-test-5696c183-77ee-4e93-ab5a-d82702f3c604.json",
+    "sha256": "73743a94b1152f8944d25d97942b40d86745e54398c6953f92da45fee10dd12d",
+    "success": true,
+    "totals": {
+      "required": 2,
+      "passed": 2,
+      "failed": 0,
+      "tests": 35,
+      "passedTests": 34,
+      "failedTests": 0,
+      "skippedTests": 1,
+      "cancelledTests": 0,
+      "todoTests": 0
+    }
+  },
+  "broaderFocused": {
+    "name": "isolated-test-ec1beb65-6695-41c1-bb42-65db9fef1aed.json",
+    "sha256": "9a83ba324837fefc52029a45324dc1d2e1ca5c75fca0aa93b8789c8d8eca0032",
+    "success": true,
+    "totals": {
+      "required": 41,
+      "passed": 41,
+      "failed": 0,
+      "tests": 285,
+      "passedTests": 275,
+      "failedTests": 0,
+      "skippedTests": 10,
+      "cancelledTests": 0,
+      "todoTests": 0
+    }
+  },
+  "ciSelectionFollowup": {
+    "name": "isolated-test-ba22eb68-0438-4566-82a3-b207f4959a8d.json",
+    "sha256": "ba1441ee69b13f8e0483645478b630f60ba5bfbc7b11bde1ae0157d918c383c4",
+    "success": true,
+    "totals": {
+      "required": 3,
+      "passed": 3,
+      "failed": 0,
+      "tests": 35,
+      "passedTests": 35,
+      "failedTests": 0,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    }
+  },
+  "finalDistinctGroups": 41,
+  "finalDistinctPassedTests": 275,
+  "finalDistinctSkippedTests": 10,
+  "acceptedGroupSources": [
+    {
+      "receipt": "isolated-test-ba22eb68-0438-4566-82a3-b207f4959a8d.json",
+      "file": "scripts/windows-backend-shards.test.mjs"
+    },
+    {
+      "receipt": "isolated-test-ba22eb68-0438-4566-82a3-b207f4959a8d.json",
+      "file": "scripts/run-isolated-tests.test.mjs"
+    },
+    {
+      "receipt": "isolated-test-ba22eb68-0438-4566-82a3-b207f4959a8d.json",
+      "file": "scripts/windows-scenario-groups.test.mjs"
+    },
+    {
+      "receipt": "isolated-test-ec1beb65-6695-41c1-bb42-65db9fef1aed.json",
+      "file": "deployment/suite/release.test.mjs"
+    },
+    {
+      "receipt": "isolated-test-ec1beb65-6695-41c1-bb42-65db9fef1aed.json",
+      "file": "deployment/suite/installation.test.mjs",
+      "pattern": "installation keeps current and one rollback version, records dated backups, preserves data and removes only owned entries",
+      "timeoutMs": 120000
+    },
+    {
+      "receipt": "isolated-test-ec1beb65-6695-41c1-bb42-65db9fef1aed.json",
+      "file": "deployment/suite/installation.test.mjs",
+      "pattern": "unowned or edited desktop entries and corrupted new releases preserve the current application",
+      "timeoutMs": 120000
+    },
+    {
+      "receipt": "isolated-test-ec1beb65-6695-41c1-bb42-65db9fef1aed.json",
+      "file": "deployment/suite/installation.test.mjs",
+      "pattern": "a failed persistent write restores every earlier launcher and the exact previous installation record",
+      "timeoutMs": 120000
+    },
+    {
+      "receipt": "isolated-test-ec1beb65-6695-41c1-bb42-65db9fef1aed.json",
+      "file": "deployment/suite/installation.test.mjs",
+      "pattern": "forced owner exit leaves a durable journal; another installer restores the exact before state without touching unrelated files",
+      "timeoutMs": 120000
+    },
+    {
+      "receipt": "isolated-test-ec1beb65-6695-41c1-bb42-65db9fef1aed.json",
+      "file": "deployment/suite/installation.test.mjs",
+      "pattern": "recovery preflights all edits before writing, and respects a committed update whose pending marker survived",
+      "timeoutMs": 120000
+    },
+    {
+      "receipt": "isolated-test-ec1beb65-6695-41c1-bb42-65db9fef1aed.json",
+      "file": "deployment/suite/installation.test.mjs",
+      "pattern": "active host connections block uninstall before any application stop or persistent mutation",
+      "timeoutMs": 120000
+    },
+    {
+      "receipt": "isolated-test-ec1beb65-6695-41c1-bb42-65db9fef1aed.json",
+      "file": "deployment/suite/installation.test.mjs",
+      "pattern": "uninstall verifies exact owner exit and restores host connections before removing persistent program entries",
+      "timeoutMs": 120000
+    },
+    {
+      "receipt": "isolated-test-ec1beb65-6695-41c1-bb42-65db9fef1aed.json",
+      "file": "deployment/suite/installation.test.mjs",
+      "pattern": "a restoration conflict retains all program entries and resumes the previous running application",
+      "timeoutMs": 120000
+    },
+    {
+      "receipt": "isolated-test-ec1beb65-6695-41c1-bb42-65db9fef1aed.json",
+      "file": "deployment/suite/installation.test.mjs",
+      "pattern": "a second registered instance blocks uninstall without stopping either owner",
+      "timeoutMs": 120000
+    },
+    {
+      "receipt": "isolated-test-ec1beb65-6695-41c1-bb42-65db9fef1aed.json",
+      "file": "deployment/suite/installation.test.mjs",
+      "pattern": "unconfirmed owner exit leaves a durable removal journal and blocks restoration until recovery",
+      "timeoutMs": 120000
+    },
+    {
+      "receipt": "isolated-test-ec1beb65-6695-41c1-bb42-65db9fef1aed.json",
+      "file": "deployment/suite/installation.test.mjs",
+      "pattern": "a failed uninstall write restores the owned program and keeps restart recovery durable",
+      "timeoutMs": 120000
+    },
+    {
+      "receipt": "isolated-test-ec1beb65-6695-41c1-bb42-65db9fef1aed.json",
+      "file": "deployment/suite/installation.test.mjs",
+      "pattern": "a dated verified recovery entry restores an interrupted uninstall even after the main loader was removed",
+      "timeoutMs": 120000
+    },
+    {
+      "receipt": "isolated-test-ec1beb65-6695-41c1-bb42-65db9fef1aed.json",
+      "file": "deployment/suite/installation.test.mjs",
+      "pattern": "an explicit no-start update stops the previous generation without restarting the new one",
+      "timeoutMs": 120000
+    },
+    {
+      "receipt": "isolated-test-ec1beb65-6695-41c1-bb42-65db9fef1aed.json",
+      "file": "deployment/suite/installation.test.mjs",
+      "pattern": "the stable installed loader verifies and addresses the actual application across update and rollback",
+      "timeoutMs": 120000
+    },
+    {
+      "receipt": "isolated-test-ec1beb65-6695-41c1-bb42-65db9fef1aed.json",
+      "file": "deployment/suite/installation.test.mjs",
+      "pattern": "pre-promotion owner loss recovers only verified staging copies and exact incomplete source prefixes",
+      "timeoutMs": 120000
+    },
+    {
+      "receipt": "isolated-test-ec1beb65-6695-41c1-bb42-65db9fef1aed.json",
+      "file": "deployment/suite/installation.test.mjs",
+      "pattern": "interrupted installation recovery accepts the full release file ceiling plus its manifest and preserves unrelated edits",
+      "timeoutMs": 120000
+    },
+    {
+      "receipt": "isolated-test-ec1beb65-6695-41c1-bb42-65db9fef1aed.json",
+      "file": "tools/layout-studio/suite.test.mjs"
+    },
+    {
+      "receipt": "isolated-test-ec1beb65-6695-41c1-bb42-65db9fef1aed.json",
+      "file": "tools/layout-studio/windows-reviewed-inputs.test.mjs"
+    },
+    {
+      "receipt": "isolated-test-ec1beb65-6695-41c1-bb42-65db9fef1aed.json",
+      "file": "tools/layout-studio/scanner-fixtures.test.mjs"
+    },
+    {
+      "receipt": "isolated-test-ec1beb65-6695-41c1-bb42-65db9fef1aed.json",
+      "file": "tools/layout-studio/scanner-fixture-invalidation.test.mjs"
+    },
+    {
+      "receipt": "isolated-test-ec1beb65-6695-41c1-bb42-65db9fef1aed.json",
+      "file": "tools/layout-studio/scanner-fixture-removal.test.mjs"
+    },
+    {
+      "receipt": "isolated-test-ec1beb65-6695-41c1-bb42-65db9fef1aed.json",
+      "file": "tools/layout-studio/scanner-review.test.mjs",
+      "timeoutMs": 120000,
+      "expectedSkipped": 0
+    },
+    {
+      "receipt": "isolated-test-ec1beb65-6695-41c1-bb42-65db9fef1aed.json",
+      "file": "tools/layout-studio/scanner-index-review.test.mjs",
+      "timeoutMs": 120000,
+      "expectedSkipped": 0
+    },
+    {
+      "receipt": "isolated-test-ec1beb65-6695-41c1-bb42-65db9fef1aed.json",
+      "file": "tools/layout-studio/scanner-history-review.test.mjs",
+      "timeoutMs": 120000,
+      "expectedSkipped": 0
+    },
+    {
+      "receipt": "isolated-test-ec1beb65-6695-41c1-bb42-65db9fef1aed.json",
+      "file": "tools/layout-studio/scanner-recipe-draft.test.mjs",
+      "timeoutMs": 120000,
+      "expectedSkipped": 0
+    },
+    {
+      "receipt": "isolated-test-ec1beb65-6695-41c1-bb42-65db9fef1aed.json",
+      "file": "tools/layout-studio/scanner-recipe-save.test.mjs",
+      "timeoutMs": 120000,
+      "expectedSkipped": 0
+    },
+    {
+      "receipt": "isolated-test-ec1beb65-6695-41c1-bb42-65db9fef1aed.json",
+      "file": "tools/layout-studio/windows-scanner-recipe-files.test.mjs",
+      "timeoutMs": 120000,
+      "expectedSkipped": 4
+    },
+    {
+      "receipt": "isolated-test-ec1beb65-6695-41c1-bb42-65db9fef1aed.json",
+      "file": "tools/layout-studio/task-authority-ignored-trees.test.mjs",
+      "timeoutMs": 120000
+    },
+    {
+      "receipt": "isolated-test-ec1beb65-6695-41c1-bb42-65db9fef1aed.json",
+      "file": "tools/layout-studio/task-authority-ignored-inputs.test.mjs"
+    },
+    {
+      "receipt": "isolated-test-ec1beb65-6695-41c1-bb42-65db9fef1aed.json",
+      "file": "tools/layout-studio/task-authority.test.mjs"
+    },
+    {
+      "receipt": "isolated-test-ec1beb65-6695-41c1-bb42-65db9fef1aed.json",
+      "file": "tools/layout-studio/legend-export.test.mjs"
+    },
+    {
+      "receipt": "isolated-test-ec1beb65-6695-41c1-bb42-65db9fef1aed.json",
+      "file": "tools/layout-studio/state-lock.test.mjs",
+      "expectedSkipped": 1
+    },
+    {
+      "receipt": "isolated-test-ec1beb65-6695-41c1-bb42-65db9fef1aed.json",
+      "file": "tools/layout-studio/runtime-command.test.mjs"
+    },
+    {
+      "receipt": "isolated-test-ec1beb65-6695-41c1-bb42-65db9fef1aed.json",
+      "file": "tools/layout-studio/runtime-command-suspended.test.mjs",
+      "expectedSkipped": 5
+    },
+    {
+      "receipt": "isolated-test-ec1beb65-6695-41c1-bb42-65db9fef1aed.json",
+      "file": "tools/layout-studio/private-fs.test.mjs"
+    },
+    {
+      "receipt": "isolated-test-ec1beb65-6695-41c1-bb42-65db9fef1aed.json",
+      "file": "packages/control-plane/test/confirmations.test.ts"
+    },
+    {
+      "receipt": "isolated-test-ec1beb65-6695-41c1-bb42-65db9fef1aed.json",
+      "file": "apps/windows-companion/test/scanner-fixtures.test.ts",
+      "currentUserProfile": false
+    }
+  ],
+  "originalCommandsBoundsSkipsAndCleanupVerified": true,
+  "typecheck": {
+    "command": "npm run typecheck",
+    "node": "24.14.0",
+    "passed": true
+  },
+  "compile": {
+    "sourceFiles": 34,
+    "existingSdk": "8.0.424",
+    "referencePack": "8.0.30",
+    "warnings": 0,
+    "errors": 0,
+    "exitCode": 0,
+    "packageSources": [],
+    "nativeWindowsExecution": false
+  },
+  "scope": {
+    "fixedNativeOperations": [
+      "create-directory",
+      "write-file",
+      "inspect-files"
+    ],
+    "closedInputAndOutputSchemas": true,
+    "ntfsAncestorPins": true,
+    "exclusiveCreation": true,
+    "ownedIdentityContentAndExactSetVerification": true,
+    "noOverwritesOrAutomaticCleanup": true,
+    "durableNativeOwnerBeforeHelperReadiness": true,
+    "verifiedOriginalGuardianRetirement": true,
+    "oneUseExactScopeConfirmation": true,
+    "taskAccountWorkspaceTargetAndFeedRevalidation": true,
+    "metadataOnlyJournal": true,
+    "lostAcknowledgementInspectionWithoutReplay": true,
+    "linuxSaveExecutionRegressionPassed": true,
+    "independentWindowsCiSuite": "scanner-save",
+    "nativeWindowsCases": 4,
+    "nativeWindowsCasesAccepted": false
+  },
+  "bounds": {
+    "privatePipeUtf8Bytes": 524288,
+    "controlFileBytes": 327680,
+    "nativeOperationMs": 45000,
+    "outputBytes": 4096,
+    "errorBytes": 1024,
+    "retainedNativeOwners": 32,
+    "windowsTestGroupMs": 300000,
+    "linuxTestGroupMs": 120000
+  },
+  "limitations": [
+    "Actual NTFS save, existing-directory refusal, junction substitution and hard-link cases are implemented and wired into the original Windows test inventory and a separate CI lane; they are skipped on Linux and native acceptance is pending.",
+    "Node composition, proof substitution and uncertain-owner cases use explicit native doubles on this Linux host.",
+    "Frontend controls remain frozen; normal UI save use is unfinished.",
+    "Partial or uncertain output is preserved, never automatically removed or replayed.",
+    "No claim isolates a compromised process using the same operating-system identity.",
+    "Full current-suite acceptance, Windows task-specific IDE attachment, mixed index/history execution and broader Shield coverage remain separate.",
+    "Live hardware, account and provider commissioning remain unperformed."
+  ],
+  "effects": {
+    "modelPrompts": 0,
+    "installedNativeTasks": 0,
+    "accountChanges": 0,
+    "hidOpened": false,
+    "frontendChanged": false,
+    "upstreamArtworkChanged": false,
+    "liveInstalledScanner": false,
+    "newRuntimeDownloads": false,
+    "tokenOrPrivilegeBoundaryChanged": false,
+    "aclChanged": false
+  },
+  "cleanup": {
+    "ownedCompilerFiles": 34,
+    "ownedCompilerBytes": 1479448,
+    "compilerSourceHashesVerified": true,
+    "exactCompilerInventoryRemoved": true,
+    "emptyOwnedTestParentVerifiedAndRemoved": true
+  },
+  "success": true
+}

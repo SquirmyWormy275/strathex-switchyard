@@ -1,0 +1,449 @@
+{
+  "schema": "switchyard-codex-native-bootstrap/v1",
+  "baseCommit": "48bf4503e3d40a3cfea8ca48797223397c11e751",
+  "sourceFiles": {
+    "tools/layout-studio/codex-editor-relay.mjs": "6a496fdf63e24067ca4669c9fae82bc436cb7d2f2e1c327272ef8a03b50efec3",
+    "tools/layout-studio/codex-editor-relay.test.mjs": "240f27df7b2bcc1299da9df18e8f6d7079fdb940a37cd11aa0531c50ddc1961a",
+    "tools/layout-studio/codex-retained-editor-client.mjs": "dea933b3b85b7e6884afb8de0d05f98cc29cf44d314dd1a296e48f09cdf8d173",
+    "tools/layout-studio/codex-retained-editor-client.test.mjs": "4f3d42aebfeed13a00b6d105ccd4ae4567b2b16eaf9dfa29bd1b58f58abc169f",
+    "apps/vscode-extension/src/codex-terminal.ts": "dfbf5f22abbe2903bc13560da8b49b16169dba75def90911f7a5df23098a66c2",
+    "apps/vscode-extension/src/codex-windows-terminal.ts": "1f2d48b13062931041ba84fe7aa1fe55c3c20ce7f7875a52a3cdabce2ced762c",
+    "apps/vscode-extension/test/codex-terminal.test.ts": "61de36622f4ab343e9c316398626a01d8aa5d2dcd58a662b48cb8d1270c0110f",
+    "apps/vscode-extension/test/codex-windows-terminal.test.ts": "0453bb7c8ec2a1f6a63f53c74bc3e64aebfeb732139d4475c911f0b10c08f7a5",
+    "apps/vscode-extension/test/studio-editor-launch.test.ts": "efd6291bd8f58652961f363e67fde336935e76fe678989c462fb71747f6736fd"
+  },
+  "runs": [
+    {
+      "receiptId": "ab1abe5d-cde0-4dea-bb68-2ca1f08bc1b6",
+      "sha256": "a71b4701f2775274e0955f5ce82efefefdf43966bf0854cb5bc4c09e0c2a0ca3",
+      "success": false,
+      "totals": {
+        "required": 2,
+        "passed": 0,
+        "failed": 2,
+        "tests": 22,
+        "passedTests": 20,
+        "failedTests": 2,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "groups": [
+        {
+          "file": "tools/layout-studio/codex-editor-relay.test.mjs",
+          "durationMs": 148,
+          "originalBoundMs": 45000
+        },
+        {
+          "file": "tools/layout-studio/codex-retained-editor-client.test.mjs",
+          "durationMs": 133,
+          "originalBoundMs": 45000
+        }
+      ],
+      "originalCommandsBoundsSkipsAndCleanupVerified": true,
+      "failures": [
+        {
+          "file": "tools/layout-studio/codex-editor-relay.test.mjs",
+          "diagnosticSha256": "dc938c72bca00462be0dbeecceda02d15d57aad5aa36524ac33d29fccbaaf950"
+        },
+        {
+          "file": "tools/layout-studio/codex-retained-editor-client.test.mjs",
+          "diagnosticSha256": "4d9ccffbeb487372f3d8303d8dc881ea8fdaf88441e69a1541bbc956223d5107"
+        }
+      ]
+    },
+    {
+      "receiptId": "eedae507-7246-4605-860b-25480c74e2d4",
+      "sha256": "244117deaee4d8d859a89ea6a198c5672853e67f7e2e05a06f2aa1768205e33f",
+      "success": true,
+      "totals": {
+        "required": 2,
+        "passed": 2,
+        "failed": 0,
+        "tests": 22,
+        "passedTests": 22,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "groups": [
+        {
+          "file": "tools/layout-studio/codex-editor-relay.test.mjs",
+          "durationMs": 154,
+          "originalBoundMs": 45000
+        },
+        {
+          "file": "tools/layout-studio/codex-retained-editor-client.test.mjs",
+          "durationMs": 131,
+          "originalBoundMs": 45000
+        }
+      ],
+      "originalCommandsBoundsSkipsAndCleanupVerified": true,
+      "failures": []
+    },
+    {
+      "receiptId": "d9b3cc81-785d-410b-a76a-1cdce06db516",
+      "sha256": "22922249bde95fe7dc4ef560f0e985cf5c2d4d201dfd2661c793ee9cd226ae92",
+      "success": false,
+      "totals": {
+        "required": 2,
+        "passed": 0,
+        "failed": 2,
+        "tests": 7,
+        "passedTests": 5,
+        "failedTests": 2,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "groups": [
+        {
+          "file": "apps/vscode-extension/test/codex-terminal.test.ts",
+          "durationMs": 100,
+          "originalBoundMs": 45000
+        },
+        {
+          "file": "apps/vscode-extension/test/codex-windows-terminal.test.ts",
+          "durationMs": 110,
+          "originalBoundMs": 45000
+        }
+      ],
+      "originalCommandsBoundsSkipsAndCleanupVerified": true,
+      "failures": [
+        {
+          "file": "apps/vscode-extension/test/codex-terminal.test.ts",
+          "diagnosticSha256": "78c32723fc2b8a10df48f6dbbc35face4ab27d85ec937acb0cf133c3bdb1cdd7"
+        },
+        {
+          "file": "apps/vscode-extension/test/codex-windows-terminal.test.ts",
+          "diagnosticSha256": "0144b5e618e72e9ce752f6c7247d1fb781dd258b5d83b7bc0266296df46a7317"
+        }
+      ]
+    },
+    {
+      "receiptId": "45481375-3095-4a90-ae50-8e052b386c53",
+      "sha256": "a9e1b593012818acd5497f33b205af985c651b30e304cd742a1340d6c40a4fe1",
+      "success": true,
+      "totals": {
+        "required": 2,
+        "passed": 2,
+        "failed": 0,
+        "tests": 7,
+        "passedTests": 7,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "groups": [
+        {
+          "file": "apps/vscode-extension/test/codex-terminal.test.ts",
+          "durationMs": 97,
+          "originalBoundMs": 45000
+        },
+        {
+          "file": "apps/vscode-extension/test/codex-windows-terminal.test.ts",
+          "durationMs": 104,
+          "originalBoundMs": 45000
+        }
+      ],
+      "originalCommandsBoundsSkipsAndCleanupVerified": true,
+      "failures": []
+    },
+    {
+      "receiptId": "05974ae9-29ab-4783-8f99-76586b244cda",
+      "sha256": "743ab5dda883250b1b0add0726de8a2c61b94bf23e537de513321723e4e221f3",
+      "success": false,
+      "totals": {
+        "required": 2,
+        "passed": 1,
+        "failed": 1,
+        "tests": 24,
+        "passedTests": 22,
+        "failedTests": 2,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "groups": [
+        {
+          "file": "tools/layout-studio/codex-editor-relay.test.mjs",
+          "durationMs": 149,
+          "originalBoundMs": 45000
+        },
+        {
+          "file": "tools/layout-studio/codex-retained-editor-client.test.mjs",
+          "durationMs": 132,
+          "originalBoundMs": 45000
+        }
+      ],
+      "originalCommandsBoundsSkipsAndCleanupVerified": true,
+      "failures": [
+        {
+          "file": "tools/layout-studio/codex-editor-relay.test.mjs",
+          "diagnosticSha256": "9fa038ef09730283193b9cf467371671d268b862088f0fd3f7e82324e34edbd2"
+        }
+      ]
+    },
+    {
+      "receiptId": "7a8aa1c9-21fa-48fc-baf1-a104836c1a85",
+      "sha256": "a1ff7f782abfea24fac6eae6161d28e29698679af3b980bbd75202f22101525f",
+      "success": true,
+      "totals": {
+        "required": 2,
+        "passed": 2,
+        "failed": 0,
+        "tests": 24,
+        "passedTests": 24,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "groups": [
+        {
+          "file": "tools/layout-studio/codex-editor-relay.test.mjs",
+          "durationMs": 152,
+          "originalBoundMs": 45000
+        },
+        {
+          "file": "tools/layout-studio/codex-retained-editor-client.test.mjs",
+          "durationMs": 135,
+          "originalBoundMs": 45000
+        }
+      ],
+      "originalCommandsBoundsSkipsAndCleanupVerified": true,
+      "failures": []
+    },
+    {
+      "receiptId": "72ff0e3c-7990-416e-9224-f30810b295c5",
+      "sha256": "15d2c7525adccac06078abff9b432792e7e13295e4b20f20aac6c654b9962aa9",
+      "success": true,
+      "totals": {
+        "required": 2,
+        "passed": 2,
+        "failed": 0,
+        "tests": 26,
+        "passedTests": 26,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "groups": [
+        {
+          "file": "tools/layout-studio/codex-editor-relay.test.mjs",
+          "durationMs": 150,
+          "originalBoundMs": 45000
+        },
+        {
+          "file": "tools/layout-studio/codex-retained-editor-client.test.mjs",
+          "durationMs": 139,
+          "originalBoundMs": 45000
+        }
+      ],
+      "originalCommandsBoundsSkipsAndCleanupVerified": true,
+      "failures": []
+    },
+    {
+      "receiptId": "ed6bf47b-0760-45f2-9887-f6f9a3fa2c02",
+      "sha256": "0e42835145cdab4dff420b053a11701d3016fdb6cfbab813bcede43751a5a6a9",
+      "success": true,
+      "totals": {
+        "required": 13,
+        "passed": 13,
+        "failed": 0,
+        "tests": 129,
+        "passedTests": 128,
+        "failedTests": 0,
+        "skippedTests": 1,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "groups": [
+        {
+          "file": "tools/layout-studio/windows-codex-editor-connection.test.mjs",
+          "durationMs": 633,
+          "originalBoundMs": 45000
+        },
+        {
+          "file": "tools/layout-studio/coding-editor-connections.test.mjs",
+          "durationMs": 14179,
+          "originalBoundMs": 45000
+        },
+        {
+          "file": "tools/layout-studio/codex-editor-protocol.test.mjs",
+          "durationMs": 134,
+          "originalBoundMs": 45000
+        },
+        {
+          "file": "tools/layout-studio/codex-editor-relay.test.mjs",
+          "durationMs": 148,
+          "originalBoundMs": 45000
+        },
+        {
+          "file": "tools/layout-studio/codex-retained-editor-client.test.mjs",
+          "durationMs": 139,
+          "originalBoundMs": 45000
+        },
+        {
+          "file": "tools/layout-studio/windows-coding-editor-connections.test.mjs",
+          "durationMs": 6916,
+          "originalBoundMs": 45000
+        },
+        {
+          "file": "tools/layout-studio/codex-editor-ingress.test.mjs",
+          "durationMs": 11746,
+          "originalBoundMs": 45000
+        },
+        {
+          "file": "tools/layout-studio/codex-editor-ingress-owner.test.mjs",
+          "durationMs": 1659,
+          "originalBoundMs": 45000
+        },
+        {
+          "file": "apps/vscode-extension/test/codex-terminal.test.ts",
+          "durationMs": 107,
+          "originalBoundMs": 45000
+        },
+        {
+          "file": "apps/vscode-extension/test/codex-windows-terminal.test.ts",
+          "durationMs": 120,
+          "originalBoundMs": 45000
+        },
+        {
+          "file": "apps/vscode-extension/test/studio-windows-editor-launch.test.ts",
+          "durationMs": 1385,
+          "originalBoundMs": 45000
+        },
+        {
+          "file": "apps/vscode-extension/test/studio-editor-launch.test.ts",
+          "durationMs": 3866,
+          "originalBoundMs": 45000
+        },
+        {
+          "file": "apps/vscode-extension/test/studio-editor-session.test.ts",
+          "durationMs": 4278,
+          "originalBoundMs": 45000
+        }
+      ],
+      "originalCommandsBoundsSkipsAndCleanupVerified": true,
+      "failures": []
+    },
+    {
+      "receiptId": "07ecc6fb-d961-44b5-abc0-87e4cac5b840",
+      "sha256": "f9cb617ea7a5d8e1547ac1dcd0b8b6231d3fd192ad593ee32d2db6958f943d9f",
+      "success": true,
+      "totals": {
+        "required": 2,
+        "passed": 2,
+        "failed": 0,
+        "tests": 27,
+        "passedTests": 27,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "groups": [
+        {
+          "file": "tools/layout-studio/codex-editor-relay.test.mjs",
+          "durationMs": 158,
+          "originalBoundMs": 45000
+        },
+        {
+          "file": "tools/layout-studio/codex-retained-editor-client.test.mjs",
+          "durationMs": 138,
+          "originalBoundMs": 45000
+        }
+      ],
+      "originalCommandsBoundsSkipsAndCleanupVerified": true,
+      "failures": []
+    }
+  ],
+  "typecheckPassed": true,
+  "implementation": [
+    "Remote terminal launch omits unsupported CLI sandbox/approval flags. The relay narrows only the reviewed 0.167 null-settings resume envelope into the exact saved UUID, directory, read-only sandbox and on-request approval policy. Every non-null override, expanded field, foreign target and replay refuses.",
+    "Project config/read is limited to the selected directory, validates all effective restrictions and brackets delivery with original-account reads. The retained Windows logical channel has the same project boundary.",
+    "The exact first model/list page and parameter-free configRequirements/read are account-bracketed metadata requests. Retained channels admit them only for native 0.167. Expanded queries, malformed metadata and account changes refuse.",
+    "Eleven observed optional feature/catalog methods receive local method-not-found errors. They never reach the native provider, enumerate unrelated tasks, install anything or grant additional capabilities. Unknown methods and task/config/account effects still close the attachment."
+  ],
+  "native": {
+    "version": "0.167.0",
+    "executableSha256": "cdcb45aaa01d0f14e298985e09465aebccd47f64ecd298aea44814af7b62bbda",
+    "receiptSha256": "47a33ce926979b16aa5796c0142b458b17d3c0f4237f3a3a033ead4aa264c431",
+    "realTerminal": true,
+    "productionWebSocketHandshake": true,
+    "productionRelay": true,
+    "productionTerminalArguments": true,
+    "provider": "synthetic only",
+    "historyMode": "legacy",
+    "networkNamespaceIsolated": true,
+    "emptyOwnedHome": true,
+    "originalPeerPidVerified": true,
+    "syntheticTaskTitleRendered": true,
+    "syntheticSavedTranscriptRendered": true,
+    "stableAfterRenderMilliseconds": 2000,
+    "reconnectObserved": false,
+    "reviewedResumeRequests": 1,
+    "protocolAcknowledgements": 1,
+    "upstreamMethods": [
+      "initialize",
+      "initialized",
+      "config/read",
+      "account/read",
+      "account/read",
+      "account/read",
+      "thread/read",
+      "account/read",
+      "account/read",
+      "thread/read",
+      "account/read",
+      "account/read",
+      "config/read",
+      "account/read",
+      "account/read",
+      "account/read",
+      "model/list",
+      "account/read",
+      "account/read",
+      "configRequirements/read",
+      "account/read",
+      "account/read",
+      "thread/read",
+      "account/read",
+      "account/read",
+      "thread/resume",
+      "account/read",
+      "thread/read"
+    ],
+    "unsupportedResponses": 14,
+    "realAccountRequests": 0,
+    "realTaskRequests": 0,
+    "modelPrompts": 0,
+    "ideAttached": false,
+    "terminalExitCode": -15,
+    "originalGuardianAndTreeExitVerified": true
+  },
+  "cleanup": {
+    "receiptSha256": "d4733c338ed69a43d0a0102c2ff714ef51efc38ee3b2b1e9d85ffdacd43042f0",
+    "ownedRootsRemoved": 12,
+    "ownedFilesRemoved": 42,
+    "ownedBytesRemoved": 254286,
+    "originalGuardianAndTreeExitVerified": true
+  },
+  "intermediateFailures": [
+    "Native capture established that Codex rejects CLI permission overrides for remote resume. The revised launch does not submit a permission override; the relay independently supplies and verifies the reviewed restrictions.",
+    "An intermediate diagnostic attempted to echo a close frame after the native peer had already closed its write side. Its BrokenPipe failure and verified child cleanup remain retained.",
+    "The first production bootstrap diagnostic closed the test socket before terminating the terminal, causing a teardown-only reconnect display. The corrected check retires the terminal first and verifies no reconnect; the transcript check repeats that ordering.",
+    "The 13-group integration run predates one additional test-only malformed-bootstrap/account-change case and five more optional-method assertions. The final focused run covers those additions with 27 passing tests; implementation is unchanged."
+  ],
+  "limitations": [
+    "This demonstration uses the native terminal with a synthetic provider and legacy saved transcript. It is not authenticated live-provider or actual VS Code GUI acceptance.",
+    "Paginated native history is not implemented in this resume dialect; initialTurnsPage must still be null. Other native TUI versions need their own reviewed contract.",
+    "The native terminal displays two skills-unavailable messages because optional feature reads are explicitly refused; no empty-success response is fabricated.",
+    "The installed app remains ec28d09 and installed VS Code commands remain source 99784a7 until a normal verified update.",
+    "No physical keyboard, installed account, real saved task, model request or user configuration was touched. The isolated CLI receives update/analytics/feedback-disabled settings only for the diagnostic."
+  ]
+}

@@ -1,0 +1,50 @@
+{
+  "schema": "switchyard-installed-editor-metadata-acceptance/v1",
+  "source": "e768d18045b52b9e9e2bc05e93535d1b593b4bce",
+  "release": "a3c929518bd02947f068f70b07ab27d0421f28162ab0754c08646e69c4c0d12c",
+  "files": 524,
+  "bytes": 5088331,
+  "frontendSha256": "24100ef601b810efb0cda95e4fe0842d2944560734b02c4cf482c25e19150543",
+  "homeSha256": "20ba0095a6b9650046df34541872aa7e0a7cdc7db5182f065abb009127c6c130",
+  "workspaceCount": 54,
+  "receipts": {
+    "normalUpdate": {
+      "name": "assignment-legends-1793945308785.json",
+      "checks": 6
+    },
+    "ownerEditorAndSeverityMetadata": {
+      "name": "installed-task-owner-metadata-1793945340224.json",
+      "checks": 9
+    },
+    "existingCopilotJournalMetadata": {
+      "name": "installed-copilot-journal-metadata-1793945340171.json",
+      "checks": 7
+    },
+    "launcherRecoveryAndCleanup": "installed-editor-cleanup-1793945398460.json"
+  },
+  "installedCvssV2": {
+    "baseScore": 10,
+    "temporalScore": 8.3,
+    "environmentalScore": 0,
+    "nativeRating": "high",
+    "mixedRating": "critical",
+    "publicQueries": 0,
+    "scannerExecuted": false
+  },
+  "normalUpdateAndReadOnlyChecksPassed": true,
+  "selectedStatePreserved": true,
+  "frozenHomePreserved": true,
+  "datedLauncherCopiesAndInstalledHashesVerified": true,
+  "temporaryBundleRemoved": true,
+  "providerStarts": 0,
+  "nativeTaskLoads": 0,
+  "modelPrompts": 0,
+  "workspaceCreated": false,
+  "hardwareOpened": false,
+  "limits": [
+    "Signed editor acceptance exercises unknown-owner refusal through the exact-source repository client against the installed server. It does not start an editor, provider or task.",
+    "Installed V2 evidence is synthetic offline calculation/collection, not an installed scanner execution or public advisory query. Actual Linux scanner journeys have separate source receipts.",
+    "One unselected keyboard-only conversation retains its historical pending marker. Post-update sealed-file timestamps predate both app lifetimes; no pre/post byte comparison of that record is claimed because an extra preflight marker write was refused before creating a file.",
+    "Terminal effect/acknowledgement, native Windows restricted-child startup and hardware/account acceptance remain unfinished or separately unaccepted."
+  ]
+}

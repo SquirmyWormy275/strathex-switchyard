@@ -1,0 +1,27 @@
+name: Prepare the pinned complete Windows test toolchain
+description: Reuse the repository's digest-verified offline tools and restore the three source test helpers.
+runs:
+  using: composite
+  steps:
+    - name: Provision the existing digest-pinned offline toolchain
+      shell: pwsh
+      run: ./deployment/windows/Provision-B122DotnetToolchain.ps1
+    - name: Set exact native test tool paths
+      shell: pwsh
+      run: |
+        $ErrorActionPreference = 'Stop'
+        $tools = Join-Path $env:GITHUB_WORKSPACE '.tools'
+        "DOTNET_ROOT=$(Join-Path $tools 'dotnet')" >> $env:GITHUB_ENV
+        "NUGET_PACKAGES=$(Join-Path $tools 'nuget-packages')" >> $env:GITHUB_ENV
+        "SXSY_B122_NUGET_CONFIG=$(Join-Path $tools 'NuGet.Config')" >> $env:GITHUB_ENV
+        "SXSY_B122_NUGET_FEED=$(Join-Path $tools 'nuget-feed')" >> $env:GITHUB_ENV
+        (Join-Path $tools 'dotnet') >> $env:GITHUB_PATH
+        foreach ($project in @(
+          'apps/windows-companion/repository-runner-helper/Sxsy.B122.RepositoryRunner.csproj',
+          'apps/windows-companion/sandbox-lifecycle-helper/Sxsy.B122.SandboxLifecycleHelper.csproj',
+          'apps/windows-companion/companion-lifecycle-helper/Sxsy.B122.CompanionLifecycleHelper.csproj'
+        )) {
+          & (Join-Path $tools 'dotnet/dotnet.exe') restore $project -r win-x64 -p:RuntimeFrameworkVersion=8.0.30 --source (Join-Path $tools 'nuget-feed') --packages (Join-Path $tools 'nuget-packages') --configfile (Join-Path $tools 'NuGet.Config') --disable-parallel
+          if ($LASTEXITCODE -ne 0) { throw 'A pinned source test helper could not restore from the verified offline feed.' }
+        }
+

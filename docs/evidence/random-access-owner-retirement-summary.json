@@ -1,0 +1,41 @@
+{
+  "schema": "switchyard-random-diagnostic-owner-retirement/v1",
+  "basis": "81b4d1c3e9bce4f36b9bb916b4191bdfbd963e84",
+  "sourceSha256": {
+    "deployment/windows/test-support/storage-broker-protocol/RestrictedRandomAccess.cs": "b8dea89c1a7a2da3c7b0e8ab9ad8bf9b89cc6b9ee698d82c43ed897f71bf40ed",
+    "deployment/windows/test-support/storage-broker-protocol/NativeRestrictedHostProof.cs": "96b8307318f4ff8c37a181b25f54dd38745539002c2f67bc24d79ce93eaf0159",
+    "deployment/windows/test-support/storage-broker-protocol/Program.cs": "cc872027d96629fcd2719291b0d8459d630fbf13ef75cb0a9f78243978628002",
+    "scripts/windows-restricted-owner-report.mjs": "285b72bbb5a490911b13da5fd461d0dcf33138018f4bc4323480a8c61a70c2af",
+    "tools/layout-studio/coding-task-owners.mjs": "a2d6bbcb16e2193177954109effa25bb1b0b0adfaeddd8547812fd4bba418318"
+  },
+  "windowsDiagnostic": "Compare BCryptGenRandom system-preferred and freshly opened Microsoft RNG provider statuses under the restricted token first, then the original creator. Each explicit handle closes under the same token; 32-byte buffers are cleared and never exported. This in-process API observation does not establish a cold child RNG repair.",
+  "ownerCorrection": "Verified exit of an in-memory listener cannot mark a substituted protected native owner retired. Previously saved startup fields must match the original live owner; drift stays uncertain and blocks replacement.",
+  "managedBuild": {
+    "receipt": "managed-source-build-1793940583816.json",
+    "targets": 2,
+    "portableChecksPassed": 1856,
+    "warnings": 0,
+    "errors": 0,
+    "existingSdkReused": true,
+    "ownedScratchRemoved": true
+  },
+  "software": {
+    "receipt": "isolated-test-ce5308cd-1611-41fe-81a6-7b85bdeca73d.json",
+    "groups": 2,
+    "testsPassed": 20,
+    "registryCases": 9,
+    "reportCases": 11,
+    "allChildAndTreeCleanupVerified": true,
+    "typecheck": true
+  },
+  "nativeDiagnosticAcceptance": "pending",
+  "limits": [
+    "The original restricted child still fails ncrypto::CSPRNG at node.cc:1221 and exits 134.",
+    "No token/desktop/Job/API/deadline relaxation, RNG fallback, account or workstation configuration change is introduced.",
+    "The task registry remains an explicit metadata-only backend service; production routing, task loading and IDE attachment are unfinished."
+  ],
+  "references": [
+    "https://learn.microsoft.com/en-us/windows/win32/api/bcrypt/nf-bcrypt-bcryptgenrandom",
+    "https://learn.microsoft.com/en-us/windows/win32/api/bcrypt/nf-bcrypt-bcryptopenalgorithmprovider"
+  ]
+}

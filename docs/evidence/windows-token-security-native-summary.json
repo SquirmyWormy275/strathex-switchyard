@@ -1,0 +1,143 @@
+{
+  "schema": "switchyard-token-security-native-summary/v1",
+  "sourceCommit": "d900499bdeb3d0bf61a8ef46f098abb0e93a9e06",
+  "executionCommit": "8cefdde90ffaa7e344ed077afa5f525ad3d1f3c9",
+  "sourceAndExecutionTree": "73989d1dc25c2b087eccc5540a04012b0055135e",
+  "mergeParents": [
+    "d8af73553de1b61402520aad1fe0c9fbad2e8c5a",
+    "d900499bdeb3d0bf61a8ef46f098abb0e93a9e06"
+  ],
+  "runId": 42190922146,
+  "restrictedJobId": 127802793753,
+  "artifact": {
+    "id": 13489028953,
+    "bytes": 3769,
+    "sha256": "15b9cab3bdeb7c8544e6c80a409c48d068aa96f255a988bb0c3adb492c9168f3",
+    "privateReceipt": "windows-token-security-d900-native.json",
+    "zipSavedLocally": false
+  },
+  "tokenSecurity": [
+    {
+      "schema": "switchyard-child-token-security/v1",
+      "scope": "cold-probe",
+      "stage": "complete",
+      "error": 0,
+      "ownerClass": "current-user",
+      "daclPresent": true,
+      "nullDacl": false,
+      "daclProtected": false,
+      "entries": [
+        {
+          "kind": "allow",
+          "flags": 0,
+          "mask": 983551,
+          "principal": "administrators"
+        },
+        {
+          "kind": "allow",
+          "flags": 0,
+          "mask": 983551,
+          "principal": "system"
+        },
+        {
+          "kind": "allow",
+          "flags": 0,
+          "mask": 131103,
+          "principal": "logon"
+        }
+      ],
+      "handlesClosedVerified": true,
+      "buffersClearedVerified": true
+    },
+    {
+      "schema": "switchyard-child-token-security/v1",
+      "scope": "node-owner",
+      "stage": "complete",
+      "error": 0,
+      "ownerClass": "current-user",
+      "daclPresent": true,
+      "nullDacl": false,
+      "daclProtected": false,
+      "entries": [
+        {
+          "kind": "allow",
+          "flags": 0,
+          "mask": 983551,
+          "principal": "administrators"
+        },
+        {
+          "kind": "allow",
+          "flags": 0,
+          "mask": 983551,
+          "principal": "system"
+        },
+        {
+          "kind": "allow",
+          "flags": 0,
+          "mask": 131103,
+          "principal": "logon"
+        }
+      ],
+      "handlesClosedVerified": true,
+      "buffersClearedVerified": true
+    }
+  ],
+  "selfTokenAccess": {
+    "query": {
+      "opened": false,
+      "error": 5,
+      "closeError": null,
+      "handlesClosedVerified": true
+    },
+    "queryDuplicate": {
+      "opened": false,
+      "error": 5,
+      "closeError": null,
+      "handlesClosedVerified": true
+    },
+    "queryDuplicateImpersonate": {
+      "opened": false,
+      "error": 5,
+      "closeError": null,
+      "handlesClosedVerified": true
+    }
+  },
+  "node": {
+    "exitCode": 134,
+    "resultAvailable": false,
+    "accepted": false
+  },
+  "scope": {
+    "restrictionIdentities": [
+      "current-user",
+      "everyone",
+      "authenticated-users",
+      "users"
+    ],
+    "administratorsDenyOnly": true,
+    "onlyTraversePrivilege": true,
+    "mediumIntegrity": true
+  },
+  "separateJobs": {
+    "filesystem": {
+      "id": 127802793357,
+      "conclusion": "success"
+    },
+    "nativeSetup": {
+      "id": 127802793355,
+      "conclusion": "success"
+    }
+  },
+  "originalFailedFixturePreserved": true,
+  "ownershipFailureReported": false,
+  "inference": "The observed token DACL has no allow entry for a restricting SID; the logon ACE that grants query access cannot satisfy the second restricted-SID access check. This accounts for the observed self-token query denial. It does not prove CryptoAPI or Node called that exact operation.",
+  "references": [
+    "https://learn.microsoft.com/en-us/windows/win32/api/securitybaseapi/nf-securitybaseapi-createrestrictedtoken",
+    "https://learn.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-openprocesstoken"
+  ],
+  "limits": [
+    "No ACL, token privilege/SID, provider-default, registry, account or runtime change in this observation.",
+    "Both original child token descriptors are read while suspended; handles close and descriptor buffers clear. Cold random and original Node results remain distinct.",
+    "The failed fixture and original startup failure remain preserved; no guest, ordinary-user or whole-run acceptance is claimed."
+  ]
+}

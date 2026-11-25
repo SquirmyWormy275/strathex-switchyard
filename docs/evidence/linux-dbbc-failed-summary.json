@@ -1,0 +1,55 @@
+{
+  "schema": "switchyard-complete-linux-failed/v1",
+  "sourceCommit": "dbbcce84ad397e90a10b7ea3e1f5a9884f6b2ffe",
+  "verificationReceipt": "isolated-test-f5d86591-b270-4824-bdb0-773304f41558.json",
+  "totals": {
+    "required": 280,
+    "passed": 279,
+    "failed": 1,
+    "tests": 1787,
+    "passedTests": 1770,
+    "failedTests": 2,
+    "skippedTests": 15,
+    "cancelledTests": 0,
+    "todoTests": 0
+  },
+  "failure": {
+    "file": "tools/layout-studio/codex-editor-recovery.test.mjs",
+    "failedCases": 2,
+    "error": "errno 122 (EDQUOT) writing regular fixture files under hardcoded /tmp socket roots",
+    "priorAbruptHostAndCarrierCasePassed": true,
+    "accepted": false
+  },
+  "ownedWriteProbe": {
+    "bytesRequested": 18,
+    "errno": 122,
+    "ownedFileAndDirectoryRemoved": true,
+    "mountOrQuotaChanged": false
+  },
+  "allChildAndTreeCleanupVerified": true,
+  "ownedCleanup": {
+    "schema": "switchyard-owned-full-linux-cleanup/v1",
+    "sourceCommit": "dbbcce84ad397e90a10b7ea3e1f5a9884f6b2ffe",
+    "verificationReceipt": "isolated-test-f5d86591-b270-4824-bdb0-773304f41558.json",
+    "generatedFiles": 782,
+    "generatedBytes": 11766655,
+    "generatedDirectories": [
+      "apps/linux-companion/dist",
+      "apps/provider-adapter-host/dist",
+      "apps/vscode-extension/dist",
+      "apps/windows-companion/dist",
+      "packages/protocol/dist"
+    ],
+    "dependencyAliasCount": 9,
+    "trackedTreeClean": true,
+    "testChildrenExited": true,
+    "testParentEmpty": true,
+    "rootIdentityVerified": true,
+    "testParentIdentityVerified": true,
+    "worktreeRemoved": true,
+    "rootRemoved": true,
+    "testParentRemoved": true,
+    "markerRemoved": true,
+    "otherWorktreesPreserved": true
+  }
+}

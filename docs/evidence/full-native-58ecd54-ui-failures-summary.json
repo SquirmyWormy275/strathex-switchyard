@@ -1,0 +1,126 @@
+{
+  "schema": "switchyard-full-native-ui-failures/v1",
+  "sourceCommit": "58ecd54db3f2c740c3b311ca6c89eb0f1dfe06fa",
+  "sourceTree": "983062fbf08cea4847c377c2806015b6265b260d",
+  "workflowRunId": 42573946626,
+  "conclusion": "failure",
+  "cohorts": [
+    {
+      "shard": "7",
+      "jobId": 129018022503,
+      "artifactId": 13655585803,
+      "artifactSha256": "f53154769d859b6ce2d85a54246b7022f574f8a15304dc9c68517f46f6204e89",
+      "wrapperSha256": "375947fcdc1bee48cbca154a11055abc4642dc0c747ec892cdaebf14b1279773",
+      "receiptId": "bac092ef-eb3f-4959-a43e-ee848850714a",
+      "receiptSha256": "78e5b0bce6530c9ae3d0c5a4ba4f74f5b3a6a7ee8db33689973bf815889482a7",
+      "scope": {
+        "platform": "win32",
+        "sourceCommit": "2089ac1b7f93995f87f67eab99379c5b7c5d330e",
+        "sourceTree": "983062fbf08cea4847c377c2806015b6265b260d",
+        "nodeVersion": "24.14.0",
+        "nodeExecutable": "C:\\hostedtoolcache\\windows\\node\\24.14.0\\x64\\node.exe",
+        "nodeSha256": "63c259c81e5d472b5f11c8d506070130cb04a1ecf84b80377a34ed6ec9048088",
+        "pythonVersion": "3.13.3",
+        "pythonExecutable": "C:\\hostedtoolcache\\windows\\Python\\3.13.3\\x64\\python.exe",
+        "pythonSha256": "d87063e5597f257004c731b66c59c56c91038861c6877b1a3dca6b8c4e919125",
+        "helperSha256": "c35f323732d42ce89e056264ac68ff0b1158ad716e853908980a7be493f129c4",
+        "dotnetManifestSha256": "9387431f821c8af70705752e6d8a9d16ec88e374167bd415c742db3a319c0387"
+      },
+      "totals": {
+        "required": 21,
+        "passed": 20,
+        "failed": 1,
+        "tests": 297,
+        "passedTests": 288,
+        "failedTests": 0,
+        "skippedTests": 9,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "originalCommandsBoundsManifestAndCleanupVerified": true,
+      "serialScheduleVerified": true,
+      "failures": [
+        {
+          "file": "tools/layout-studio/scanner-ui.test.mjs",
+          "timeout": true,
+          "effectiveTimeoutMs": 45000,
+          "durationMs": 45113,
+          "partialTap": true,
+          "diagnostic": "TAP version 13\n# (node:2432) ExperimentalWarning: Transform Types is an experimental feature and might change at any time\n# (Use `node --trace-warnings ...` to show where the warning was created)\n# Subtest: scanner preparation exposes exact new control bytes and can be cancelled without a write or permission\nok 1 - scanner preparation exposes exact new control bytes and can be cancelled without a write or permission\n  ---\n  duration_ms: 9095.0208\n  type: 'test'\n  ...\n# Subtest: saved scanner setup crosses separate permission and execution reviews without automatically scanning\nok 2 - saved scanner setup crosses separate permission and execution reviews without automatically scanning\n  ---\n  duration_ms: 23938.0338\n  type: 'test'\n  ...\n",
+          "diagnosticSha256": "40711bdd88562780e436c6579b985ddce3e88ae4ea622e2dde6d7728900fe87f",
+          "cleanupCompleted": true,
+          "processTreeTermination": {
+            "strategy": "taskkill-owned-tree",
+            "completed": true,
+            "supervisorExitCode": 0,
+            "supervisorError": null
+          }
+        }
+      ]
+    },
+    {
+      "shard": "11",
+      "jobId": 129018022530,
+      "artifactId": 13655580117,
+      "artifactSha256": "59a554f8cc8f5899ff4b07ed6fb069ebc0150f76e89790350df89d4bcce23b75",
+      "wrapperSha256": "7311b23cc97b6ca10da740041a3798bd5c4f6f2e87a16755930afe31ec61e1a4",
+      "receiptId": "ecde5f7e-184f-4a38-9beb-c501fb224d23",
+      "receiptSha256": "dd31d2f58d9dfb02e5ec2ba2a0ddf2670cd6e7b11851cc044eed2259557a3bb0",
+      "scope": {
+        "platform": "win32",
+        "sourceCommit": "2089ac1b7f93995f87f67eab99379c5b7c5d330e",
+        "sourceTree": "983062fbf08cea4847c377c2806015b6265b260d",
+        "nodeVersion": "24.14.0",
+        "nodeExecutable": "C:\\hostedtoolcache\\windows\\node\\24.14.0\\x64\\node.exe",
+        "nodeSha256": "63c259c81e5d472b5f11c8d506070130cb04a1ecf84b80377a34ed6ec9048088",
+        "pythonVersion": "3.13.3",
+        "pythonExecutable": "C:\\hostedtoolcache\\windows\\Python\\3.13.3\\x64\\python.exe",
+        "pythonSha256": "d87063e5597f257004c731b66c59c56c91038861c6877b1a3dca6b8c4e919125",
+        "helperSha256": "c35f323732d42ce89e056264ac68ff0b1158ad716e853908980a7be493f129c4",
+        "dotnetManifestSha256": "9387431f821c8af70705752e6d8a9d16ec88e374167bd415c742db3a319c0387"
+      },
+      "totals": {
+        "required": 21,
+        "passed": 20,
+        "failed": 1,
+        "tests": 133,
+        "passedTests": 126,
+        "failedTests": 0,
+        "skippedTests": 7,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "originalCommandsBoundsManifestAndCleanupVerified": true,
+      "serialScheduleVerified": true,
+      "failures": [
+        {
+          "file": "tools/layout-studio/execution-ui.test.mjs",
+          "timeout": true,
+          "effectiveTimeoutMs": 45000,
+          "durationMs": 45142,
+          "partialTap": true,
+          "diagnostic": "not ok 1 - saved permission selection and local file hashing lead to an exact cancellable review without execution\n  ---\n  duration_ms: 7662.1128\n  type: 'test'\n  location: 'D:\\\\a\\\\strathex-switchyard\\\\strathex-switchyard\\\\tools\\\\layout-studio\\\\execution-ui.test.mjs:29:1'\n  failureType: 'testCodeFailure'\n  error: 'UI interaction did not settle within two seconds'\n  code: 'ERR_TEST_FAILURE'\n  stack: |-\n    until (file:///D:[redacted].mjs:29:51)\n    async review (file:///D:[redacted].test.mjs:26:57)\n    async file:///D:[redacted].test.mjs:32:24\n    async file:///D:[redacted].test.mjs:18:5\n    async withBrowserSurface (file:///D:[redacted].mjs:49:7)\n    async fixture (file:///D:[redacted].test.mjs:14:3)\n    async Test.run (node:internal/test_runner/test:1125:7)\n    async startSubtestAfterBootstrap (node:internal/test_runner/harness:358:3)\n  ...\n# Subtest: one confirmed run retains admission separately from observed process exit and never replays on refresh\nnot ok 2 - one confirmed run retains admission separately from observed process exit and never replays on refresh\n  ---\n  duration_ms: 7692.0308\n  type: 'test'\n  location: 'D:\\\\a\\\\strathex-switchyard\\\\strathex-switchyard\\\\tools\\\\layout-studio\\\\execution-ui.test.mjs:39:1'\n  failureType: 'testCodeFailure'\n  error: 'UI interaction did not settle within two seconds'\n  code: 'ERR_TEST_FAILURE'\n  stack: |-\n    until (file:///D:[redacted].mjs:29:51)\n    async review (file:///D:[redacted].test.mjs:26:57)\n    async file:///D:[redacted].test.mjs:40:24\n    async file:///D:[redacted].test.mjs:18:5\n    async withBrowserSurface (file:///D:[redacted].mjs:49:7)\n    async fixture (file:///D:[redacted].test.mjs:14:3)\n    async Test.run (node:internal/test_runner/test:1125:7)\n    async Test.processPendingSubtests (node:internal/test_runner/test:787:7)\n  ...\n# Subtest: separate stop approval reaches only the selected owned run and preserves its original admission\nnot ok 3 - separate stop approval reaches only the selected owned run and preserves its original admission\n  ---\n  duration_ms: 7641.0557\n  type: 'test'\n  location: 'D:\\\\a\\\\strathex-switchyard\\\\strathex-switchyard\\\\tools\\\\layout-studio\\\\execution-ui.test.mjs:46:1'\n  failureType: 'testCodeFailure'\n  error: 'UI interaction did not settle within two seconds'\n  code: 'ERR_TEST_FAILURE'\n  stack: |-\n    until (file:///D:[redacted].mjs:29:51)\n    async review (file:///D:[redacted]\n[bounded final output]\n:[redacted].test.mjs:18:5\n    async withBrowserSurface (file:///D:[redacted].mjs:49:7)\n    async fixture (file:///D:[redacted].test.mjs:14:3)\n    async Test.run (node:internal/test_runner/test:1125:7)\n    async Test.processPendingSubtests (node:internal/test_runner/test:787:7)\n  ...\n# Subtest: a file read that settles after a workspace change cannot enable execution there\nok 6 - a file read that settles after a workspace change cannot enable execution there\n  ---\n  duration_ms: 5433.8223\n  type: 'test'\n  ...\n",
+          "diagnosticSha256": "8f8c44f6f0f0e843e578043b75df9925cb6923cbe0ae4ccae98653b5fc723efd",
+          "cleanupCompleted": true,
+          "processTreeTermination": {
+            "strategy": "taskkill-owned-tree",
+            "completed": true,
+            "supervisorExitCode": 255,
+            "supervisorError": null
+          }
+        }
+      ]
+    }
+  ],
+  "completeAcceptance": false,
+  "findings": [
+    "Scanner UI exceeded the original 45-second file bound after two passing cases.",
+    "Execution UI checked rendering before joining the backend review reply, and the file also exceeded its 45-second bound.",
+    "Missing final TAP summaries are failures even though aggregated failedTests is zero."
+  ],
+  "boundaries": [
+    "Only these two retained worker receipts are audited here; their passing groups do not constitute complete source acceptance.",
+    "Original failure diagnostics remain retained. No manual CI retry/cancel/dispatch or deadline/skip changes.",
+    "Artifact ZIPs were hashed in memory; only bounded JSON was retained. No native runtime download or actual account/hardware operations."
+  ]
+}

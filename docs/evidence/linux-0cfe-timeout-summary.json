@@ -1,0 +1,160 @@
+{
+  "schema": "switchyard-linux-full-timeout-summary/v1",
+  "sourceCommit": "0cfe82c1eb214dc431e0024555280cc649bce67a",
+  "success": false,
+  "totals": {
+    "required": 230,
+    "passed": 209,
+    "failed": 21,
+    "tests": 1304,
+    "passedTests": 1294,
+    "failedTests": 0,
+    "skippedTests": 10,
+    "cancelledTests": 0,
+    "todoTests": 0
+  },
+  "failedReceipt": "isolated-test-fcd80689-414e-463d-a875-e6d536e4cc3f.json",
+  "allChildCleanupVerified": true,
+  "failures": [
+    {
+      "file": "tools/layout-studio/repository-commits.test.mjs",
+      "timeout": true,
+      "durationMs": 45015,
+      "cleanupCompleted": true
+    },
+    {
+      "file": "tools/layout-studio/repository-shield-exceptions.test.mjs",
+      "timeout": true,
+      "durationMs": 120019,
+      "cleanupCompleted": true
+    },
+    {
+      "file": "tools/layout-studio/repository-windows-shield-exceptions.test.mjs",
+      "timeout": true,
+      "durationMs": 120031,
+      "cleanupCompleted": true
+    },
+    {
+      "file": "tools/layout-studio/repository-windows-execution.test.mjs",
+      "timeout": true,
+      "durationMs": 45022,
+      "cleanupCompleted": true
+    },
+    {
+      "file": "tools/layout-studio/repository-windows-pipeline.test.mjs",
+      "timeout": true,
+      "durationMs": 45014,
+      "cleanupCompleted": true
+    },
+    {
+      "file": "tools/layout-studio/repository-windows-execution-recovery.test.mjs",
+      "timeout": true,
+      "durationMs": 45022,
+      "cleanupCompleted": true
+    },
+    {
+      "file": "tools/layout-studio/repository-windows-execution-output.test.mjs",
+      "timeout": true,
+      "durationMs": 45063,
+      "cleanupCompleted": true
+    },
+    {
+      "file": "tools/layout-studio/repository-shield-index.test.mjs",
+      "timeout": true,
+      "durationMs": 120031,
+      "cleanupCompleted": true
+    },
+    {
+      "file": "tools/layout-studio/repository-shield-history.test.mjs",
+      "timeout": true,
+      "durationMs": 120020,
+      "cleanupCompleted": true
+    },
+    {
+      "file": "tools/layout-studio/repository-shield-pypi.test.mjs",
+      "timeout": true,
+      "durationMs": 120030,
+      "cleanupCompleted": true
+    },
+    {
+      "file": "tools/layout-studio/repository-shield-licenses.test.mjs",
+      "timeout": true,
+      "durationMs": 120040,
+      "cleanupCompleted": true
+    },
+    {
+      "file": "tools/layout-studio/repository-windows-shield-licenses.test.mjs",
+      "timeout": true,
+      "durationMs": 120034,
+      "cleanupCompleted": true
+    },
+    {
+      "file": "tools/layout-studio/repository-windows-shield-history.test.mjs",
+      "timeout": true,
+      "durationMs": 120021,
+      "cleanupCompleted": true
+    },
+    {
+      "file": "tools/layout-studio/repository-shield-ignored-trees.test.mjs",
+      "timeout": true,
+      "durationMs": 120019,
+      "cleanupCompleted": true
+    },
+    {
+      "file": "tools/layout-studio/repository-shield-workspaces.test.mjs",
+      "timeout": true,
+      "durationMs": 120028,
+      "cleanupCompleted": true
+    },
+    {
+      "file": "tools/layout-studio/repository-shield.test.mjs",
+      "timeout": true,
+      "durationMs": 120027,
+      "cleanupCompleted": true
+    },
+    {
+      "file": "tools/layout-studio/repository-pipeline.test.mjs",
+      "timeout": true,
+      "durationMs": 120035,
+      "cleanupCompleted": true
+    },
+    {
+      "file": "tools/layout-studio/repository-pipeline-fixtures.test.mjs",
+      "timeout": true,
+      "durationMs": 2001724,
+      "cleanupCompleted": true
+    },
+    {
+      "file": "tools/layout-studio/repository-ignored-scanner-inputs.test.mjs",
+      "timeout": true,
+      "durationMs": 120032,
+      "cleanupCompleted": true
+    },
+    {
+      "file": "tools/layout-studio/task-authority.test.mjs",
+      "timeout": true,
+      "durationMs": 45044,
+      "cleanupCompleted": true
+    },
+    {
+      "file": "tools/layout-studio/claude-submissions.test.mjs",
+      "timeout": true,
+      "durationMs": 45040,
+      "cleanupCompleted": true
+    }
+  ],
+  "cleanupReceipt": "failed-full-0cfe-cleanup-1793899052031.json",
+  "ownedFixturesAliasesAndCheckoutRemoved": true,
+  "originalDeadlinesUnchanged": true,
+  "causeEstablished": false,
+  "hardwareOrAccountBlocked": false,
+  "currentSourceCommitRerun": {
+    "baseCommit": "ac71097d01d37b9e2004b504f44c83875f527140",
+    "testFile": "tools/layout-studio/repository-commits.test.mjs",
+    "success": false,
+    "timeout": true,
+    "durationMs": 45034,
+    "cleanupCompleted": true,
+    "receipt": "isolated-test-246884b6-5ea6-432c-8223-1707204257fc.json"
+  }
+}

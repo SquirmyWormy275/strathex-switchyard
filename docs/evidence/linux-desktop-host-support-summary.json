@@ -1,0 +1,298 @@
+{
+  "schema": "switchyard-linux-desktop-host-support-summary/v1",
+  "at": "2026-11-09T12:46:50.902Z",
+  "baseCommit": "ebbc70568555b9ad87d9d99c1a9b582ff43ebd55",
+  "sourceFiles": {
+    "tools/layout-studio/linux-desktop-support.mjs": "f9f537d15cf0064ce755bee96607ffe5fe2ba5576fbef79f1dc6ce0182afc722",
+    "tools/layout-studio/client-integrations.mjs": "5038cf10cf9af49e1b6d89f0031098c1003201db6725ead92bdf329a14e383b1",
+    "tools/layout-studio/integrations.test.mjs": "10935a284547cd677eb7b46518e809e9e46b8a0823eee118f3ceda93e4503814",
+    "tools/layout-studio/client-ui.test.mjs": "1ab4415d6fc3b12956c333892d16f9df7c0604773e81ca7fd40a21d2daceb09a",
+    "deployment/windows/Test-B122TrustedBootstrap.ps1": "e57ceeadbabaeb9ffe4579cc020bf85d927453e4b8f3535701be73d332b006ba"
+  },
+  "runs": [
+    {
+      "receiptId": "79901140-f14b-4b67-93a0-af13f186c128",
+      "receiptSha256": "e1452fdd6e3bcd8ce9ac06fbe33f9c01d299ef69b35de78ec1c774dd2fc19368",
+      "green": true,
+      "totals": {
+        "required": 6,
+        "passed": 6,
+        "failed": 0,
+        "tests": 71,
+        "passedTests": 70,
+        "failedTests": 0,
+        "skippedTests": 1,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "children": [
+        {
+          "file": "tools/layout-studio/integrations.test.mjs",
+          "pattern": null,
+          "durationMs": 667,
+          "effectiveTimeoutMs": 45000,
+          "tests": {
+            "total": 19,
+            "passed": 19,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "tools/layout-studio/role-ui.test.mjs",
+          "pattern": null,
+          "durationMs": 1294,
+          "effectiveTimeoutMs": 45000,
+          "tests": {
+            "total": 15,
+            "passed": 15,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "tools/layout-studio/client-ui.test.mjs",
+          "pattern": null,
+          "durationMs": 803,
+          "effectiveTimeoutMs": 45000,
+          "tests": {
+            "total": 5,
+            "passed": 5,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "tools/layout-studio/native-focus-ui.test.mjs",
+          "pattern": null,
+          "durationMs": 2254,
+          "effectiveTimeoutMs": 45000,
+          "tests": {
+            "total": 18,
+            "passed": 18,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "tools/layout-studio/connection-ui.test.mjs",
+          "pattern": null,
+          "durationMs": 534,
+          "effectiveTimeoutMs": 45000,
+          "tests": {
+            "total": 4,
+            "passed": 4,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "tools/layout-studio/client-launch.test.mjs",
+          "pattern": null,
+          "durationMs": 524,
+          "effectiveTimeoutMs": 45000,
+          "tests": {
+            "total": 10,
+            "passed": 9,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 1,
+            "todo": 0
+          }
+        }
+      ],
+      "duplicateReceiptRemoved": true
+    },
+    {
+      "receiptId": "a5164561-da25-453a-8af6-21e5a21d5490",
+      "receiptSha256": "e9c957933e331a3cafa35764303f3b784ef05f9756e576008b98151647af16a6",
+      "green": true,
+      "totals": {
+        "required": 1,
+        "passed": 1,
+        "failed": 0,
+        "tests": 19,
+        "passedTests": 19,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "children": [
+        {
+          "file": "tools/layout-studio/integrations.test.mjs",
+          "pattern": null,
+          "durationMs": 703,
+          "effectiveTimeoutMs": 45000,
+          "tests": {
+            "total": 19,
+            "passed": 19,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        }
+      ],
+      "duplicateReceiptRemoved": true
+    },
+    {
+      "receiptId": "8cb181e1-3c25-4741-b4c0-5cf8ecd2d942",
+      "receiptSha256": "aa2356c820d7186c7a2c1196596fc282219a4aebfc377d7e341698ae7aa6cd25",
+      "green": true,
+      "totals": {
+        "required": 2,
+        "passed": 2,
+        "failed": 0,
+        "tests": 32,
+        "passedTests": 32,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "children": [
+        {
+          "file": "scripts/windows-complete-shards.test.mjs",
+          "pattern": null,
+          "durationMs": 773,
+          "effectiveTimeoutMs": 45000,
+          "tests": {
+            "total": 5,
+            "passed": 5,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "scripts/run-isolated-tests.test.mjs",
+          "pattern": null,
+          "durationMs": 5768,
+          "effectiveTimeoutMs": 45000,
+          "tests": {
+            "total": 27,
+            "passed": 27,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        }
+      ],
+      "duplicateReceiptRemoved": true
+    },
+    {
+      "receiptId": "015ad099-28bd-4df6-b3d9-4a568029979a",
+      "receiptSha256": "cf4eedf6f18b727c02ff1528331bfc007af80c97014f01957caa0434ce661777",
+      "green": false,
+      "totals": {
+        "required": 2,
+        "passed": 0,
+        "failed": 2,
+        "tests": 2,
+        "passedTests": 0,
+        "failedTests": 2,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "children": [
+        {
+          "file": "tools/layout-studio/integrations.test.mjs",
+          "pattern": "Linux Claude Desktop discovery reports this host separately from portable recipes and native permission",
+          "durationMs": 282,
+          "effectiveTimeoutMs": 45000,
+          "tests": {
+            "total": 1,
+            "passed": 0,
+            "failed": 1,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "tools/layout-studio/client-ui.test.mjs",
+          "pattern": "distinct client metadata and exported recipes do not open applications or carry authority",
+          "durationMs": 386,
+          "effectiveTimeoutMs": 45000,
+          "tests": {
+            "total": 1,
+            "passed": 0,
+            "failed": 1,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        }
+      ],
+      "duplicateReceiptRemoved": true
+    }
+  ],
+  "accepted": {
+    "integrationGroups": 6,
+    "distinctIntegrationPasses": 70,
+    "existingSkippedTests": 1,
+    "finalMetadataGroupPasses": 19,
+    "verificationHarnessPasses": 32,
+    "countsOverlap": true
+  },
+  "red": {
+    "distinctRegressions": 2,
+    "reason": "The catalog omitted this host distribution assessment and the connected UI could not explain it."
+  },
+  "pilot": {
+    "schema": "switchyard-linux-desktop-host-support/v1",
+    "source": "https://code.claude.com/docs/en/desktop-linux",
+    "checkedAt": "2026-11-09",
+    "supported": false,
+    "applicationObserved": false,
+    "executableVerified": false,
+    "accountVerified": false,
+    "authorityGranted": false,
+    "distribution": "omarchy",
+    "version": "4.5.0",
+    "architecture": "x64",
+    "status": "unsupported-distribution",
+    "summary": "Linux desktop host: omarchy is unsupported by the desktop beta. Vendor-tested distributions are Ubuntu 22.04+ and Debian 12+. This does not select Claude Code or a web app."
+  },
+  "typecheck": {
+    "command": "node node_modules/typescript/bin/tsc --noEmit -p tsconfig.json",
+    "exitCode": 0
+  },
+  "source": {
+    "url": "https://code.claude.com/docs/en/desktop-linux",
+    "checkedAt": "2026-11-09",
+    "requirements": "Ubuntu 22.04+ or Debian 12+, x64/arm64; other Debian derivatives are untested and Arch/Fedora are not supported by the desktop beta."
+  },
+  "scope": [
+    "One bounded 16 KiB os-release read and the Node architecture identify the local vendor-baseline assessment. No shell evaluation, process/window/account discovery or native invocation occurs.",
+    "Malformed/missing/ambiguous metadata reports unverified; older supported distributions, untested derivatives and unsupported architectures retain separate states.",
+    "The existing Your tools client facts show the assessment. Portable recipes, Work policy, native app capability flags and authorization remain unchanged.",
+    "The native desktop binding/launch/focus implementation remains unfinished; matching vendor platform requirements does not implement it or verify an installed application."
+  ],
+  "audit": {
+    "originalManifestCommandsBoundsSkips": true,
+    "serialOrder": true,
+    "outputBounds": true,
+    "originalChildTreeCleanup": true,
+    "privateReceiptCopiesVerified": true
+  },
+  "limitations": [
+    "Normal installed adoption is pending.",
+    "Actual Windows PowerShell correction is not accepted by these Linux integration or harness checks.",
+    "No browser graphical acceptance, hardware or account actions are claimed."
+  ]
+}

@@ -1,0 +1,196 @@
+{
+  "schema": "switchyard-windows-pipe-native/v1",
+  "sourceCommit": "1fc9d7fa891c941e432aae67d3e4cdea041464c3",
+  "executionCommit": "2f675ed7cb59a165b427595b9937531af134e734",
+  "sourceAndExecutionTree": "fc468fa7f5570627b9837118863abf0f2273a45f",
+  "runId": 42218424480,
+  "restrictedJobId": 127894507889,
+  "artifacts": [
+    {
+      "id": 13502104000,
+      "bytes": 4327,
+      "sha256": "5071308db85cc89e76f5749ecf8171113b65ae02868174a84391a4a96d016753",
+      "privateReceipt": "windows-pipe-1fc-native.json",
+      "zipSavedLocally": false
+    },
+    {
+      "id": 13501668621,
+      "bytes": 851,
+      "sha256": "45d7f80c8cfd9d42b139f7004fd22e9484226749af73b6637945707c2461af66",
+      "privateReceipt": "windows-standalone-1fc-native.json",
+      "zipSavedLocally": false
+    }
+  ],
+  "helperSha256": "6c81ff08aa859e86f402c285c20ba47ae39d9b368da6cf322140eee2260efb58",
+  "standalone": {
+    "success": true,
+    "nativeExitVerified": true,
+    "noAdjacentRuntimeRequired": true,
+    "isolatedCopyRemoved": true,
+    "runtimeDeployment": {
+      "schema": "switchyard-runtime-package-metadata/v1",
+      "framework": ".NET 8.0.30",
+      "extractionConfigured": true,
+      "extractionBaseSha256": "e8799095571854386a224667a5cc6f9c23b88ede79fa39c85a749edfdc6b6458",
+      "mainImageSha256": "6c81ff08aa859e86f402c285c20ba47ae39d9b368da6cf322140eee2260efb58",
+      "runtimeLinkedIntoImage": true,
+      "nativeModules": [],
+      "effectStarted": false
+    }
+  },
+  "consoleComparison": [
+    {
+      "schema": "switchyard-lease-console-probe/v2",
+      "imageSubsystem": "windows-gui",
+      "mode": "no-window",
+      "executableSha256": "6c81ff08aa859e86f402c285c20ba47ae39d9b368da6cf322140eee2260efb58",
+      "stage": "retired",
+      "waitResult": 0,
+      "exitCode": 2,
+      "entryObserved": true,
+      "primaryTokenVerified": true,
+      "tokenRecheckedAfterExit": true,
+      "treeExitVerified": true,
+      "processHandlesClosedVerified": true,
+      "creatorQuotaRestoredVerified": true,
+      "queryAcl": {
+        "schema": "switchyard-child-self-query-acl/v1",
+        "scope": "lease-no-window",
+        "status": "verified",
+        "grantedMask": 8,
+        "changeRequested": true,
+        "beforeAclSha256": "386d422251ddc3236030a7a52c8d9a3e46acb257b1f663bd6145a10965c60863",
+        "afterAclSha256": "0c077cae03bc573bbfdb400c10d68c4b3d53623627ba9cb3fd23b495289c1dfe",
+        "originalAcesPreserved": true,
+        "exactQueryEntryVerified": true,
+        "tokenRestrictionsRechecked": true,
+        "handlesClosedVerified": true,
+        "buffersClearedVerified": true
+      },
+      "standardIo": {
+        "schema": "switchyard-restricted-child-stdio/v1",
+        "standardHandles": 3,
+        "inheritanceRestricted": true,
+        "stdinEof": true,
+        "stdoutBytes": 0,
+        "stderrBytes": 15,
+        "outputBounded": true,
+        "handlesClosedVerified": true,
+        "drainsCompleted": true,
+        "stderr": {
+          "category": "unclassified",
+          "function": null,
+          "code": null,
+          "sourceFile": null,
+          "sourceLine": null
+        }
+      }
+    },
+    {
+      "schema": "switchyard-lease-console-probe/v2",
+      "imageSubsystem": "windows-gui",
+      "mode": "detached",
+      "executableSha256": "6c81ff08aa859e86f402c285c20ba47ae39d9b368da6cf322140eee2260efb58",
+      "stage": "retired",
+      "waitResult": 0,
+      "exitCode": 2,
+      "entryObserved": true,
+      "primaryTokenVerified": true,
+      "tokenRecheckedAfterExit": true,
+      "treeExitVerified": true,
+      "processHandlesClosedVerified": true,
+      "creatorQuotaRestoredVerified": true,
+      "queryAcl": {
+        "schema": "switchyard-child-self-query-acl/v1",
+        "scope": "lease-detached",
+        "status": "verified",
+        "grantedMask": 8,
+        "changeRequested": true,
+        "beforeAclSha256": "386d422251ddc3236030a7a52c8d9a3e46acb257b1f663bd6145a10965c60863",
+        "afterAclSha256": "0c077cae03bc573bbfdb400c10d68c4b3d53623627ba9cb3fd23b495289c1dfe",
+        "originalAcesPreserved": true,
+        "exactQueryEntryVerified": true,
+        "tokenRestrictionsRechecked": true,
+        "handlesClosedVerified": true,
+        "buffersClearedVerified": true
+      },
+      "standardIo": {
+        "schema": "switchyard-restricted-child-stdio/v1",
+        "standardHandles": 3,
+        "inheritanceRestricted": true,
+        "stdinEof": true,
+        "stdoutBytes": 0,
+        "stderrBytes": 15,
+        "outputBounded": true,
+        "handlesClosedVerified": true,
+        "drainsCompleted": true,
+        "stderr": {
+          "category": "unclassified",
+          "function": null,
+          "code": null,
+          "sourceFile": null,
+          "sourceLine": null
+        }
+      }
+    }
+  ],
+  "restrictedOwnerFailure": {
+    "waitResult": 0,
+    "exitCode": 2,
+    "resultAvailable": true,
+    "childReportedSuccess": false,
+    "ownerReportedSuccess": false,
+    "completedChecks": 0,
+    "failedPhase": "private-state-initialize",
+    "failureCategory": "Error",
+    "stateLockFailure": {
+      "schema": "switchyard-state-lock-failure/v1",
+      "kind": "child-exit",
+      "phase": "worker-startup",
+      "progress": "lease-input-read",
+      "exitCode": 2,
+      "signal": null,
+      "spawnCode": null
+    }
+  },
+  "queryOnlyTokenAcls": [
+    {
+      "schema": "switchyard-child-self-query-acl/v1",
+      "scope": "cold-probe",
+      "status": "verified",
+      "grantedMask": 8,
+      "changeRequested": true,
+      "beforeAclSha256": "386d422251ddc3236030a7a52c8d9a3e46acb257b1f663bd6145a10965c60863",
+      "afterAclSha256": "0c077cae03bc573bbfdb400c10d68c4b3d53623627ba9cb3fd23b495289c1dfe",
+      "originalAcesPreserved": true,
+      "exactQueryEntryVerified": true,
+      "tokenRestrictionsRechecked": true,
+      "handlesClosedVerified": true,
+      "buffersClearedVerified": true
+    },
+    {
+      "schema": "switchyard-child-self-query-acl/v1",
+      "scope": "node-owner",
+      "status": "verified",
+      "grantedMask": 8,
+      "changeRequested": true,
+      "beforeAclSha256": "386d422251ddc3236030a7a52c8d9a3e46acb257b1f663bd6145a10965c60863",
+      "afterAclSha256": "0c077cae03bc573bbfdb400c10d68c4b3d53623627ba9cb3fd23b495289c1dfe",
+      "originalAcesPreserved": true,
+      "exactQueryEntryVerified": true,
+      "tokenRestrictionsRechecked": true,
+      "handlesClosedVerified": true,
+      "buffersClearedVerified": true
+    }
+  ],
+  "ordinaryOwnerChecks": 8,
+  "restrictedMetadataChecks": 13,
+  "restrictedNativeExchangeChecks": 31,
+  "filesystemAndSetupJobs": "GitHub reports both success; their separate receipt archives were not imported for this summary.",
+  "limits": [
+    "Copied-helper startup and console initialization progressed; the unchanged restricted owner remains exit 2 at private-state-initialize, zero of eight checks.",
+    "Both diagnostic EOF probes reach helper entry and retire exact trees/handles; EOF is not a successful lease.",
+    "The last fixed label is lease-input-read. Conditional later labels prevent assigning a more exact native cause.",
+    "The failed restricted fixture remains preserved; no broader token/ACL/privilege/default-DACL/SID fallback is accepted."
+  ]
+}

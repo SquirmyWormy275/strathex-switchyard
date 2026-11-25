@@ -1,0 +1,70 @@
+{
+  "schema": "switchyard-hotkey-owner-source-summary/v1",
+  "baseCommit": "68bcc76d031e06a8a655f39311f8f0eafdbe7645",
+  "sourceFiles": {
+    "tools/layout-studio/windows-host.mjs": "864decd9aeee7686995cea1ff55851bd6968ee78763dd371c0f8082b4657909d",
+    "tools/layout-studio/windows-host.test.mjs": "1546efd7a113c213e18cfe1d2d6d814a67e7a844c83d47f567e8eb0fe5e84d2d"
+  },
+  "beforeCorrection": {
+    "name": "isolated-test-940ca8c3-df15-40ec-ab17-8783ce1c2abb.json",
+    "sha256": "aafb79b1cf321dcddf14dc705c0a368e7a0ea471554cffc3b27807cfb28fcf64",
+    "totals": {
+      "required": 1,
+      "passed": 0,
+      "failed": 1,
+      "tests": 1,
+      "passedTests": 0,
+      "failedTests": 1,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    },
+    "success": false
+  },
+  "initialCorrected": {
+    "name": "isolated-test-49a7b2a9-a200-4b23-a773-24cafc5d82a6.json",
+    "sha256": "6ffb634828c0b3af9885a12a4c7ae5b87181c2d8a2dc031d3c8b57bd8bec1603",
+    "totals": {
+      "required": 8,
+      "passed": 8,
+      "failed": 0,
+      "tests": 86,
+      "passedTests": 86,
+      "failedTests": 0,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    },
+    "success": true
+  },
+  "finalCorrected": {
+    "name": "isolated-test-a66f61a0-964e-4419-8366-40e8c9d6eed3.json",
+    "sha256": "6c03ccba8805f84d6304a612cb44d59dd1944240ebdc57f2526f9afccd187558",
+    "totals": {
+      "required": 8,
+      "passed": 8,
+      "failed": 0,
+      "tests": 89,
+      "passedTests": 89,
+      "failedTests": 0,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    },
+    "success": true
+  },
+  "newRegressionTests": 6,
+  "realControlledNodeChildren": 2,
+  "typecheckPassed": true,
+  "originalFullPackageBudgetPassed": true,
+  "allChildAndTreeCleanupVerified": true,
+  "ownedFocusedRootRemoved": true,
+  "actualWindowsShortcutRegistrations": 0,
+  "installedChanged": false,
+  "nativeWindowsAccepted": false,
+  "interactiveDesktopAcceptance": false,
+  "frontendChanged": false,
+  "modelRequests": 0,
+  "hardwareOperations": 0,
+  "arbitraryDescendantOrAbruptParentLossAcceptance": false
+}

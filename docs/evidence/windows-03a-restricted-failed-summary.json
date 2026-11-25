@@ -1,0 +1,22 @@
+{
+  "schema": "switchyard-windows-restricted-owner-failed-summary/v1",
+  "sourceCommit": "03a60659b51565b0fb3521a81d556ae520821767",
+  "executionCommit": "b6c892a4e294b638fe93a8d09e9c8427fff96c01",
+  "workflowRun": 42049684276,
+  "jobId": 127322436489,
+  "artifactId": 13426377387,
+  "archiveSha256": "3c7ba721f35b0d709ce6770442be4206c93d9a3b7dbb87b9696d9aa3bead3e26",
+  "digestVerified": true,
+  "privateReceipt": "windows-03a-restricted-owner-failed.json",
+  "success": false,
+  "errorCategory": "InvalidOperationException",
+  "nativeCode": null,
+  "managedHResult": -2146233079,
+  "failurePhase": "restricted-primary-token/historical-filter-observation",
+  "historicalFlagObservations": [],
+  "historicalFlagValueKnown": false,
+  "childCreated": false,
+  "protectedServiceAndContextPreserved": true,
+  "priorFalseFlagInferenceWithdrawn": true,
+  "nativeDiagnosticValidationPending": true
+}

@@ -1,0 +1,75 @@
+{
+  "schema": "switchyard-host-action-settlement-diagnostic/v1",
+  "failure": {
+    "sourceCommit": "cf3bb4c5c456802d232d9250e7de1032687febab",
+    "mergeCommit": "94010f1cc8922ac1288419d7ed3dd59eb0110a4c",
+    "sourceTree": "80ce528f780a7f13919ba61c1dfa0c088e2c9659",
+    "runId": 42395492107,
+    "jobId": 128472638426,
+    "artifactId": 13584065594,
+    "zipSha256": "f2a0f8f494866485631b7af8dbcfe35b303ce9d48770a69d975028eeb1785f3f",
+    "envelopeSha256": "bbe6fd81f6d2121f792de32c909e7d37223807c7cb713750a76881f448f62657",
+    "receiptSha256": "ec5ee9e1424851afdf5f49acaf08d3ec5d1880762e65626c35b064018a8547f6",
+    "receiptId": "8a61b3ec-1dc8-40c9-8efd-1c6382ff09c0",
+    "totals": {
+      "required": 22,
+      "passed": 21,
+      "failed": 1,
+      "tests": 147,
+      "passedTests": 132,
+      "failedTests": 1,
+      "skippedTests": 14,
+      "cancelledTests": 0,
+      "todoTests": 0
+    },
+    "file": "apps/windows-companion/test/windows-host-action-consumer.test.ts",
+    "durationMs": 3882,
+    "effectiveTimeoutMs": 45000,
+    "wholeGroupTimeout": false,
+    "failedTest": "an unavailable reviewed host application settles not-started without invoking the effect port",
+    "observedError": "The existing two-second settlement observation expired; the original receipt does not identify which journal phase was delayed.",
+    "originalManifestCommandsBoundsAndCleanupVerified": true
+  },
+  "fixtureChange": {
+    "path": "apps/windows-companion/test/windows-host-action-consumer.test.ts",
+    "sha256": "223135a2c9bd7c7d3796107f6c03c7331a37aa7c5adece29144a2ccb578f1770",
+    "description": "Always stop all fixture consumers before removing their private journal, including assertion failures. On the original settlement timeout, report only completion/effect counts, journal kinds and closed outcome tags; preserve original assertions, 75ms coordination/effect deadline, 2000ms observation deadline and 45000ms group bound.",
+    "focusedReceipts": [
+      {
+        "id": "4cab3402-2361-4bb2-b591-fb5f0158697e",
+        "sha256": "a7b4eb09a817337383bfeb5b0e5f6fa8d3574f4915c6c2b08d872e195b789a27",
+        "totals": {
+          "required": 2,
+          "passed": 2,
+          "failed": 0,
+          "tests": 32,
+          "passedTests": 32,
+          "failedTests": 0,
+          "skippedTests": 0,
+          "cancelledTests": 0,
+          "todoTests": 0
+        }
+      },
+      {
+        "id": "5f01e3c3-4f97-4708-b664-536428972fbe",
+        "sha256": "b1504162edd6d75a9d7c7e23f5298187b927897df20bc5cdaedf08519914d83d",
+        "totals": {
+          "required": 2,
+          "passed": 2,
+          "failed": 0,
+          "tests": 32,
+          "passedTests": 32,
+          "failedTests": 0,
+          "skippedTests": 0,
+          "cancelledTests": 0,
+          "todoTests": 0
+        }
+      }
+    ],
+    "typecheck": true,
+    "retainedTypecheckCorrection": "Initial teardown used Array.toReversed outside the repository's selected TypeScript library. Replaced it with a copied array plus reverse; compiler configuration unchanged."
+  },
+  "productionChanged": false,
+  "rootCauseRepaired": false,
+  "nativeFollowupAcceptance": false
+}

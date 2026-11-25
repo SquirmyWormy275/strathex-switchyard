@@ -1,0 +1,212 @@
+{
+  "schema": "switchyard-codex-native-startup/v1",
+  "baseCommit": "7aabe09a0a3f5c619c55c3fff9ba8f30f7a6d397",
+  "sourceFiles": {
+    "tools/layout-studio/codex-editor-ingress.py": "1be402f29263368307b654c9be4ba7740c8d0813fddb72f92ca79b57d4b7c58d",
+    "tools/layout-studio/codex-editor-ingress.test.mjs": "fde2c05727e61f1ff19f941d3ffbdfc3951813602def1f3f088e4dc5d2dabb70",
+    "tools/layout-studio/codex-editor-relay.mjs": "2a331928db47a8ebc867087a77ed6a78379e8f5794bcabf844413a5c067feaf8",
+    "tools/layout-studio/codex-editor-relay.test.mjs": "a0114056f97941ead15015bf744f1ddaa9e563a57fab02683f44d929217a78bf"
+  },
+  "runs": [
+    {
+      "receiptId": "4b110a21-3097-47dc-9434-ba4e62ae8650",
+      "sha256": "a1fa900c5ed6156ef54a22db88f8c9bdb7bd6271f61e6fbd87acebfe692e3665",
+      "success": false,
+      "totals": {
+        "required": 2,
+        "passed": 0,
+        "failed": 2,
+        "tests": 29,
+        "passedTests": 25,
+        "failedTests": 4,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "groups": [
+        {
+          "file": "tools/layout-studio/codex-editor-relay.test.mjs",
+          "durationMs": 143,
+          "originalBoundMs": 45000
+        },
+        {
+          "file": "tools/layout-studio/codex-editor-ingress.test.mjs",
+          "durationMs": 11663,
+          "originalBoundMs": 45000
+        }
+      ],
+      "originalCommandsBoundsSkipsAndCleanupVerified": true,
+      "failures": [
+        {
+          "file": "tools/layout-studio/codex-editor-relay.test.mjs",
+          "diagnosticSha256": "0a3de5d65dccc46cdedd76c46553876f41139e2f9fbeae7ac8c415ad57f154c3"
+        },
+        {
+          "file": "tools/layout-studio/codex-editor-ingress.test.mjs",
+          "diagnosticSha256": "498ff79fe307730fbd6340f7e96c9a1c2e31c49345d20e1e343d0c268070b786"
+        }
+      ]
+    },
+    {
+      "receiptId": "123b2f2b-8b72-480b-b9e0-1b9bdb3f2ab8",
+      "sha256": "88f8e06640f97f42639d620db386580becc5c0f1dd8c6cc5b649188c42adbb3a",
+      "success": true,
+      "totals": {
+        "required": 2,
+        "passed": 2,
+        "failed": 0,
+        "tests": 29,
+        "passedTests": 29,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "groups": [
+        {
+          "file": "tools/layout-studio/codex-editor-relay.test.mjs",
+          "durationMs": 143,
+          "originalBoundMs": 45000
+        },
+        {
+          "file": "tools/layout-studio/codex-editor-ingress.test.mjs",
+          "durationMs": 11737,
+          "originalBoundMs": 45000
+        }
+      ],
+      "originalCommandsBoundsSkipsAndCleanupVerified": true,
+      "failures": []
+    },
+    {
+      "receiptId": "0b5c1313-52a1-4546-a5d6-b20e3dc48dc2",
+      "sha256": "94fb772ee135d720e7d9a7405a85baab2449278ed1c5c896a0df54e0a958a275",
+      "success": true,
+      "totals": {
+        "required": 7,
+        "passed": 7,
+        "failed": 0,
+        "tests": 64,
+        "passedTests": 64,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "groups": [
+        {
+          "file": "tools/layout-studio/windows-codex-editor-connection.test.mjs",
+          "durationMs": 630,
+          "originalBoundMs": 45000
+        },
+        {
+          "file": "tools/layout-studio/codex-editor-protocol.test.mjs",
+          "durationMs": 132,
+          "originalBoundMs": 45000
+        },
+        {
+          "file": "tools/layout-studio/codex-editor-relay.test.mjs",
+          "durationMs": 142,
+          "originalBoundMs": 45000
+        },
+        {
+          "file": "tools/layout-studio/codex-retained-editor-client.test.mjs",
+          "durationMs": 134,
+          "originalBoundMs": 45000
+        },
+        {
+          "file": "tools/layout-studio/codex-editor-ingress.test.mjs",
+          "durationMs": 11709,
+          "originalBoundMs": 45000
+        },
+        {
+          "file": "tools/layout-studio/codex-editor-ingress-owner.test.mjs",
+          "durationMs": 1602,
+          "originalBoundMs": 45000
+        },
+        {
+          "file": "apps/vscode-extension/test/codex-terminal.test.ts",
+          "durationMs": 90,
+          "originalBoundMs": 45000
+        }
+      ],
+      "originalCommandsBoundsSkipsAndCleanupVerified": true,
+      "failures": []
+    }
+  ],
+  "implementation": [
+    "Accept the two exact Unix WebSocket request paths / and /rpc, with the existing original kernel peer, header, byte and frame checks. Query strings, alternate paths and encoded variants refuse.",
+    "Normalize only the captured codex-tui 0.167.0 capability shape into experimentalApi:false upstream. Unknown clients, changed versions, notification opt-outs and attestation requests keep refusing.",
+    "Normalize native empty account reads into refreshToken:false. Before resume, permit only metadata for the exact selected thread, bracketed by original-account checks; no acknowledgement, transcript hydration, resume or additional task authority is created."
+  ],
+  "native": {
+    "executableSha256": "cdcb45aaa01d0f14e298985e09465aebccd47f64ecd298aea44814af7b62bbda",
+    "version": "0.167.0",
+    "receiptSha256": "c4528fa385902c48dcbd337aa0b60582239842eeca868fc4ef9c50700142b998",
+    "realTerminalAndProductionHandshake": true,
+    "productionRelay": true,
+    "provider": "synthetic only",
+    "networkNamespaceIsolated": true,
+    "emptyOwnedHome": true,
+    "originalPeerPidVerified": true,
+    "acceptedClientMethods": [
+      "initialize",
+      "initialized",
+      "account/read",
+      "thread/read",
+      "thread/read"
+    ],
+    "refusedNextMethod": {
+      "id": "tui-project-trust-read-2652c13a-f817-4080-a9be-6eb99c8837a9",
+      "method": "config/read",
+      "params": {
+        "includeLayers": true,
+        "cwd": "/tmp/work"
+      }
+    },
+    "upstreamCalls": [
+      "initialize",
+      "initialized",
+      "config/read",
+      "account/read",
+      "account/read",
+      "account/read",
+      "thread/read",
+      "account/read",
+      "account/read",
+      "thread/read",
+      "account/read"
+    ],
+    "realAccountRequests": 0,
+    "realTaskRequests": 0,
+    "modelPrompts": 0,
+    "protocolAcknowledgements": 0,
+    "ideAttached": false,
+    "terminalExitCode": -15,
+    "originalGuardianAndTreeExitVerified": true
+  },
+  "cleanup": {
+    "receiptSha256": "30e3c49c7765b7053b2a315fa7d5fc5b837bc2e83baa1fc0dd29ae6cef6a149d",
+    "ownedRootsRemoved": 12,
+    "ownedFilesRemoved": 40,
+    "ownedBytesRemoved": 230303,
+    "originalGuardianAndTreeExitVerified": true
+  },
+  "intermediateFailures": [
+    "The original production handshake refused /rpc. A separate capture peer recorded the actual native HTTP and initialize frames.",
+    "The first synthetic thread fixture omitted the mandatory sessionId field. Its resulting native close frame exposed a probe-parser assertion; both observations remain retained.",
+    "The first two in-namespace production-relay probes could not resolve the current UID in the deliberately empty /etc. The corrected isolated namespace supplies one synthetic passwd entry with the unchanged actual UID/GID; host accounts and identity policy remain untouched.",
+    "Two Linux-only path cases were folded into the existing handshake tests before the final integration run. Every original assertion remains, and the 13 declared non-Linux skips and all deadlines are unchanged."
+  ],
+  "limitations": [
+    "This is startup-prefix compatibility, not a completed native TUI attachment. The next config/read with includeLayers:true and exact cwd is still refused before reaching the synthetic provider.",
+    "Separate capture probes also observed hooks/list and account/bedrock/checkGovCloudRequirements later in startup. These are not admitted or forwarded by this change.",
+    "Native resume parameter normalization, remaining bootstrap metadata, visible task loading, live provider/account acceptance and VS Code GUI acceptance remain unfinished or separately blocked.",
+    "The installed application remains ec28d09 and has not received this source change. No hardware, user configuration, installed provider account or model operation occurred."
+  ],
+  "sources": [
+    "https://learn.chatgpt.com/docs/app-server",
+    "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/app-server-client/src/remote.rs",
+    "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/tui/src/lib.rs",
+    "https://github.com/openai/codex/blob/rust-v0.167.0/codex-rs/app-server-protocol/src/protocol/v2/thread_data.rs"
+  ]
+}

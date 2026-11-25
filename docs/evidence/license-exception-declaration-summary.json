@@ -1,0 +1,53 @@
+{
+  "schema": "switchyard-license-exception-declaration-summary/v1",
+  "basis": "4faa8a1a9e1fcfbfc2402b1ea4e8d51dd93657fe",
+  "sourceSha256": {
+    "tools/layout-studio/shield-scanner-engine.mjs": "fd15f7de0c701c42fcf7142761b27b8df8c4361e243607cf07bab431da4685ec",
+    "tools/layout-studio/shield-scanner-engine.test.mjs": "28f3797e7be17d9af698a040aaf57062d994dd68b55d4b145671a8bc54196783",
+    "tools/layout-studio/test-support/shield-scanner-fixture.mjs": "ca6414e95cc8432219c61f036bf05fd3a6ea047850ef136af130e2eedbb9e7e6",
+    "tools/layout-studio/test-support/assert-license-shield.mjs": "0ad5bc3df9e9ef8c606cb9fb2863352ae751ef7cb3235e794d274a2be48d072a",
+    "scripts/verify-shield-host.mjs": "f9ca5792528b0e8fa69ba21222c0c2cadccce5ebbbfc29b9dc755593ca73780f"
+  },
+  "isolated": {
+    "receipt": "isolated-test-89dab278-af0d-4972-a20e-10dd342a1712.json",
+    "totals": {
+      "required": 7,
+      "passed": 7,
+      "failed": 0,
+      "tests": 59,
+      "passedTests": 59,
+      "failedTests": 0,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    },
+    "allChildAndTreeCleanupVerified": true
+  },
+  "caseGuardFollowup": {
+    "receipt": "isolated-test-9b51fc24-0092-49a1-b3a2-01bb39b77ec6.json",
+    "totals": {
+      "required": 1,
+      "passed": 1,
+      "failed": 0,
+      "tests": 26,
+      "passedTests": 26,
+      "failedTests": 0,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    },
+    "allChildAndTreeCleanupVerified": true
+  },
+  "typecheckPassed": true,
+  "behavior": [
+    "WITH binds a simple license declaration to one exception as an exact atomic policy entry. Base-only, exception-only and different-pair permissions do not substitute.",
+    "Existing AND/OR precedence, bounds, case-sensitive operators, identifier comparison and unselected-alternative gaps remain.",
+    "Signed policy admits unique canonical simple IDs or exact WITH pairs, never AND/OR policy expressions. Invalid references/exception syntax refuse the entire declaration.",
+    "Supply Chain and Release exercise eight component declarations through real Linux namespace execution and Windows guest doubles; original index/HEAD/lockfiles and authenticated report/BOM/receipt cleanup verify."
+  ],
+  "limits": [
+    "Declared strings are not SPDX-list membership, actual text, publisher, compatibility or legal verification. All coverage remains incomplete.",
+    "No installed runtime, live scanner/task/provider/account, hardware or model operation was performed.",
+    "Windows-host and native guest acceptance of this extension remain separate."
+  ]
+}

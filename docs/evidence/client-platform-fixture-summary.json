@@ -1,0 +1,73 @@
+{
+  "schema": "switchyard-client-platform-fixture-summary/v1",
+  "at": "2026-11-09T13:10:13.734596+00:00",
+  "native": {
+    "headCommit": "167df7b125af93e46c0631b2a1b08d1ec9bec951",
+    "mergeCommit": "f72e6707f2bd516ccc604369a3ddc29f3451c5d8",
+    "tree": "c4adc1d52d06c6e621ae6485a293a71136b1512d",
+    "mergeParents": [
+      "d8af73553de1b61402520aad1fe0c9fbad2e8c5a",
+      "167df7b125af93e46c0631b2a1b08d1ec9bec951"
+    ],
+    "runId": 42620025971,
+    "jobId": 129170296960,
+    "artifactId": 13677191085,
+    "artifactBytes": 5160,
+    "zipSha256": "64f68bd4738ff1ac41b05b7b800b1a8cea170ffd76e11a1e9f0becc7b620e4e1",
+    "envelopeSha256": "2adb21ac71341ea4902fdf9d1e2cc4858f31da7bc154befc9aac0196db0f1063",
+    "receiptId": "3bcc2003-beb0-450b-8cb4-24c965ce3a4b",
+    "receiptSha256": "63ba1962a2f1f293d0973b94b78e328ee72cb1865ed16000f5167c38ebc956c7",
+    "totals": {
+      "required": 20,
+      "passed": 19,
+      "failed": 1,
+      "tests": 134,
+      "passedTests": 115,
+      "failedTests": 1,
+      "skippedTests": 18,
+      "cancelledTests": 0,
+      "todoTests": 0
+    },
+    "failure": {
+      "file": "tools/layout-studio/client-ui.test.mjs",
+      "durationMs": 4586,
+      "effectiveTimeoutMs": 45000,
+      "reason": "The Linux portal double was paired with the native Windows client catalog; the Linux host-assessment assertion failed.",
+      "timedOut": false
+    },
+    "originalManifestCommandsBoundsSkips": true,
+    "serialOrder": true,
+    "outputBounds": true,
+    "originalChildTreeCleanup": true,
+    "completeAcceptance": false
+  },
+  "correction": {
+    "description": "Set the existing synthetic Linux portal fixture and its catalog to the same explicit Linux platform on every host. All five UI assertions and existing production platform branches remain.",
+    "productionChanged": false,
+    "assertionsRemoved": false,
+    "newSkips": false,
+    "deadlinesExpanded": false,
+    "nativeFollowUp": "pending-normal-branch-push"
+  },
+  "local": {
+    "runId": "96f5c33d-f44f-4bb1-b9ae-e2117d0cb316",
+    "receiptSha256": "0ec3d1d919500068f9b68b73d0ec76732bfd05429d322712fa70456742f4fd80",
+    "totals": {
+      "required": 2,
+      "passed": 2,
+      "failed": 0,
+      "tests": 24,
+      "passedTests": 24,
+      "failedTests": 0,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    },
+    "originalBounds": true,
+    "childTreeCleanup": true,
+    "duplicateReceiptRemoved": true
+  },
+  "sourceFiles": {
+    "tools/layout-studio/client-ui.test.mjs": "b1d0b04042c4894924810ac1412b6ed04929fb1ae68389c62273021eb42510f5"
+  }
+}

@@ -1,0 +1,51 @@
+{
+  "schema": "switchyard-native-main-window-evidence/v1",
+  "success": true,
+  "scope": "Linux repaired native ChatGPT main-window focus only",
+  "baseCommit": "869aa9e1be4c1ec665c7e1c693d6d339b7e60f2c",
+  "uncommittedSource": true,
+  "sourceSha256": {
+    "tools/layout-studio/host.mjs": "47770b45ffe6c88a2346a385f9ba8b1095362834522fa25d4fbda976469977a2",
+    "tools/layout-studio/native-process.mjs": "aa88645c7f44420c5241ba46a0d3071cbb6e92404817914d5277b7093a33f92c",
+    "tools/layout-studio/task-window.mjs": "b0e03289cf884e7925233b25d75402bbe388856aebe4df2933146b91e52a9b9f",
+    "tools/layout-studio/suite.mjs": "ff3a5306a55b2d0248f7ca184a38c9c9b5f93088d1ed6276462465f318e6fbed"
+  },
+  "receipts": [
+    {
+      "localReceipt": "native-main-window-focus-1793880286229.json",
+      "receiptSha256": "7ddaf42f7e14868d04d7aa2c0d2367488c655397deee4ec209559dc242c503fc"
+    },
+    {
+      "localReceipt": "native-main-window-gateway-1793880470456.json",
+      "receiptSha256": "3cd059859d6fd51df72be0bca516d55cfbe5015db94561bf9c35609b2c1afc65"
+    }
+  ],
+  "authenticatedGatewayVerified": true,
+  "unauthenticatedRefused": true,
+  "processBirthIdentityUnchanged": true,
+  "mappedMainWindows": 1,
+  "mappedFloatingOverlays": 0,
+  "ownedGatewayFixtureRemoved": true,
+  "installedSelectionChanged": false,
+  "settingsChangedByProof": false,
+  "modelPromptsSubmitted": 0,
+  "keyboardOpened": false,
+  "accountAccepted": false,
+  "conversationAccepted": false,
+  "taskResumptionAccepted": false,
+  "installedAcceptance": {
+    "sourceCommit": "b82f0564b69368053eed4d8e9971ce9bb699e3b2",
+    "applicationRelease": "a6c095ec81436d03fc136e7f6da73977c842e9cabb57ceb33f15a202daa11416",
+    "updateChecks": 6,
+    "focusChecks": 5,
+    "updateReceipt": "assignment-legends-1793880918634.json",
+    "focusReceipt": "installed-native-main-window-1793881005201.json",
+    "focusReceiptSha256": "62402d104a6255927b283d8d7f3ed5c1eb8d2ee9a12586433909fbc24f42c407",
+    "validationRestored": true,
+    "mappedMainWindows": 1,
+    "mappedFloatingOverlays": 0,
+    "modelPromptsSubmitted": 0,
+    "disposableBundleRemoved": true,
+    "proofCheckoutRemoved": true
+  }
+}

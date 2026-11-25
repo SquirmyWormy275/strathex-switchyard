@@ -1,0 +1,155 @@
+{
+  "schema": "switchyard-lease-console-native-summary/v1",
+  "sourceCommit": "700e7f2c45401b797828a4797f7a43bd05a04608",
+  "executionCommit": "0d71ed01d347ecba643d3c2f9bd3bf2734e319d3",
+  "sourceAndExecutionTree": "171165ce234ec970cfb58a077c066c91740a2362",
+  "mergeParents": [
+    "d8af73553de1b61402520aad1fe0c9fbad2e8c5a",
+    "700e7f2c45401b797828a4797f7a43bd05a04608"
+  ],
+  "runId": 42202932826,
+  "restrictedJobId": 127842766361,
+  "artifact": {
+    "id": 13494259861,
+    "bytes": 4317,
+    "sha256": "a7c09cda9109024a05d8d9f1b75a1c8441beaf99d81324601accb718f025d0dc",
+    "privateReceipt": "windows-lease-console-700-native.json",
+    "zipSavedLocally": false
+  },
+  "consoleComparison": [
+    {
+      "schema": "switchyard-lease-console-probe/v1",
+      "mode": "no-window",
+      "executableSha256": "254bd1c4e359f777f67241dd7f089a956723014f80fa3bc1cb1f7d2b155e281d",
+      "stage": "retired",
+      "waitResult": 0,
+      "exitCode": 3221225794,
+      "entryObserved": false,
+      "primaryTokenVerified": true,
+      "tokenRecheckedAfterExit": true,
+      "treeExitVerified": true,
+      "processHandlesClosedVerified": true,
+      "creatorQuotaRestoredVerified": true,
+      "queryAcl": {
+        "schema": "switchyard-child-self-query-acl/v1",
+        "scope": "lease-no-window",
+        "status": "verified",
+        "grantedMask": 8,
+        "changeRequested": true,
+        "beforeAclSha256": "41298fe4e72aeea10f908a6eba57cbc02b43108603f501fe2d11e5cbba6fc84f",
+        "afterAclSha256": "61b564530fea96d3ffedd57b56c51d3f24d9517ad52437908441b308f275d84a",
+        "originalAcesPreserved": true,
+        "exactQueryEntryVerified": true,
+        "tokenRestrictionsRechecked": true,
+        "handlesClosedVerified": true,
+        "buffersClearedVerified": true
+      },
+      "standardIo": {
+        "schema": "switchyard-restricted-child-stdio/v1",
+        "standardHandles": 3,
+        "inheritanceRestricted": true,
+        "stdinEof": true,
+        "stdoutBytes": 0,
+        "stderrBytes": 0,
+        "outputBounded": true,
+        "handlesClosedVerified": true,
+        "drainsCompleted": true,
+        "stderr": {
+          "category": "empty",
+          "function": null,
+          "code": null,
+          "sourceFile": null,
+          "sourceLine": null
+        }
+      }
+    },
+    {
+      "schema": "switchyard-lease-console-probe/v1",
+      "mode": "detached",
+      "executableSha256": "254bd1c4e359f777f67241dd7f089a956723014f80fa3bc1cb1f7d2b155e281d",
+      "stage": "retired",
+      "waitResult": 0,
+      "exitCode": 2,
+      "entryObserved": true,
+      "primaryTokenVerified": true,
+      "tokenRecheckedAfterExit": true,
+      "treeExitVerified": true,
+      "processHandlesClosedVerified": true,
+      "creatorQuotaRestoredVerified": true,
+      "queryAcl": {
+        "schema": "switchyard-child-self-query-acl/v1",
+        "scope": "lease-detached",
+        "status": "verified",
+        "grantedMask": 8,
+        "changeRequested": true,
+        "beforeAclSha256": "41298fe4e72aeea10f908a6eba57cbc02b43108603f501fe2d11e5cbba6fc84f",
+        "afterAclSha256": "61b564530fea96d3ffedd57b56c51d3f24d9517ad52437908441b308f275d84a",
+        "originalAcesPreserved": true,
+        "exactQueryEntryVerified": true,
+        "tokenRestrictionsRechecked": true,
+        "handlesClosedVerified": true,
+        "buffersClearedVerified": true
+      },
+      "standardIo": {
+        "schema": "switchyard-restricted-child-stdio/v1",
+        "standardHandles": 3,
+        "inheritanceRestricted": true,
+        "stdinEof": true,
+        "stdoutBytes": 0,
+        "stderrBytes": 15,
+        "outputBounded": true,
+        "handlesClosedVerified": true,
+        "drainsCompleted": true,
+        "stderr": {
+          "category": "unclassified",
+          "function": null,
+          "code": null,
+          "sourceFile": null,
+          "sourceLine": null
+        }
+      }
+    }
+  ],
+  "unchangedOriginalNode": {
+    "waitResult": 0,
+    "exitCode": 2,
+    "resultAvailable": true,
+    "childReportedSuccess": false,
+    "ownerReportedSuccess": false,
+    "completedChecks": 0,
+    "failedPhase": "private-state-initialize",
+    "failureCategory": "Error",
+    "stateLockFailure": {
+      "schema": "switchyard-state-lock-failure/v1",
+      "kind": "child-exit",
+      "phase": "worker-startup",
+      "progress": "not-observed",
+      "exitCode": 3221225794,
+      "signal": null,
+      "spawnCode": null
+    }
+  },
+  "separateChecks": {
+    "restrictedClient": 13,
+    "restrictedExchange": 31,
+    "ordinaryNodeOwner": 8
+  },
+  "separateJobs": {
+    "filesystem": {
+      "id": 127842766244,
+      "conclusion": "success"
+    },
+    "nativeSetup": {
+      "id": 127842766403,
+      "conclusion": "success"
+    }
+  },
+  "failedFixturePreserved": true,
+  "limits": [
+    "Both actual helper children used the same exact image, restricted token recipe, query-only correction, environment, pipes and explicit creation-time Job.",
+    "CREATE_NO_WINDOW exited with 0xc0000142 before its fixed entry marker. DETACHED_PROCESS reached the marker and returned the intended EOF refusal (exit 2). Each exact tree, handle, token and creator privilege recheck verifies.",
+    "This establishes a console-mode difference in the controlled comparison. It does not identify the failing DLL/resource or prove a production repair.",
+    "The unchanged original Node journey still fails at private-state-initialize with zero of eight restricted owner checks. The ordinary eight-check journey is separate.",
+    "Production detached mode is not enabled: libuv skips its child Job in that mode. A repair must retain parent-loss containment and pass the complete restricted journey. No broader token/privilege/SID/account/runtime fallback is used."
+  ]
+}

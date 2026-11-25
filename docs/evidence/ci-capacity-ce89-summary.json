@@ -1,0 +1,147 @@
+{
+  "schema": "switchyard-ci-capacity-followup/v1",
+  "source": "ce89c78abe2eb6d53c782dafaaa1fbea6bf387a5",
+  "merge": "fa6aa193f80a46166ef94fb1109a708dba086e52",
+  "tree": "2b93b2e61abc617e027021056bc2f036cd5b0e96",
+  "sourceAndMergeTreeVerified": true,
+  "linuxFailure": {
+    "run": 42549523571,
+    "job": 128942741555,
+    "reason": "Six historical backend estimates exceed the unchanged 950000ms setup allowance."
+  },
+  "windowsFailure": {
+    "run": 42549523570,
+    "jobs": [
+      128942108974,
+      128942109368
+    ],
+    "artifacts": [
+      {
+        "id": 13645841206,
+        "sha256": "571ca274db1accc1500e73aece5f26a1255b4076ceaeca85041a60ad6ed4e7d8"
+      },
+      {
+        "id": 13645885841,
+        "sha256": "618b032b8fb6af9efc3b67938148d9408c45ce64d6f7da9aab7d902343a98d50"
+      }
+    ],
+    "receipts": [
+      {
+        "shard": 11,
+        "receiptId": "8a74518f-f66c-4c99-98c5-ed7ee6d4c5bb",
+        "receiptSha256": "3a6c03e25c7fcf13d0851dc77980750dd74ac97f0cee58badea01852dc53e149",
+        "totals": {
+          "required": 24,
+          "passed": 23,
+          "failed": 1,
+          "tests": 151,
+          "passedTests": 139,
+          "failedTests": 0,
+          "skippedTests": 12,
+          "cancelledTests": 0,
+          "todoTests": 0
+        },
+        "failures": [
+          {
+            "file": "apps/windows-companion/test/windows-host-action-consumer.test.ts",
+            "timeout": true,
+            "effectiveTimeoutMs": 45000,
+            "outputDigest": "38dc607dde453ea0a6669e8a312030c2620a6fc5f8b64e879eac97726b4c1f91",
+            "diagnostic": "TAP version 13\n# (node:5664) ExperimentalWarning: Transform Types is an experimental feature and might change at any time\n# (Use `node --trace-warnings ...` to show where the warning was created)\n# Subtest: the companion consumes only exact targetless VS Code and terminal focus intents after durable claims\nok 1 - the companion consumes only exact targetless VS Code and terminal focus intents after durable claims\n  ---\n  duration_ms: 159.883\n  type: 'test'\n  ...\n# Subtest: an unavailable reviewed host application settles not-started without invoking the effect port\nok 2 - an unavailable reviewed host application settles not-started without invoking the effect port\n  ---\n  duration_ms: 58.2561\n  type: 'test'\n  ...\n# Subtest: repeated VS Code focus durably advances the exact native window ordinal across consumer restart and resets after the repeat window\nok 3 - repeated VS Code focus durably advances the exact native window ordinal across consumer restart and resets after the repeat window\n  ---\n  duration_ms: 211.0198\n  type: 'test'\n  ...\n# Subtest: Voice Center remains extension-owned and is never confused with launching or focusing Code\nok 4 - Voice Center remains extension-owned and is never confused with launching or focusing Code\n  ---\n  duration_ms: 66.3493\n  type: 'test'\n  ...\n# Subtest: context fields, unknown fields, and mismatched closed mappings never reach authorization or Windows\nok 5 - context fields, unknown fields, and mismatched closed mappings never reach authorization or Windows\n  ---\n  duration_ms: 122.8142\n  type: 'test'\n  ...\n# Subtest: a returned effect without the single-use durable barrier is failed as not started\nnot ok 6 - a returned effect without the single-use durable barrier is failed as not started\n  ---\n  duration_ms: 2023.041\n  type: 'test'\n  location: 'D:\\\\a\\\\strathex-switchyard\\\\strathex-switchyard\\\\apps\\\\windows-companion\\\\test\\\\windows-host-action-consumer.test.ts:266:1'\n  failureType: 'testCodeFailure'\n  error: 'Timed out waiting for missing-barrier settlement.'\n  code: 'ERR_TEST_FAILURE'\n  stack: |-\n    waitFor (D:\\a\\strathex-switchyard\\strathex-switchyard\\apps\\windows-companion\\test\\windows-host-action-consumer.test.ts:130:9)\n    runNextTicks (node:internal/process/task_queues:65:5)\n    listOnTimeout (node:internal/timers:567:9)\n    process.processTimers (node:internal/timers:541:7)\n    async TestContext.<anonymous> (D:\\a\\strathex-switchyard\\strathex-switchyard\\apps\\windows-companion\\test\\windows-host-action-consumer.test.ts:272:3)\n    async Test.run (node:internal/test_runner/test:1125:7)\n    async Test.processPendingSubtests (node:internal/test_runner/test:787:7)\n  ...\n# Subtest: an exception after the durable effect boundary is ambiguous and never replayed\nok 7 - an exception after the durable effect boundary is ambiguous and never replayed\n  ---\n  duration_ms: 155.7758\n  type: 'test'\n  ...\n# Subtest: restart converts a lost post-effect settlement into durable ambiguity without re-forwarding\nok 8 - restart converts a lost post-effect settlement into durable ambiguity without re-forwarding\n  ---\n  duration_ms: 129.7771\n  type: 'test'\n  ...\n# Subtest: restart retries only durable external completion after its queue settlement was already committed\nnot ok 9 - restart retries only durable external completion after its queue settlement was already committed\n  ---\n  duration_ms: 203.5294\n  type: 'test'\n  location: 'D:\\\\a\\\\strathex-switchyard\\\\strathex-switchyard\\\\apps\\\\windows-companion\\\\test\\\\windows-host-action-consumer.test.ts:341:1'\n  failureType: 'testCodeFailure'\n  error: |-\n    Expected values to be strictly equal:\n    \n    0 !== 1\n    \n  code: 'ERR_ASSERTION'\n  name: 'AssertionError'\n  expected: 1\n  actual: 0\n  operator: 'strictEqual'\n  stack: |-\n    TestContext.<anonymous> (D:\\a\\strathex-switchyard\\strathex-switchyard\\apps\\windows-companion\\test\\windows-host-action-consumer.test.ts:350:10)\n    async Test.run (node:internal/test_runner/test:1125:7)\n    async Test.processPendingSubtests (node:internal/test_runner/test:787:7)\n  ...\n"
+          }
+        ],
+        "originalBoundsPreserved": true,
+        "ownedCleanupComplete": true
+      },
+      {
+        "shard": 15,
+        "receiptId": "378797c9-9a0d-4a52-9ad0-b20e3b1f9184",
+        "receiptSha256": "1f779cabc59c935d4fbadcf5d301fe1d0bb21c4e2d667ad2e01d771e13c49847",
+        "totals": {
+          "required": 24,
+          "passed": 23,
+          "failed": 1,
+          "tests": 160,
+          "passedTests": 139,
+          "failedTests": 1,
+          "skippedTests": 20,
+          "cancelledTests": 0,
+          "todoTests": 0
+        },
+        "failures": [
+          {
+            "file": "scripts/windows-backend-shards.test.mjs",
+            "timeout": false,
+            "effectiveTimeoutMs": 45000,
+            "outputDigest": "59ab5c85450f1574ab0f253eb78c5b02ad95205a965a507b780d817dd7edcc9c",
+            "diagnostic": "TAP version 13\n# Subtest: native measured workloads fit evenly inside the unchanged preliminary job budget\nnot ok 1 - native measured workloads fit evenly inside the unchanged preliminary job budget\n  ---\n  duration_ms: 31.8229\n  type: 'test'\n  location: 'D:\\\\a\\\\strathex-switchyard\\\\strathex-switchyard\\\\scripts\\\\windows-backend-shards.test.mjs:8:1'\n  failureType: 'testCodeFailure'\n  error: 'The historical workload leaves too little room for setup: 1001542,1001541,1001544,1001545,1001543,1001545'\n  code: 'ERR_ASSERTION'\n  name: 'AssertionError'\n  expected: true\n  actual: false\n  operator: '=='\n  stack: |-\n    TestContext.<anonymous> (file:///D:[redacted].test.mjs:12:10)\n    Test.runInAsyncScope (node:async_hooks:228:14)\n    Test.run (node:internal/test_runner/test:1118:25)\n    Test.start (node:internal/test_runner/test:1015:17)\n    startSubtestAfterBootstrap (node:internal/test_runner/harness:358:17)\n  ...\n# Subtest: six Windows backend shards preserve every original file and exact manifest scenario once\nok 2 - six Windows backend shards preserve every original file and exact manifest scenario once\n  ---\n  duration_ms: 35.1128\n  type: 'test'\n  ...\n# Subtest: Windows CI requires every isolated backend shard and uses the pinned Python executable without PATH expansion\nok 3 - Windows CI requires every isolated backend shard and uses the pinned Python executable without PATH expansion\n  ---\n  duration_ms: 7.8636\n  type: 'test'\n  ...\n1..3\n# tests 3\n# suites 0\n# pass 2\n# fail 1\n# cancelled 0\n# skipped 0\n# todo 0\n# duration_ms 157.3624\n"
+          }
+        ],
+        "originalBoundsPreserved": true,
+        "ownedCleanupComplete": true
+      }
+    ]
+  },
+  "localRuns": [
+    {
+      "receiptId": "295741e4-366f-4608-898f-1331eb8bc527",
+      "sha256": "be40fc01c115b47544025aac362f6a984da25e222f55f51d14174d6230e02496",
+      "success": false,
+      "totals": {
+        "required": 2,
+        "passed": 1,
+        "failed": 1,
+        "tests": 18,
+        "passedTests": 17,
+        "failedTests": 1,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "originalBoundsPreserved": true,
+      "ownedCleanupComplete": true
+    },
+    {
+      "receiptId": "5ada98b6-542a-4128-be57-a9c95afdeebf",
+      "sha256": "c67e28725002a9468749d7081a684da8327766b0ddc0d64a4a92f63734502289",
+      "success": true,
+      "totals": {
+        "required": 5,
+        "passed": 5,
+        "failed": 0,
+        "tests": 59,
+        "passedTests": 59,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "originalBoundsPreserved": true,
+      "ownedCleanupComplete": true
+    }
+  ],
+  "scheduling": {
+    "workers": 8,
+    "loadsMs": [
+      773597,
+      773713,
+      773707,
+      773601,
+      773603,
+      773713,
+      773682,
+      773644
+    ],
+    "allowanceMs": 950000,
+    "jobDeadlineMinutes": 20,
+    "historicalCostsUnchanged": true,
+    "allGroupsExactlyOnce": true
+  },
+  "typecheckPassed": true,
+  "fixtureChange": "Two unbounded synthetic effect-entry waits now use the existing 2000ms observer. The 75ms coordination/effect bound, assertions, production code and 45000ms group bound are unchanged.",
+  "limitations": [
+    "Native host-action failure cause remains unresolved; local passing tests do not prove repair.",
+    "Native acceptance of eight-worker scheduling and current full packages remains pending.",
+    "ZIP archives were read only in memory; only bounded failed receipt JSON is retained locally."
+  ]
+}

@@ -1,0 +1,390 @@
+{
+  "schema": "switchyard-native-collector-acceptance/v1",
+  "sourceCommit": "db2463431cff362ce3ef0ab47ffe3c74080b4745",
+  "workflowRunId": 42462775822,
+  "workflowConclusion": "success",
+  "nativeCollector": {
+    "schema": "switchyard-complete-windows-verification/v1",
+    "scope": {
+      "platform": "win32",
+      "sourceCommit": "27067de5c888a91dae28069f724abad672dec27c",
+      "sourceTree": "f41fcffeb284bd7cdcdf8a14ee30d4876bbe2d29",
+      "nodeVersion": "24.14.0",
+      "nodeExecutable": "C:\\hostedtoolcache\\windows\\node\\24.14.0\\x64\\node.exe",
+      "nodeSha256": "63c259c81e5d472b5f11c8d506070130cb04a1ecf84b80377a34ed6ec9048088",
+      "pythonVersion": "3.13.3",
+      "pythonExecutable": "C:\\hostedtoolcache\\windows\\Python\\3.13.3\\x64\\python.exe",
+      "pythonSha256": "d87063e5597f257004c731b66c59c56c91038861c6877b1a3dca6b8c4e919125",
+      "helperSha256": "02bba6bb5679ff346b52918e9ede7bb4ba135b1858559094f925bb8acc0f0886",
+      "dotnetManifestSha256": "9387431f821c8af70705752e6d8a9d16ec88e374167bd415c742db3a319c0387"
+    },
+    "complete": true,
+    "distributed": true,
+    "manifestSha256": "cc4cd1d1eb5cea40b54b93bb53580141dfecb77be2536fdb9ae2ea92bc3d50da",
+    "totals": {
+      "required": 462,
+      "passed": 462,
+      "failed": 0,
+      "tests": 3156,
+      "passedTests": 2910,
+      "failedTests": 0,
+      "skippedTests": 246,
+      "cancelledTests": 0,
+      "todoTests": 0
+    },
+    "cohorts": [
+      {
+        "shard": "1",
+        "receiptId": "5bf4ae4a-a12f-441c-80d2-80b6d7143ecc",
+        "receiptSha256": "3b1618b3639fa0ac03d7286de4c99a1ef958b161ecbe06c5bf066d053bced3d3",
+        "totals": {
+          "required": 21,
+          "passed": 21,
+          "failed": 0,
+          "tests": 143,
+          "passedTests": 126,
+          "failedTests": 0,
+          "skippedTests": 17,
+          "cancelledTests": 0,
+          "todoTests": 0
+        }
+      },
+      {
+        "shard": "2",
+        "receiptId": "ba900217-c91e-4084-9b53-2cd026d17712",
+        "receiptSha256": "cc0f23dc6ecf9998beebc2132573152a1ae467edc7254eb6aaaf28c52e808997",
+        "totals": {
+          "required": 21,
+          "passed": 21,
+          "failed": 0,
+          "tests": 154,
+          "passedTests": 98,
+          "failedTests": 0,
+          "skippedTests": 56,
+          "cancelledTests": 0,
+          "todoTests": 0
+        }
+      },
+      {
+        "shard": "3",
+        "receiptId": "b463419a-93ae-4a79-891d-d9c433bdb2b1",
+        "receiptSha256": "be3807c79c10d5be67f749dbd95a0c958b5683895102614a9e4a0f577c164cd7",
+        "totals": {
+          "required": 23,
+          "passed": 23,
+          "failed": 0,
+          "tests": 165,
+          "passedTests": 141,
+          "failedTests": 0,
+          "skippedTests": 24,
+          "cancelledTests": 0,
+          "todoTests": 0
+        }
+      },
+      {
+        "shard": "4",
+        "receiptId": "4b0e05c2-9ca5-4eb8-a4bf-ddbd496a90c0",
+        "receiptSha256": "9a4c40ee2b1a7a8a09bfa2e1c412f2f22c45a7dbc19e9ca5189801e01c0bbbcd",
+        "totals": {
+          "required": 22,
+          "passed": 22,
+          "failed": 0,
+          "tests": 147,
+          "passedTests": 133,
+          "failedTests": 0,
+          "skippedTests": 14,
+          "cancelledTests": 0,
+          "todoTests": 0
+        }
+      },
+      {
+        "shard": "5",
+        "receiptId": "a6f143a0-db00-4536-b6ea-a78707fbb939",
+        "receiptSha256": "20fdff97a80e73ce8243c4469e81c23a289c398e18154b56a2b36740fee83016",
+        "totals": {
+          "required": 22,
+          "passed": 22,
+          "failed": 0,
+          "tests": 117,
+          "passedTests": 112,
+          "failedTests": 0,
+          "skippedTests": 5,
+          "cancelledTests": 0,
+          "todoTests": 0
+        }
+      },
+      {
+        "shard": "6",
+        "receiptId": "4d2ea7fb-ba1d-4f3d-87ef-d83864f5c34f",
+        "receiptSha256": "01d69706542e3a7e15c0afa54a08e631f56bbc177943245ae4233a2a457231c6",
+        "totals": {
+          "required": 19,
+          "passed": 19,
+          "failed": 0,
+          "tests": 152,
+          "passedTests": 142,
+          "failedTests": 0,
+          "skippedTests": 10,
+          "cancelledTests": 0,
+          "todoTests": 0
+        }
+      },
+      {
+        "shard": "7",
+        "receiptId": "d9e5274f-49fb-4e04-b27a-138d8e3a60f1",
+        "receiptSha256": "1b8ae554d6684909faeff7168e010f29a354d1aad9fd0fcfb06477135f0b1a46",
+        "totals": {
+          "required": 22,
+          "passed": 22,
+          "failed": 0,
+          "tests": 122,
+          "passedTests": 117,
+          "failedTests": 0,
+          "skippedTests": 5,
+          "cancelledTests": 0,
+          "todoTests": 0
+        }
+      },
+      {
+        "shard": "8",
+        "receiptId": "f7709b60-ab1f-45b1-9316-0ba39f501738",
+        "receiptSha256": "5ca79c00297baf14c007b31caf875f8e73e6a631d7dc2bfbc97081d09a109a6a",
+        "totals": {
+          "required": 22,
+          "passed": 22,
+          "failed": 0,
+          "tests": 149,
+          "passedTests": 136,
+          "failedTests": 0,
+          "skippedTests": 13,
+          "cancelledTests": 0,
+          "todoTests": 0
+        }
+      },
+      {
+        "shard": "9",
+        "receiptId": "bf475ce9-be68-4d04-b197-3be643883eb9",
+        "receiptSha256": "8af9a2a1785fe6c2b9c9f7566ca811609fff53db67ce65beb68c641a77fc2939",
+        "totals": {
+          "required": 22,
+          "passed": 22,
+          "failed": 0,
+          "tests": 138,
+          "passedTests": 131,
+          "failedTests": 0,
+          "skippedTests": 7,
+          "cancelledTests": 0,
+          "todoTests": 0
+        }
+      },
+      {
+        "shard": "10",
+        "receiptId": "c9300b8e-aa4f-4f70-bbe0-f92eacb26739",
+        "receiptSha256": "1103bdd84c3ac88de3693a137798e8e510d9578ccac347f3bbae146b626fdcd9",
+        "totals": {
+          "required": 23,
+          "passed": 23,
+          "failed": 0,
+          "tests": 183,
+          "passedTests": 181,
+          "failedTests": 0,
+          "skippedTests": 2,
+          "cancelledTests": 0,
+          "todoTests": 0
+        }
+      },
+      {
+        "shard": "11",
+        "receiptId": "12fbc649-ad21-460b-a369-decb2c03567b",
+        "receiptSha256": "a72790520e1d6de787a2146cca61ba43ef111e193e40c0dc002f95d6acb656d0",
+        "totals": {
+          "required": 21,
+          "passed": 21,
+          "failed": 0,
+          "tests": 159,
+          "passedTests": 154,
+          "failedTests": 0,
+          "skippedTests": 5,
+          "cancelledTests": 0,
+          "todoTests": 0
+        }
+      },
+      {
+        "shard": "12",
+        "receiptId": "b9fd7b12-f282-4323-b235-66d68778377c",
+        "receiptSha256": "1d809cb1b336cf2e365c6d185eebbf8012b60d72756408be6e5680ff2d425aa0",
+        "totals": {
+          "required": 23,
+          "passed": 23,
+          "failed": 0,
+          "tests": 141,
+          "passedTests": 120,
+          "failedTests": 0,
+          "skippedTests": 21,
+          "cancelledTests": 0,
+          "todoTests": 0
+        }
+      },
+      {
+        "shard": "13",
+        "receiptId": "bfcd1dab-af2a-40b1-8dbb-0693afc79f83",
+        "receiptSha256": "288a32369ddec88ec3286568acee390b89ba3803cc98388c013db93eb634ac7c",
+        "totals": {
+          "required": 23,
+          "passed": 23,
+          "failed": 0,
+          "tests": 135,
+          "passedTests": 132,
+          "failedTests": 0,
+          "skippedTests": 3,
+          "cancelledTests": 0,
+          "todoTests": 0
+        }
+      },
+      {
+        "shard": "14",
+        "receiptId": "d4b03437-6969-4065-b727-f369e317cce3",
+        "receiptSha256": "0d382b025433b02bfde924840d36e252a1376f7eeada7b87c26b4c3eced192b4",
+        "totals": {
+          "required": 23,
+          "passed": 23,
+          "failed": 0,
+          "tests": 176,
+          "passedTests": 153,
+          "failedTests": 0,
+          "skippedTests": 23,
+          "cancelledTests": 0,
+          "todoTests": 0
+        }
+      },
+      {
+        "shard": "15",
+        "receiptId": "a3ae3aad-29eb-45b4-957b-d16d41663fd5",
+        "receiptSha256": "29912eeeb8b91a0fba8d9a6f3628c8465486407e623270239562c249fa7b550b",
+        "totals": {
+          "required": 25,
+          "passed": 25,
+          "failed": 0,
+          "tests": 186,
+          "passedTests": 184,
+          "failedTests": 0,
+          "skippedTests": 2,
+          "cancelledTests": 0,
+          "todoTests": 0
+        }
+      },
+      {
+        "shard": "16",
+        "receiptId": "6407b5ef-f44a-4fb5-840c-805ebc614d65",
+        "receiptSha256": "83d371b610d3a5b9282b5e6b148b92e59235804b420a4f2249385388d31c46bd",
+        "totals": {
+          "required": 25,
+          "passed": 25,
+          "failed": 0,
+          "tests": 150,
+          "passedTests": 145,
+          "failedTests": 0,
+          "skippedTests": 5,
+          "cancelledTests": 0,
+          "todoTests": 0
+        }
+      },
+      {
+        "shard": "17",
+        "receiptId": "c1cba6f6-61ff-4e98-bffe-d2ecf640e2d3",
+        "receiptSha256": "6b3754818464592c6da291cfa6a88cd47286a5fcc14df3474365b6fae36d769e",
+        "totals": {
+          "required": 23,
+          "passed": 23,
+          "failed": 0,
+          "tests": 193,
+          "passedTests": 183,
+          "failedTests": 0,
+          "skippedTests": 10,
+          "cancelledTests": 0,
+          "todoTests": 0
+        }
+      },
+      {
+        "shard": "18",
+        "receiptId": "2e384038-53ba-4394-b47d-ae60a0df1426",
+        "receiptSha256": "c24019199649d9fdfa48e3091f8029f1ad2e56cec6bf03399f6f0e810c639cd9",
+        "totals": {
+          "required": 24,
+          "passed": 24,
+          "failed": 0,
+          "tests": 121,
+          "passedTests": 116,
+          "failedTests": 0,
+          "skippedTests": 5,
+          "cancelledTests": 0,
+          "todoTests": 0
+        }
+      },
+      {
+        "shard": "19",
+        "receiptId": "a3e7b2eb-80bb-4eef-9799-4e9dc116da28",
+        "receiptSha256": "f0aa66549967b56e9d82f2f32b2fd897600371946f5a68c9630716512c6ac932",
+        "totals": {
+          "required": 21,
+          "passed": 21,
+          "failed": 0,
+          "tests": 96,
+          "passedTests": 94,
+          "failedTests": 0,
+          "skippedTests": 2,
+          "cancelledTests": 0,
+          "todoTests": 0
+        }
+      },
+      {
+        "shard": "20",
+        "receiptId": "a00eec23-ed72-4ac3-9f4f-8cd00ad4ab1d",
+        "receiptSha256": "ece379912426e6aff38cddff83c5717ad0f579b0557ab5dc7995cc586695d3a1",
+        "totals": {
+          "required": 24,
+          "passed": 24,
+          "failed": 0,
+          "tests": 317,
+          "passedTests": 300,
+          "failedTests": 0,
+          "skippedTests": 17,
+          "cancelledTests": 0,
+          "todoTests": 0
+        }
+      },
+      {
+        "shard": "assembly",
+        "receiptId": "4e0d2018-6c4d-4f32-895f-018d5bcf18b2",
+        "receiptSha256": "379e56ebc777606691e53a1be5337e58c693368d6611742175db6623f4926ba6",
+        "totals": {
+          "required": 13,
+          "passed": 13,
+          "failed": 0,
+          "tests": 12,
+          "passedTests": 12,
+          "failedTests": 0,
+          "skippedTests": 0,
+          "cancelledTests": 0,
+          "todoTests": 0
+        }
+      }
+    ],
+    "originalCommandsBoundsSkipsAndCleanupVerified": true,
+    "packageAcceptance": false
+  },
+  "artifact": {
+    "id": 13611655341,
+    "archiveBytes": 2607,
+    "archiveSha256": "fb9b716a73a2677d3bcdd2c1cadf18b15daabebc652dea475f2c7318aacdb18e",
+    "summarySha256": "1e3a0b30fb0446a7c51a040eded01a21fbab04accfa7988e610b534332a177c0"
+  },
+  "sameOriginalManifestAsIndependentlyAudited4db5948": true,
+  "allSourceWorkerReceiptsIndependentlyReauditedLocally": false,
+  "separateFullPackageTestReceiptIndependentlyAudited": "windows-package-db24634-tests-summary.json",
+  "packageAcceptance": false,
+  "limitations": [
+    "This verifies the exact native collector, source/merge tree, unchanged manifest and cohort totals. Only workers 16/17 were additionally downloaded here; this does not claim a second independent local audit of all 21 source worker bodies.",
+    "The separate complete package test receipt independently passes all 462 groups, including the alias assertions. The later native helper compiler failure still blocks release acceptance."
+  ]
+}

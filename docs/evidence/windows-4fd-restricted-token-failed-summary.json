@@ -1,0 +1,23 @@
+{
+  "schema": "switchyard-windows-restricted-owner-failed-summary/v1",
+  "sourceCommit": "4fd8c287b42e7abdc5d41b5e3169e8f381f2e928",
+  "executionCommit": "6fc84bb1c4be1905d7e282196aa9df0354d5e08b",
+  "workflowRun": 42029707013,
+  "artifactId": 13416510790,
+  "archiveSha256": "ef268fec55926be81139e51aee95ab039b8206e3e4533020fe1a2ab1e12ed265",
+  "digestVerified": true,
+  "privateReceipt": "windows-restricted-owner-4fd.json",
+  "success": false,
+  "failurePhase": "restricted-primary-token",
+  "errorCategory": "InvalidOperationException",
+  "previousDiagnosticCode": 5385,
+  "previousDiagnosticCodeMeaning": "low 16 bits of managed HRESULT; not a Win32 API error",
+  "childCreated": false,
+  "hostOwnerChecksBeforeRestrictedProof": 8,
+  "earlierChecksDoNotAcceptRestrictedPrimaryProcess": true,
+  "protectedInstallationPreserved": true,
+  "restrictedFixtureRemoved": false,
+  "guestLaunched": false,
+  "ordinaryUserAccountAccepted": false,
+  "nextDiagnostic": "Finite token verification phases and distinct managed HRESULT/native API code; no relaxed check or elevated fallback."
+}

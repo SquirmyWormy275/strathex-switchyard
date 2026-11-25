@@ -1,0 +1,25 @@
+{
+  "schema": "switchyard-worker-start-refusal-native/v1",
+  "sourceCommit": "d15285bcf946f99c8aa3af7f714718bbddd7567b",
+  "executionCommit": "5b313f0043ce31103b7e320ef87c0d4e66085e37",
+  "sourceAndExecutionTree": "615765a44c5e3cb4fe131df3740c358d3fd2ff53",
+  "runId": 42258954607,
+  "jobId": 128034037796,
+  "artifactId": 13524615864,
+  "archiveBytes": 462,
+  "archiveSha256": "3872b63169fbbb71cdcfdaa7766e82dc1444aeebfc0bd18fd61f4bd76f305bac",
+  "privateReceipt": "windows-worker-start-refusal-d152-native.json",
+  "receipt": {
+    "testSourceSha256": "a1c96ce75d9873e83998005b1e3fd5c0b4b49e57fb3e1111e4b6f6ec6cf3c490",
+    "sourceCommit": "5b313f0043ce31103b7e320ef87c0d4e66085e37",
+    "success": true,
+    "schema": "switchyard-windows-suspended-worker-native/v1",
+    "failedTests": 0,
+    "skippedTests": 0,
+    "helperSha256": "6353c1b2006b4e10d5837f29b6829564168aa98ef13ec6021f01e7c9ae5edad2",
+    "passedTests": 8
+  },
+  "zipSavedLocally": false,
+  "installedChanged": false,
+  "restrictedOwnerAccepted": false
+}

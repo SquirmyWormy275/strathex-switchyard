@@ -4,7 +4,10 @@
   "description": "Mediated SXSY-B122 VS Code control surface.",
   "publisher": "SquirmyWormy275",
   "license": "UNLICENSED",
-  "repository": { "type": "git", "url": "https://github.com/SquirmyWormy275/strathex-switchyard.git" },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/SquirmyWormy275/strathex-switchyard.git"
+  },
   "private": true,
   "type": "commonjs",
   "version": "0.1.0",
@@ -26,6 +29,7 @@
     "onCommand:sxsy-b122.adoptTerminal",
     "onCommand:sxsy-b122.refreshManagedRegistry",
     "onCommand:sxsy-b122.showManagedSessions",
+    "onCommand:sxsy-b122.startBoundCodexThread",
     "onCommand:sxsy-b122.showQuickReference",
     "onCommand:sxsy-b122.connectProviderAdapter",
     "onCommand:sxsy-b122.installRepositoryRuntime",
@@ -114,7 +118,10 @@
     "onCommand:sxsy-b122.chord.sandbox.shift",
     "onCommand:sxsy-b122.chord.sandbox.alt",
     "onCommand:sxsy-b122.chord.sandbox.shift_alt",
-    "onCommand:sxsy-b122.chord.sandbox.ctrl_shift_alt"
+    "onCommand:sxsy-b122.chord.sandbox.ctrl_shift_alt",
+    "onCommand:switchyard.showSavedTasks",
+    "onCommand:switchyard.connectSavedTask",
+    "onCommand:switchyard.returnToConnectedTask"
   ],
   "contributes": {
     "commands": [
@@ -133,6 +140,10 @@
       {
         "command": "sxsy-b122.showManagedSessions",
         "title": "SXSY-B122: Show Managed Sessions"
+      },
+      {
+        "command": "sxsy-b122.startBoundCodexThread",
+        "title": "SXSY-B122: Start Task-Bound Codex Thread"
       },
       {
         "command": "sxsy-b122.showQuickReference",
@@ -489,6 +500,18 @@
       {
         "command": "sxsy-b122.chord.sandbox.ctrl_shift_alt",
         "title": "SXSY-B122: Quarantine"
+      },
+      {
+        "command": "switchyard.showSavedTasks",
+        "title": "Switchyard: Browse Saved Project Tasks"
+      },
+      {
+        "command": "switchyard.connectSavedTask",
+        "title": "Switchyard: Connect Saved Task in Terminal"
+      },
+      {
+        "command": "switchyard.returnToConnectedTask",
+        "title": "Switchyard: Return to Connected Terminal"
       }
     ]
   }

@@ -1,0 +1,30 @@
+{
+  "schema": "switchyard-editor-metadata-client/v1",
+  "basis": "2eeb2f9e758dda1b784f160e8ddc63495ce14682",
+  "receipt": "isolated-test-a93f80aa-c8c8-43c8-8f20-d627d40af456.json",
+  "groups": 6,
+  "passedTests": 63,
+  "allChildAndTreeCleanupVerified": true,
+  "typecheck": true,
+  "compiledReceipt": "editor-client-signed-compiled-1793944902747.json",
+  "commonJsBuildPassed": true,
+  "ownedCompiledOutputRemoved": true,
+  "sourceSha256": {
+    "apps/vscode-extension/src/studio-task-client.ts": "9267f4a72fe126c4566319b0a05f43b1ecb251bd71691277785ed094ba4a669b",
+    "tools/layout-studio/instance.mjs": "41c9dfbcb64c292981336f7a6068e4ef64d6c9151d67461ebbf12f80cde203fc",
+    "tools/layout-studio/serve.mjs": "2b39e80b883986cb9a45074d733a39985fafe9fb41aedaffe26ab76e21096f67"
+  },
+  "protocol": {
+    "route": "/instance/v1/editor-target",
+    "effect": "read-only-original-target-metadata",
+    "requestAndResponseAuthenticated": true,
+    "apiBearerTransmitted": false,
+    "selectedIdsCopiedAcrossAsyncWork": true,
+    "rawCredentialsInTargets": false
+  },
+  "limits": [
+    "The metadata consumer is implemented for Linux owned Unix task targets. Windows task-owner/editor composition remains separate unfinished work.",
+    "No command registration, terminal creation, native attachment acknowledgement or actual provider task load is added by this client.",
+    "The full 2eeb2f9 Linux run remains independent and does not include this later client. Installed application remains 4b5e3cc."
+  ]
+}

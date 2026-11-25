@@ -15,3 +15,23 @@ Creator: **cyber_engineer** (GeekHack), Twitter **@Mates_ENGINEER**.
 The included `ReadMe.txt` welcomes editing, remixing, and redistribution and requests creator credit for official distributions. It also instructs operators to print on A4 at actual size and verify the 15 mm reference box. The example PDF includes some Remix Icon artwork under the Apache License; the generated SXSY-B122 legend artwork does not copy those icons.
 
 No standard SPDX license identifier is asserted for this package. Preserve this README, the supplied instructions, the visible PDF notices, and the root `ATTRIBUTION.md` entry whenever redistributing it or geometry-derived sheets.
+
+`pure-template.svg` is a vector-only conversion of the retained blank PDF, made
+with Poppler `pdftocairo` 26.10.0. It preserves the entire page, cut lines,
+calibration box and creator notices for the app's profile-derived print export.
+SHA-256: `06bb168f1cf6b7cf4d2a84041626d032a62d41b41e1dff2377fcaa32355ec2b3`.
+Regenerate with `pdftocairo -svg pure-template.pdf pure-template.svg`; review the
+result and update the checked hash deliberately if the converter changes bytes.
+This source geometry does not establish a fit on an untested cap or keyboard.
+
+`template-faces.json` records the 18 compact and 15 full variant face rectangles
+directly from the retained SVG's axis-aligned rectangle paths, in SVG points.
+The application insets its ink by 0.5 points on every edge, preserving source
+outlines and clip cuts. These are template coordinates, not keyboard pitch or
+a measurement of the user's caps.
+
+The canonical B122 generator also matches all 33 faces back to the literal SVG
+and derives its sixty full-insert flaps and side clip cuts from that same pinned
+source. Its colored ink stays inside those boundaries; each standalone insert
+retains the sixteen original face/flap/clip paths at their actual point scale.
+No new physical-fit or third-party artwork-license claim is added.

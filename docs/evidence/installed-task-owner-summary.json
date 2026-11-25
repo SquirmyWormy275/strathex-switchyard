@@ -1,0 +1,33 @@
+{
+  "schema": "switchyard-installed-task-owner-summary/v1",
+  "sourceCommit": "4b5e3cc250ec57f290924c63508a6cdfa11526d8",
+  "applicationRelease": "7b20609923c073615d23e18cd1cd3058c245ac568fd0d0f517778698a6120892",
+  "success": true,
+  "updateReceipt": "assignment-legends-1793942323521.json",
+  "updateChecks": 6,
+  "ownerMetadataReceipt": "installed-task-owner-metadata-1793942342073.json",
+  "ownerMetadataChecks": 7,
+  "existingMetadataReceipt": "installed-copilot-journal-metadata-1793942364772.json",
+  "existingMetadataChecks": 7,
+  "cleanupReceipt": "installed-task-owner-cleanup-1793942364564.json",
+  "datedLauncherRecoveryBeforeAndAfterHashesVerified": true,
+  "originalWorkspaces": 54,
+  "selectedSealedStatePreserved": true,
+  "privateEndpointPreserved": true,
+  "homeSha256": "20ba0095a6b9650046df34541872aa7e0a7cdc7db5182f065abb009127c6c130",
+  "frontendDigest": "24100ef601b810efb0cda95e4fe0842d2944560734b02c4cf482c25e19150543",
+  "nativeProviderStarts": 0,
+  "nativeTaskLoads": 0,
+  "modelPromptsSubmitted": 0,
+  "workspaceCreated": false,
+  "keyboardOpened": false,
+  "microphoneOpened": false,
+  "ownedBundleRemoved": true,
+  "runtimeDownloaded": false,
+  "bundleBytes": 5077159,
+  "limits": [
+    "Installed metadata/refusal acceptance only; no actual provider task loading or IDE attachment.",
+    "Earlier c5d2d28 Supply Chain/Release native scanner demonstrations remain source-specific.",
+    "The complete Linux checkpoint is 74d0d04; later routed loading has separate focused and installed evidence."
+  ]
+}

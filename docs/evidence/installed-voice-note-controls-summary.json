@@ -1,0 +1,203 @@
+{
+  "schema": "switchyard-installed-voice-note-controls-summary/v1",
+  "at": "2026-11-09T04:59:37.892777+00:00",
+  "readback": {
+    "schema": "switchyard-voice-notes-installed-readback/v1",
+    "sourceCommit": "4e3feb45dc899393db7403d108c18c1b57d7e48d",
+    "release": "dba8ce5b76b2610e9dbf77482d9f773fd59e0fc2ff84640c65442213d8b8f423",
+    "previous": "447f05ef97fad12a72686f226d65a2e07dbc5ae5d44c68b2d17760dd42d1e0c0",
+    "frontend": "1f1f3d1f7e9d3613f49d6da592f6daeaeb64ace41e1e6301db817c09c86503d1",
+    "assets": 36,
+    "files": 572,
+    "bytes": 5027703,
+    "workspaces": 54,
+    "semanticSnapshotsPreserved": true,
+    "sealedByteIdentical": 53,
+    "allConversationSemanticsPreserved": true,
+    "conversationCount": 3,
+    "selectionPreserved": true,
+    "allModesPreserved": true,
+    "privateAccessChangedForNewFrontend": true,
+    "datedBackupVerified": true,
+    "managedLauncherReadbackVerified": true,
+    "currentAndOneRollbackOnly": true,
+    "ready": true,
+    "checks": [
+      "served index.html",
+      "served app.mjs",
+      "served model.mjs",
+      "served workspace.mjs",
+      "served connection.mjs",
+      "served vial-snapshot.mjs",
+      "served voice-ui.mjs",
+      "served observation-ui.mjs",
+      "served portable-ui.mjs",
+      "served scanner-ui.mjs",
+      "served feed-ui.mjs",
+      "served conversation-ui.mjs",
+      "served copilot-ui.mjs",
+      "served task-ui.mjs",
+      "served authority-ui.mjs",
+      "served execution-ui.mjs",
+      "served client-ui.mjs",
+      "served role-ui.mjs",
+      "served suite-ui.mjs",
+      "served workflow.mjs",
+      "served device-diagnostic-ui.mjs",
+      "served device-settings-ui.mjs",
+      "served vial-settings.mjs",
+      "served vial-keycodes.mjs",
+      "served vial-rules.mjs",
+      "served device-ui.mjs",
+      "served shell.mjs",
+      "served home.mjs",
+      "served catalog.mjs",
+      "served geometry.mjs",
+      "served keyboard-view.mjs",
+      "served model-f-catalog.json",
+      "served style.css",
+      "served sample-info.json",
+      "served sample-keymap.json",
+      "served sample-study-report.json",
+      "metadata coding/authority/list",
+      "metadata coding/execution/list",
+      "metadata coding/scanner-save/list",
+      "metadata host/scanner-fixtures/list",
+      "native app metadata reads two fixed Linux targets without native observation",
+      "unauthenticated native app catalog refused",
+      "native catalog rejects effect fields",
+      "workspace-bound native focus rejects role or arbitrary targets before effects",
+      "saved agent inventory reads metadata without contacting adapters",
+      "unauthenticated saved inventory refused",
+      "revocation review refuses absent saved identity without enrollment or commands",
+      "uncertainty review refuses absent original claim without replay",
+      "saved voice inventory is readable without microphone or recognizer execution",
+      "unauthenticated voice correction refused",
+      "voice correction refuses absent selected note",
+      "voice deletion refuses absent selected note"
+    ],
+    "hardwareOpened": false,
+    "nativeProviderRequests": 0,
+    "microphoneOpened": false,
+    "localRecognizerStarted": false,
+    "visualAcceptance": false
+  },
+  "finalState": {
+    "schema": "switchyard-voice-notes-installed-final-state/v1",
+    "release": "dba8ce5b76b2610e9dbf77482d9f773fd59e0fc2ff84640c65442213d8b8f423",
+    "workspaces": 54,
+    "allSemanticSnapshotsPreserved": true,
+    "allModesAndConversationsPreserved": true,
+    "sealedByteIdentical": 53,
+    "selectionPreserved": true,
+    "verifiersCompleted": 8
+  },
+  "metadataReceipts": [
+    {
+      "name": "installed-agent-security-metadata-1794200340025.json",
+      "sha256": "b6ac87b6fd7eaacd4bc7fae061c74c7ffa9d8101db7bac0b328925e9779634a5",
+      "checks": 30
+    },
+    {
+      "name": "installed-npm-archive-metadata-1794200340063.json",
+      "sha256": "0bfb89be812021fd2d25a221a7196acaa6012d14cc6038eb4bbb0015208ac1db",
+      "checks": 3
+    },
+    {
+      "name": "installed-python-inventory-metadata-1794200340113.json",
+      "sha256": "8eed6c1375ad4c4dbd2d5bcf52249a2be8549721c5918e3910a16b83df8ada02",
+      "checks": 14
+    },
+    {
+      "name": "installed-cargo-inventory-metadata-1794200340187.json",
+      "sha256": "d472731e857087a66c9d7c72f7e73e15816e08825a2f7ae9d9035a7a8d729fa9",
+      "checks": 10
+    },
+    {
+      "name": "installed-workflow-identity-metadata-1794200340887.json",
+      "sha256": "aba5ca017bb1ca5233579809e04949deec1de1b4cbea16856d481df19b1f19bb",
+      "checks": 10
+    },
+    {
+      "name": "installed-task-owner-metadata-1794200355829.json",
+      "sha256": "c1754531721e365e746043b1d96ae3e256cfc2f9306566db87cb92e40d386833",
+      "checks": 18
+    },
+    {
+      "name": "installed-copilot-journal-metadata-1794200356090.json",
+      "sha256": "6c30984a2b3a5fc655792cf55b86d1df4ca339bb7e5e09c95f3fd16826cd3c8a",
+      "checks": 7
+    },
+    {
+      "name": "installed-signed-intent-metadata-1794200356346.json",
+      "sha256": "0c8439d3b329cf8923072fec16d7b55b00618aa964d5d7207f84f68569af14e9",
+      "checks": 8
+    }
+  ],
+  "metadataChecks": 100,
+  "exactModuleHashes": 58,
+  "workflowsVerified": 57,
+  "sourceProvenance": "voice-ui-source-summary.json",
+  "cleanup": {
+    "schema": "switchyard-voice-notes-prepared-cleanup/v1",
+    "release": "dba8ce5b76b2610e9dbf77482d9f773fd59e0fc2ff84640c65442213d8b8f423",
+    "dev": "58",
+    "ino": "34246453",
+    "files": 573,
+    "bytes": 5131212,
+    "manifestSha256": "f3e8ce9e17f98e69910aae14bee6ed56151e5da60f3d7902c9bb8ab0fd4b51b2",
+    "allPayloadHashesVerified": true,
+    "installedReadbackPassed": true,
+    "reason": "Remove only the exact owned prepared copy after installed assets, state and all eight metadata verifiers pass.",
+    "removed": true
+  },
+  "limitations": [
+    "Browser control remains blocked before inspection; visual/responsive acceptance is not inferred from HTTP.",
+    "No actual native account/task/model, HID, microphone or IDE operation occurred.",
+    "Latest full Linux/Windows acceptance belongs to separately recorded earlier sources.",
+    "Exact interactive task attachment remains unfinished implementation; current complete Linux/Windows and native host-action follow-up remain separate."
+  ],
+  "installationRegression": {
+    "receiptId": "07aadf41-05ca-4e69-8e06-b39e2da0da8c",
+    "sha256": "66eb8d048ad0627b13003006cfe087301cbb4c4d0e09e48e8ef8c035f8eaba60",
+    "success": true,
+    "totals": {
+      "required": 18,
+      "passed": 18,
+      "failed": 0,
+      "tests": 29,
+      "passedTests": 29,
+      "failedTests": 0,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    },
+    "files": [
+      "scripts/verify-copilot-journal-host.test.mjs",
+      "deployment/suite/release.test.mjs",
+      "deployment/suite/installation.test.mjs",
+      "deployment/suite/installation.test.mjs",
+      "deployment/suite/installation.test.mjs",
+      "deployment/suite/installation.test.mjs",
+      "deployment/suite/installation.test.mjs",
+      "deployment/suite/installation.test.mjs",
+      "deployment/suite/installation.test.mjs",
+      "deployment/suite/installation.test.mjs",
+      "deployment/suite/installation.test.mjs",
+      "deployment/suite/installation.test.mjs",
+      "deployment/suite/installation.test.mjs",
+      "deployment/suite/installation.test.mjs",
+      "deployment/suite/installation.test.mjs",
+      "deployment/suite/installation.test.mjs",
+      "deployment/suite/installation.test.mjs",
+      "deployment/suite/installation.test.mjs"
+    ],
+    "originalBoundsPreserved": true,
+    "ownedCleanupComplete": true
+  },
+  "verificationSelectionCorrection": {
+    "originalAttempt": "A nonexistent scripts/verify-signed-intent-host.test.mjs filename caused the manifest selection guard to refuse before any tests. Diagnostic retained privately.",
+    "testGroupsStarted": 0,
+    "correction": "Use the original registered installation/release/Copilot verifier groups. Signed intent separately passes its eight actual installed metadata checks."
+  }
+}

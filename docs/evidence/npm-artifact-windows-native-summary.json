@@ -1,0 +1,30 @@
+{
+  "schema": "switchyard-npm-artifact-windows-native/v1",
+  "sourceCommit": "f0aacab94f94686edac0e130b98f0dce4d01aafc",
+  "executionCommit": "aa585ce3870b4e6f7c38fd7f2e80fe420c5edcaa",
+  "sourceAndExecutionTree": "f83716216fa029cc464e94582e19b7b485eb7f02",
+  "runId": 42239618186,
+  "jobId": 127966680430,
+  "artifactId": 13515347379,
+  "archiveBytes": 1002,
+  "archiveSha256": "5f3b2159fcb46cb3bbeaff531f49bd6d5ccd0c1c8b8cf49ce6729ae4badbd803",
+  "zipSavedLocally": false,
+  "privateReceipt": "windows-artifact-f0-native.json",
+  "totals": {
+    "required": 1,
+    "passed": 1,
+    "failed": 0,
+    "tests": 10,
+    "passedTests": 8,
+    "failedTests": 0,
+    "skippedTests": 2,
+    "cancelledTests": 0,
+    "todoTests": 0
+  },
+  "originalTimeoutMs": 300000,
+  "durationMs": 188142,
+  "allChildAndTreeCleanupVerified": true,
+  "guestExecution": "controlled double",
+  "actualLinuxCases": "two declared skips on Windows",
+  "installedAcceptance": false
+}

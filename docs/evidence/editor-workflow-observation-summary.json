@@ -1,0 +1,44 @@
+{
+  "schema": "switchyard-editor-workflow-observation/v1",
+  "basis": "8168d4e81b9b92ed13755e99cf5217c56ed4231a",
+  "sourceSha256": {
+    "tools/layout-studio/editor-observation.mjs": "c91f2c93a68f61569f32ef53c4b9558265d9230943e412c813540170b0f013e9",
+    "tools/layout-studio/editor-observation.test.mjs": "4d42e0a59f37aac501a7af5d2c36bead84c0e75164fd22042c3f541c6abe0afc",
+    "tools/layout-studio/coding-editor-journal.mjs": "af74132456f5f7db3fcc094e8276474a991fd1c8cb9edd1c7b48f5e09120a9f7",
+    "tools/layout-studio/coding-editor-journal.test.mjs": "215c1a729feb1686f75a4abe776561eeb42c1cddc683323e7fb471ab702f1ed3",
+    "tools/layout-studio/coding-editor-connections.test.mjs": "c834b9a5c686728467616ed7cdf2435067ce810c25643da7dbe7d87031a3e593",
+    "tools/layout-studio/suite.mjs": "0d7999853d51b3859ee5dc7df81780b01bd7e46560352cb1bb8a155e48e4de0c",
+    "scripts/run-isolated-tests.mjs": "a1803cc7176e40d841904a512e3db4da11d72ecde52fc03da036e3942e516180"
+  },
+  "receipt": "isolated-test-55f9dae3-5b0f-4e0f-aebf-a7d08c4f16c8.json",
+  "totals": {
+    "required": 7,
+    "passed": 7,
+    "failed": 0,
+    "tests": 84,
+    "passedTests": 84,
+    "failedTests": 0,
+    "skippedTests": 0,
+    "cancelledTests": 0,
+    "todoTests": 0
+  },
+  "allChildAndTreeCleanupVerified": true,
+  "ownedEmptyTestParentRemoved": true,
+  "typecheckPassed": true,
+  "demonstration": "Real encrypted state and Linux carriers, controlled provider and terminal: reserved, acknowledged, stopped events share one private digest. Exact retirement and private field omission verify.",
+  "retainedFailedReceipts": [
+    "isolated-test-cf9419c5-19af-47ce-9de6-0ef6f6ff54e2.json",
+    "isolated-test-38f2449d-525f-4083-a576-98966edaa8be.json"
+  ],
+  "fixtureCorrection": "Seeded test recordings require updatedAt for existing retention. Production pruning was unchanged.",
+  "liveAccountUsed": false,
+  "modelPromptSubmitted": false,
+  "installedAcceptance": false,
+  "nativeWindowsAcceptance": false,
+  "frontendChanged": false,
+  "limits": [
+    "History does not establish live IDE attachment, completed tasks or measured savings.",
+    "New source selection has backend API support; frontend exposure is unfinished.",
+    "Complete Linux 0ad510e predates these focused changes."
+  ]
+}

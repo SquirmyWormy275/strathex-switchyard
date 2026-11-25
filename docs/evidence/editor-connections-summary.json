@@ -1,0 +1,46 @@
+{
+  "schema": "switchyard-editor-connection-composition/v1",
+  "basis": "73520e86973cd0a9990f535cf8eebdc0d1c5ca61",
+  "sourceSha256": {
+    "tools/layout-studio/coding-editor-connections.mjs": "2feb53e7ec3fa81c2463872a419efdd3624d1d1f5831e99b2d7e375ebf45b0c1",
+    "tools/layout-studio/coding-editor-connections.test.mjs": "9828cc4fdb4bb6a43115cd62d9f0587d2a7f813bf52610aecb8d9de7f339469b",
+    "tools/layout-studio/coding-editor-journal.mjs": "09bddbbd8a0a7010db3763b494ba5499f73480f7f1aa6993608bed8af4e57a41",
+    "tools/layout-studio/coding-task-owners.mjs": "ca6e6a76b06466a0a8159291028fe0ebcbb54062336d940484b4fb0687f5b04d",
+    "tools/layout-studio/suite.mjs": "a76dc4f3933b1b54144a73dd9ba99a36d4a81a5cd6ad691914c931de2fb2965d"
+  },
+  "receipt": "isolated-test-fa0c35e7-9e07-4ffc-9d8a-ab7dc47727ec.json",
+  "groups": 5,
+  "passed": 57,
+  "allChildAndTreeCleanupVerified": true,
+  "typecheckPassed": true,
+  "javascriptParseChecksPassed": true,
+  "packageImportPassed": true,
+  "implemented": [
+    "The internal connection service reserves one consumed review, durably records the exact intended directory before mkdir, pins its private parent, and records actual upstream/carrier/peer identities before each next step.",
+    "Original task-owner lookup rechecks its acknowledged load and account after bridge registration. The relay uses the dedicated original upstream with account samples bracketing the one exact resume.",
+    "The protocol acknowledgement is now retained in real encrypted protected state before delivery. Duplicate hosts receive no second endpoint. Private journal records are omitted from ordinary Studio snapshots.",
+    "Disconnect, explicit stop, workspace stop and shutdown fence admission, join pending work and retire exact bridges/carriers/sockets/directories. A substituted socket is preserved and cleanup remains uncertain."
+  ],
+  "demonstration": {
+    "realEncryptedStoreAndKernelLeases": true,
+    "realLinuxIngressAndPinnedUpstream": true,
+    "syntheticProviderAndTerminal": true,
+    "originalPeerProcessVerified": true,
+    "acknowledgementDurablyRecorded": true,
+    "successfulExactRetirement": true,
+    "liveNativeAccountOrTaskEffects": false
+  },
+  "retainedFailure": {
+    "receipt": "isolated-test-a58e8936-7cfe-46ec-a6ad-a3454b457dc5.json",
+    "passedGroups": 3,
+    "failedGroups": 2,
+    "cause": "A missing object-method delimiter in the new task-owner method prevented owner and package imports. Corrected before publication; the final complete five-group cohort passes.",
+    "allChildAndTreeCleanupVerified": true
+  },
+  "limits": [
+    "Signed routes, typed client responses and retained Terminal activation are not wired yet. This internal composition is not exposed as an active editor command.",
+    "Interrupted-host recovery and startup failures with unconfirmed carrier ownership remain unfinished; unknown resources are preserved, never adopted or broadly deleted.",
+    "Native TUI wire/capability compatibility and Codex 0.167.0 runtime compatibility remain unaccepted. No real account, thread, model, browser or keyboard action ran.",
+    "The earlier full Linux 072e066 checkpoint excludes this later composition. Windows restricted helper startup remains separately failed."
+  ]
+}

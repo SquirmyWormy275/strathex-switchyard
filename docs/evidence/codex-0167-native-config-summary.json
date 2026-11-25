@@ -1,0 +1,43 @@
+{
+  "schema": "switchyard-codex-production-config-summary/v1",
+  "sourceCommit": "5033c18a2085cbe8fc045d642f50b4ed35516dff",
+  "executableSha256": "cdcb45aaa01d0f14e298985e09465aebccd47f64ecd298aea44814af7b62bbda",
+  "observation": {
+    "schema": "switchyard-isolated-codex-config/v1",
+    "version": "0.167.0",
+    "featuresVerified": 42,
+    "methods": [
+      "initialize",
+      "initialized",
+      "config/read"
+    ],
+    "providerExited": true,
+    "networkNamespaceIsolated": true,
+    "accountRequests": 0,
+    "threadRequests": 0,
+    "modelPrompts": 0
+  },
+  "restrictions": [
+    "Existing 34 design feature exclusions plus all seven new 0.167 flags and deferred_tool_world_state are explicitly false.",
+    "Empty owned HOME and CODEX_HOME, hidden host homes/configuration, no network namespace access, no account or thread request."
+  ],
+  "cleanup": {
+    "originalGuardianAndTreeExitVerified": true,
+    "ownedFilesRemoved": 66,
+    "ownedBytesRemoved": 3053593,
+    "ownedRootAndMarkerRemoved": true
+  },
+  "runtimeAdmissionChanged": true,
+  "productionArgumentBuilderVerified": true,
+  "productionHelloAndConfigValidatorsVerified": true,
+  "limitations": [
+    "Effective configuration readback is accepted only in the isolated account-free environment.",
+    "Live account/task/model and native TUI protocol acceptance remain separate.",
+    "Production argument construction and actual hello/config validators execute with the current source. Earlier isolated diagnostics remain separately recorded."
+  ],
+  "receipt": {
+    "name": "codex-167-production-probe-result.json",
+    "sha256": "b0594e790b0c9152618971176007c32663f8a55c3ee5c7e45b70598659df3b4d"
+  },
+  "documentation": "https://learn.chatgpt.com/docs/app-server"
+}

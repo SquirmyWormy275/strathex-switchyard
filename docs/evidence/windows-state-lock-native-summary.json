@@ -1,0 +1,126 @@
+{
+  "schema": "switchyard-state-lock-native-summary/v1",
+  "sourceCommit": "71614e08baa51387ce0d9737afbb4f9255acebb2",
+  "executionCommit": "27c8a1dbdd5ef13162ed67aaaff2f424c440fce6",
+  "sourceAndExecutionTree": "b4d91b36ffe7d84d3aa0fc378b522be7f84281c8",
+  "mergeParents": [
+    "d8af73553de1b61402520aad1fe0c9fbad2e8c5a",
+    "71614e08baa51387ce0d9737afbb4f9255acebb2"
+  ],
+  "runId": 42195888793,
+  "restrictedJobId": 127819303156,
+  "artifact": {
+    "id": 13492300775,
+    "bytes": 4072,
+    "sha256": "bd1b1f6509b8a9db1c70110d7c8c220abfdba9fef846379631711686e6605b4e",
+    "privateReceipt": "windows-state-lock-716-native.json",
+    "zipSavedLocally": false
+  },
+  "node": {
+    "waitResult": 0,
+    "exitCode": 2,
+    "resultAvailable": true,
+    "childReportedSuccess": false,
+    "ownerReportedSuccess": false,
+    "completedChecks": 0,
+    "failedPhase": "private-state-initialize",
+    "failureCategory": "Error",
+    "stateLockFailure": {
+      "schema": "switchyard-state-lock-failure/v1",
+      "kind": "child-exit",
+      "phase": "worker-startup",
+      "progress": "not-observed",
+      "exitCode": 3221225794,
+      "signal": null,
+      "spawnCode": null
+    }
+  },
+  "standardIo": {
+    "schema": "switchyard-restricted-child-stdio/v1",
+    "standardHandles": 3,
+    "inheritanceRestricted": true,
+    "stdinEof": true,
+    "stdoutBytes": 0,
+    "stderrBytes": 0,
+    "outputBounded": true,
+    "handlesClosedVerified": true,
+    "drainsCompleted": true,
+    "stderr": {
+      "category": "empty",
+      "function": null,
+      "code": null,
+      "sourceFile": null,
+      "sourceLine": null
+    }
+  },
+  "selfTokenQueryAcl": [
+    {
+      "schema": "switchyard-child-self-query-acl/v1",
+      "scope": "cold-probe",
+      "status": "verified",
+      "grantedMask": 8,
+      "changeRequested": true,
+      "beforeAclSha256": "2073f05bed0d0538f53e13ee6d7fbc314c6d23767e942bb1d31d6dac4911f975",
+      "afterAclSha256": "110ead88e547a435eed84aa555b28ed032612d21aa99b4a4a91ea7dc62246612",
+      "originalAcesPreserved": true,
+      "exactQueryEntryVerified": true,
+      "tokenRestrictionsRechecked": true,
+      "handlesClosedVerified": true,
+      "buffersClearedVerified": true
+    },
+    {
+      "schema": "switchyard-child-self-query-acl/v1",
+      "scope": "node-owner",
+      "status": "verified",
+      "grantedMask": 8,
+      "changeRequested": true,
+      "beforeAclSha256": "2073f05bed0d0538f53e13ee6d7fbc314c6d23767e942bb1d31d6dac4911f975",
+      "afterAclSha256": "110ead88e547a435eed84aa555b28ed032612d21aa99b4a4a91ea7dc62246612",
+      "originalAcesPreserved": true,
+      "exactQueryEntryVerified": true,
+      "tokenRestrictionsRechecked": true,
+      "handlesClosedVerified": true,
+      "buffersClearedVerified": true
+    }
+  ],
+  "selfTokenAccess": {
+    "query": {
+      "opened": true,
+      "error": 0,
+      "closeError": 0,
+      "handlesClosedVerified": true
+    },
+    "queryDuplicate": {
+      "opened": false,
+      "error": 5,
+      "closeError": null,
+      "handlesClosedVerified": true
+    },
+    "queryDuplicateImpersonate": {
+      "opened": false,
+      "error": 5,
+      "closeError": null,
+      "handlesClosedVerified": true
+    }
+  },
+  "separateJobs": {
+    "filesystem": {
+      "id": 127819303157,
+      "conclusion": "success"
+    },
+    "nativeSetup": {
+      "id": 127819303414,
+      "conclusion": "success"
+    }
+  },
+  "failedFixturePreserved": true,
+  "limits": [
+    "Original Node starts and reaches private-state-initialize; zero of eight owner checks complete. The exact state-lock helper exits with 3221225794 (0xc0000142) during worker-startup, with no fixed entry progress observed.",
+    "The diagnostic does not identify the DLL or denied resource. Do not infer that the descendant token descriptor matches its parent or widen rights to make this check pass.",
+    "The original query-only correction remains verified and duplicate/impersonation remain denied. No privilege/SID/account/runtime or broader ACL fallback is used.",
+    "This is failed native software validation. Separate filesystem/setup success does not establish a complete restricted owner, guest/UAC/ordinary-user journey."
+  ],
+  "references": [
+    "https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-erref/596a1078-e883-4972-9bbc-49e60bebca55"
+  ]
+}

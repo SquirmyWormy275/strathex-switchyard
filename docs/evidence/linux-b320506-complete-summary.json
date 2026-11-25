@@ -1,0 +1,55 @@
+{
+  "schema": "switchyard-full-linux-source-summary/v1",
+  "sourceCommit": "b320506c66119852363e41f14bd9b7df95619956",
+  "sourceTree": "0f8738a27bd76312c0dd2c400f53cf71add57261",
+  "verificationReceipt": "isolated-test-4676464d-91e8-4899-8c95-1e5dc5c2eed9.json",
+  "verificationReceiptSha256": "aa7d1be51467c7090e8e52c66528efece42ea666a16007582e8e3ac1d2d77ef4",
+  "success": true,
+  "totals": {
+    "required": 328,
+    "passed": 328,
+    "failed": 0,
+    "tests": 2065,
+    "passedTests": 2049,
+    "failedTests": 0,
+    "skippedTests": 16,
+    "cancelledTests": 0,
+    "todoTests": 0
+  },
+  "allChildAndTreeCleanupVerified": true,
+  "cleanupReceipt": "linux-b320506-cleanup-1794032547932.json",
+  "cleanup": {
+    "schema": "switchyard-owned-full-linux-cleanup/v1",
+    "sourceCommit": "b320506c66119852363e41f14bd9b7df95619956",
+    "verificationReceipt": "isolated-test-4676464d-91e8-4899-8c95-1e5dc5c2eed9.json",
+    "generatedFiles": 788,
+    "generatedBytes": 11809393,
+    "generatedDirectories": [
+      "apps/linux-companion/dist",
+      "apps/provider-adapter-host/dist",
+      "apps/vscode-extension/dist",
+      "apps/windows-companion/dist",
+      "packages/protocol/dist"
+    ],
+    "dependencyAliasCount": 9,
+    "trackedTreeClean": true,
+    "testChildrenExited": true,
+    "testParentEmpty": true,
+    "rootIdentityVerified": true,
+    "testParentIdentityVerified": true,
+    "worktreeRemoved": true,
+    "rootRemoved": true,
+    "testParentRemoved": true,
+    "markerRemoved": true,
+    "otherWorktreesPreserved": true,
+    "dependencyAliasIdentityAndTargetVerified": true,
+    "cleanupPlanSha256": "8fc95ea9cc3cb47a216bba71ad4f4904e2227b064c407eb3f1d79a734c3f8887"
+  },
+  "providersAndWindowsGuestsDoubledWhereDeclared": true,
+  "installedChanged": false,
+  "originalManifestCommandsBoundsAndSkipsVerified": true,
+  "limitations": [
+    "Windows scanner saving was implemented after this source and has separate focused evidence; native Windows acceptance remains pending.",
+    "Interactive Windows, provider account and physical hardware acceptance remain separate."
+  ]
+}

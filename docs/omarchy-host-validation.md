@@ -1,5 +1,10 @@
 # Omarchy workstation validation — 2026-08-31 PDT
 
+> Historical August snapshot. The October 2026 Linux source-lane repair is
+> recorded in [the Linux software audit](linux-software-completion-audit.md).
+> The August missing-`espeak-ng` and namespace observations should not be
+> treated as current host state.
+
 This record is host-specific pre-hardware evidence from the real Omarchy workstation used to continue `feat/omarchy-capability-foundation`. It is not hardware, production, or acceptance evidence and does not change the canonical B122 map.
 
 ## Capability audit

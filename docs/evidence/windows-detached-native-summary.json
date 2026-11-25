@@ -1,0 +1,24 @@
+{
+  "schema": "switchyard-detached-restricted-child-native/v1",
+  "source": "7a16bfe5a96ec6ce2e59ee9229aa5c3cbb9aedeb",
+  "executionMerge": "fb8ca69643af29f3d95abd7264189e241f9a9eb7",
+  "runId": 42159918611,
+  "jobId": 127703173494,
+  "artifactId": 13476705993,
+  "archiveSha256": "c19bc050f563508aeac6bcb96e96fa5d4eb6300942288cd0fe0e8abb8a56c124",
+  "receipt": "windows-restricted-detached-7a16-native.json",
+  "childExit": {
+    "waitResult": 0,
+    "exitCode": 134,
+    "resultAvailable": false
+  },
+  "success": false,
+  "failedFixturePreserved": true,
+  "workflowJobsPassed": 58,
+  "workflowJobsTotal": 59,
+  "limits": [
+    "Detached startup changes the observed exit from 3221225794 to 134; this is not successful startup or proof of the cause.",
+    "The native owner did not report a result. Preserve token/Job/desktop/exit guards and investigate explicit standard handles next.",
+    "No general native cleanup claim is inferred from this failed receipt."
+  ]
+}

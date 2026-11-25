@@ -1,0 +1,109 @@
+{
+  "schema": "switchyard-linux-editor-project-context/v1",
+  "at": "2026-11-07T12:11:27.154Z",
+  "baseCommit": "db6106d37d8f5719121aa8587663f0e91c34276b",
+  "sourceFiles": {
+    "apps/vscode-extension/src/studio-editor-launch.ts": "f0638ac43c24dec441e9cf7bd495226d86c7448f1a118b4a34e391058f2f7d95",
+    "apps/vscode-extension/test/studio-editor-launch.test.ts": "f95d7b1907c9c7e015b4348dd5c7a29116838a50f3bc974467025b16822ddc1a",
+    "apps/vscode-extension/test/studio-editor-session.test.ts": "d6097e2867c43650a383a81f17ec73654f255bda744d709cf4b65476dc42001a",
+    "scripts/run-isolated-tests.mjs": "63cc0edff56178bdb103b1384a3ffd606fb5c746346a9b3f5b223c4c6d52f934"
+  },
+  "receipts": [
+    {
+      "name": "isolated-test-4379ca54-7099-483a-9d00-ddaae9d0c185.json",
+      "sha256": "45d750073c7dec54bd29022e1096c4794ce324d65f228a4f8aa9bc388273b104",
+      "success": false,
+      "totals": {
+        "required": 1,
+        "passed": 0,
+        "failed": 1,
+        "tests": 22,
+        "passedTests": 16,
+        "failedTests": 6,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "originalCommandsBoundsAndCleanupVerified": true
+    },
+    {
+      "name": "isolated-test-761ce4c8-cff1-4480-aa81-fb9118fd7250.json",
+      "sha256": "70b5e2b74bda2ed985c6480e875d4d8614e852bc0cfcb3c6903c88a1c86c8ab7",
+      "success": true,
+      "totals": {
+        "required": 1,
+        "passed": 1,
+        "failed": 0,
+        "tests": 22,
+        "passedTests": 22,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "originalCommandsBoundsAndCleanupVerified": true
+    },
+    {
+      "name": "isolated-test-748c826c-1fc6-4d84-ac25-58543ee9cf89.json",
+      "sha256": "d9ac7f1ec02cc3317f0288438037acfa9f91eb97761861e1f0b86271ff25db35",
+      "success": true,
+      "totals": {
+        "required": 11,
+        "passed": 11,
+        "failed": 0,
+        "tests": 123,
+        "passedTests": 123,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "originalCommandsBoundsAndCleanupVerified": true
+    }
+  ],
+  "accepted": {
+    "groups": 11,
+    "passedTests": 123,
+    "skippedTests": 0
+  },
+  "typechecks": [
+    {
+      "command": "node node_modules/typescript/bin/tsc --noEmit -p tsconfig.json",
+      "success": true
+    },
+    {
+      "command": "node node_modules/typescript/bin/tsc --noEmit -p apps/vscode-extension/tsconfig.build.json",
+      "success": true
+    }
+  ],
+  "scope": {
+    "originalLocalWorkspaceFolderAndGenerationRetained": true,
+    "removedAndReopenedProjectRequiresNewReview": true,
+    "replacedAmbiguousAndRemoteFoldersRefused": true,
+    "reviewResponseAndCarrierOpenRechecked": true,
+    "workspaceDepartureRetiresOriginalCarrier": true,
+    "shutdownJoinsOriginalSignedRetirement": true,
+    "terminalAndProviderPreserved": true,
+    "uncertainRetirementStillFails": true
+  },
+  "composedDemonstration": {
+    "cases": 2,
+    "signedClient": true,
+    "encryptedSuiteState": true,
+    "actualLinuxSocketsAndOwnedProcesses": true,
+    "provider": "synthetic",
+    "terminalObject": "VS Code double",
+    "exactTaskAcknowledged": true,
+    "peerExitAndWorkspaceDepartureVerified": true,
+    "modelPromptSubmitted": false
+  },
+  "failureNotes": [
+    "Six original regressions reproduced stale project admission, missing departure retirement and cancellation of an in-flight signed retirement acknowledgement.",
+    "The corrected launcher passes all 22 tests, including fresh review after reopening, exact terminal retention and uncertain retirement refusal. Original 45-second group and five-second signed-request limits remain unchanged."
+  ],
+  "limitations": [
+    "No command activation or guided frontend exposure was added. Interactive IDE and native account/task/TUI acceptance remain unfinished.",
+    "This Linux correction postdates the accepted complete c359cdf run and is not yet installed. No complete current-tree or Windows release acceptance is claimed.",
+    "The first attempted extension typecheck named a nonexistent tsconfig.json; the actual tsconfig.build.json check passed without emitting output."
+  ]
+}

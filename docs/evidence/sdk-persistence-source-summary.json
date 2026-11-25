@@ -1,0 +1,72 @@
+{
+  "schema": "switchyard-sdk-persistence-source-summary/v1",
+  "baseCommit": "a6480b47029431269e1fcfa8957b6d70794e5551",
+  "sourceFiles": {
+    "integrations/agent-sdk.mjs": "4283ff269f478dd6922147116b55e67c08151442787f0b9855d917f421673449",
+    "integrations/switchyard_agent.py": "00d6a985df82f8d8d6a4b923e1af69ada92423a6d63467ee94ba3211326a6896",
+    "tools/layout-studio/integrations.test.mjs": "5a4764158f0c64b44e126a35b1f7fabb8c6e7d1875ba8a925144223fd2871589"
+  },
+  "beforeCorrection": {
+    "name": "isolated-test-36104d40-ba9d-4689-976f-8e7e765197f8.json",
+    "sha256": "c78d7be239e35df2cc4ce15907271e43815b49962d71f62de6f471dde60bf368",
+    "success": false,
+    "totals": {
+      "required": 2,
+      "passed": 0,
+      "failed": 2,
+      "tests": 2,
+      "passedTests": 0,
+      "failedTests": 2,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    }
+  },
+  "corrected": {
+    "name": "isolated-test-a42add38-f317-4b0b-be2b-9d525f0bf493.json",
+    "sha256": "e5b42b0a22334cfa3120093fe448c919a6a8a5d729dbd9fe2f2ad4771da91fe4",
+    "success": true,
+    "totals": {
+      "required": 4,
+      "passed": 4,
+      "failed": 0,
+      "tests": 66,
+      "passedTests": 66,
+      "failedTests": 0,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    }
+  },
+  "finalIntegrationFollowup": {
+    "name": "isolated-test-0b972bc8-6724-4a55-845d-7668d41ac9de.json",
+    "sha256": "f86fac4701d5826384fd53702518aa877f095e973a67c6f48041af5a8842ecfd",
+    "success": true,
+    "totals": {
+      "required": 1,
+      "passed": 1,
+      "failed": 0,
+      "tests": 15,
+      "passedTests": 15,
+      "failedTests": 0,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    }
+  },
+  "newTests": 4,
+  "actualPythonProcessesPerFullIntegrationPass": 2,
+  "syntheticLoopbackHttpOnly": true,
+  "counterPersistenceObservedBeforeTransmission": true,
+  "pythonEnrollmentMutationRefused": true,
+  "typecheckPassed": true,
+  "originalPackageBudgetPassed": true,
+  "allChildAndTreeCleanupVerified": true,
+  "ownedFocusedRootRemoved": true,
+  "installedChanged": false,
+  "nativeWindowsAccepted": false,
+  "liveEnrollmentOrAccountChanges": 0,
+  "modelRequests": 0,
+  "hardwareOperations": 0,
+  "initialFailureNote": "The pre-correction Node failure also exposed unjoined save promises during fixture teardown. The fixture now joins its own save operations before removal."
+}

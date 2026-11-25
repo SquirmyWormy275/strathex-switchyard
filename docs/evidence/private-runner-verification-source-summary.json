@@ -1,0 +1,69 @@
+{
+  "schema": "switchyard-private-runner-verification-source/v1",
+  "baseCommit": "2ab67fca616955f359eb8df23183e7935b235ed6",
+  "sourceFiles": {
+    "apps/vscode-extension/test/named-pipe-transport.test.ts": "89bc81429fa4168682c65fb05d09ffc22d661ec3455cdfe7e1b506ed12f10b29",
+    "scripts/verify-python-inventory-host.mjs": "b0b37cdf52bda018b908c403f3bffeece748a095545dfe5b7217550cf9cc1501"
+  },
+  "originalFullFailureReceipt": "isolated-test-fde1bf37-f5b2-4383-87a9-66a4b0eaa6cc.json",
+  "longSocketPathFollowup": {
+    "name": "isolated-test-e26b093c-5d50-4220-9cef-025d434a16a0.json",
+    "sha256": "8c14cb632c79567f63de798a4bad49b98286d7e5a3f929a529d10bad5cef6cd5",
+    "success": false,
+    "totals": {
+      "required": 1,
+      "passed": 0,
+      "failed": 1,
+      "tests": 12,
+      "passedTests": 4,
+      "failedTests": 1,
+      "skippedTests": 7,
+      "cancelledTests": 0,
+      "todoTests": 0
+    }
+  },
+  "permissionFixtureUnderPrivateUmask": {
+    "name": "isolated-test-4004b523-7a5a-4605-9846-009859341cdf.json",
+    "sha256": "03a63d7afc2dfa59496bab32bcfef58ac4332dcbb4e19f50edb86c1f70c5451a",
+    "success": true,
+    "totals": {
+      "required": 1,
+      "passed": 1,
+      "failed": 0,
+      "tests": 12,
+      "passedTests": 5,
+      "failedTests": 0,
+      "skippedTests": 7,
+      "cancelledTests": 0,
+      "todoTests": 0
+    }
+  },
+  "installedVerifierGuards": {
+    "name": "isolated-test-d3c3a732-3705-4465-bed8-fd8344ef51f4.json",
+    "sha256": "f7bc1718ae55be2b0d44fd227bd6cd763f64fa7bab25a315aeded4e37ac43aa2",
+    "success": true,
+    "totals": {
+      "required": 1,
+      "passed": 1,
+      "failed": 0,
+      "tests": 4,
+      "passedTests": 4,
+      "failedTests": 0,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    }
+  },
+  "umask": "0077",
+  "typecheckPassed": true,
+  "productionTransportOrPermissionsChanged": false,
+  "newInstalledVerifierChecks": 10,
+  "installedAcceptancePending": true,
+  "allChildAndTreeCleanupVerified": true,
+  "longAndShortOwnedRootsRemoved": true,
+  "notes": [
+    "The deliberate public test file now gets explicit chmod and mode readback; application permission validation is unchanged.",
+    "The first focused follow-up used a too-long Unix socket path. It failed separately; the corrected short owned parent passes.",
+    "Future full Linux runs require the existing pinned Node directory first on PATH; no mise trust or account configuration is changed."
+  ]
+}

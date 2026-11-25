@@ -1,0 +1,152 @@
+{
+  "schema": "switchyard-windows-owned-stdio-source-summary/v1",
+  "at": "2026-11-07T08:02:50.048Z",
+  "baseCommit": "f1167c98cb9487688754dc47c06529c7dcf0c401",
+  "sourceFiles": {
+    ".github/workflows/client-platform.yml": "b435b6ebdd8a178531a8c6f692e85286129c8704a4b2100f275f50104b762abf",
+    "apps/desktop-hotkeys/OwnedStdioRunner.cs": "8a1a4021f4e3f3a5820c4540a0b72578f5f0424c898de926446bda37fa035a00",
+    "apps/desktop-hotkeys/Program.cs": "0300c6a562674ff414320922fce3e1685fd1748c7cd4539f820412754f681172",
+    "apps/desktop-hotkeys/RuntimeCommandRunner.cs": "707abda45e13d70ea7a8a9fa0bb5ab8ac342ae491b9c5590118d3f3ba2047f5b",
+    "apps/windows-companion/provider-desktop-helper/Program.cs": "04f0c5fd546aed1099aeca89377db623c79ac08124fb985009417100c2fec6dc",
+    "deployment/suite/application.test.mjs": "bfff39c8699b6d578edd54a80e1e26fd9d346c708b1707ac27e332e934d4b83b",
+    "deployment/suite/release.test.mjs": "bfdce3a7644ef2be90619ee410e4941e3deacff5cf387ed6c8697d8f8f5863ef",
+    "scripts/run-isolated-tests.mjs": "a2b8161aa959944689d7a5b62eedd3db05525dcbd8cb8c1b98cb9ba4e17b754f",
+    "scripts/run-isolated-tests.test.mjs": "b35e3e1ea98ab49af5b8f50fd475eb06c19af0eefef49ad0957cb6c09f3a60a5",
+    "scripts/verify-client-platform.mjs": "0d1de7005765bb704bd25ad64158eeef4b0c1f5c0358a1bdf5f4c0f27cd47abc",
+    "scripts/windows-backend-shards.test.mjs": "efaaa961fd4fd3f64dd5e7019a841b9da86b385b7ad7b9cd4593468aef04e1c3",
+    "tools/layout-studio/codex-editor-ingress.test.mjs": "7a1de575fd6b72c62e23ef72003176aea26d48d6864e8a0c0170edf2c041eed0",
+    "tools/layout-studio/codex-editor-protocol.test.mjs": "4d73f413a8f280789b66a5b560f955b6349639c1d087f81abbdddbf8edf3d182",
+    "tools/layout-studio/codex-editor-relay.test.mjs": "7a3ac25a8c82df7edaaabc1cfc3a36d788ca2c061fa4c3f6d7f9138c96f5bc61",
+    "tools/layout-studio/coding-editor-connections.test.mjs": "134fd8ecb7ed502d7644d09c70bd2bc4e84a70511f4f2d7ae676b60b68c4eecf",
+    "tools/layout-studio/editor-websocket-frames.mjs": "56ba5da76b9e7b3e0473e17b6408d6dd3baf5e4727e4f2aeeea58e345e1f9637",
+    "tools/layout-studio/editor-websocket-frames.test.mjs": "4a7bdcb0d0e48697c95b935cf53a0d41fa91b427f426373bcb418126236d7d74",
+    "tools/layout-studio/owned-native-command.mjs": "111ae7ad96adf1a461e3aaa8d73c0c7c698de95e9348ea6b0abc596c1d77261a",
+    "tools/layout-studio/owned-process.test.mjs": "402433fc594f7c6c747b452b1904a67496ba75986d97932a642a8f2fad906dfb",
+    "tools/layout-studio/runtime-command-suspended.test.mjs": "2b0e28e8e6f6f6805c30b940db68e46e8eccdf9e4018e0c42e5a12cc4009ac05",
+    "tools/layout-studio/runtime-command.test.mjs": "284608a2595cb4b823a44afce2d45a244023a1f62ad36f3f4e85e3dfadea01d1",
+    "tools/layout-studio/test-support/windows-owned-stdio-guardian-fixture.cjs": "cfb96e92085fd116e242040de99ca98d21e398416814047fe785ca3540e4150d",
+    "tools/layout-studio/windows-codex-editor-connection.mjs": "0e630a0bf2e17b46c87ffefc1047d1088b81c109cbd55bb2b53137b34b809bc6",
+    "tools/layout-studio/windows-codex-editor-connection.test.mjs": "de8d47435a4a464608158a01b3e72e315adb6c3d45b9e4fda4c738b332ac14a6",
+    "tools/layout-studio/windows-editor-ingress.mjs": "7c49607d024205f3c05c725a96a4043e75e8164d696e5382f7856851dfff5571",
+    "tools/layout-studio/windows-editor-ingress.test.mjs": "dcf381d0487754f65077487b84570114d28c918218f03c361754369e7bb83681",
+    "tools/layout-studio/windows-owned-stdio.mjs": "e998e04fc266e2c2ad9fc9e72e17595e009d5bbe4e429f44d50264b202add3d5",
+    "tools/layout-studio/windows-owned-stdio.test.mjs": "44f2e368ae348e8b31876e3e405f9c0245f723b097cf1687519a167ab8b64b21",
+    "tools/layout-studio/windows-terminal-peer.test.mjs": "e83f37af27b9a47094fdb23ff81fd9d65c0c48ad02c7fafb8fab6fa16b72b9a2",
+    "tools/layout-studio/windows-terminal-process.mjs": "fe0ed2b7e4d635130c6e734440dd23daf838aad3213837734d9d75f96ae6da7f",
+    "tools/layout-studio/windows-terminal-process.test.mjs": "6c79e27b8f9737fdd38a0923ce933ce02a58fed9fdec7f1db78c00762a71bb1b"
+  },
+  "receipts": [
+    {
+      "name": "isolated-test-fe509299-3e3b-4923-bfc2-b33134ccc233.json",
+      "sha256": "c56c733f9868faacac1e02b0773c737a95285083b16884699fbe025ee401b41a",
+      "totals": {
+        "required": 4,
+        "passed": 4,
+        "failed": 0,
+        "tests": 57,
+        "passedTests": 50,
+        "failedTests": 0,
+        "skippedTests": 7,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "name": "isolated-test-c1dc326d-d293-4871-89a4-a49314440fc9.json",
+      "sha256": "7ab995a90e5748f6e3a89321acc7ee56cb52445661cf4b6a8d53968a76eddef9",
+      "totals": {
+        "required": 17,
+        "passed": 17,
+        "failed": 0,
+        "tests": 151,
+        "passedTests": 141,
+        "failedTests": 0,
+        "skippedTests": 10,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "name": "isolated-test-01732c75-aba8-409d-8f34-0f700e69b937.json",
+      "sha256": "f5243c3d565fe7ef0ecb0b41249582a2963faf839efc74eb47b9df33c6f5b97a",
+      "totals": {
+        "required": 2,
+        "passed": 2,
+        "failed": 0,
+        "tests": 35,
+        "passedTests": 32,
+        "failedTests": 0,
+        "skippedTests": 3,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    }
+  ],
+  "groups": 17,
+  "passedTests": 142,
+  "skippedTests": 11,
+  "originalCommandsBoundsSkipsAndCleanupVerified": true,
+  "typecheck": {
+    "command": "npm run typecheck",
+    "node": "24.14.0",
+    "passed": true
+  },
+  "scope": {
+    "actualOwnedChildGuardianDouble": true,
+    "actualBidirectionalByteStream": true,
+    "retainedGuardianAndSuspendedWorkerBeforeAdmission": true,
+    "oneAcknowledgedChunkPerDirection": true,
+    "queuedInputBounded": true,
+    "malformedReplyClosesOriginal": true,
+    "heldStartupCallbackJoined": true,
+    "failedStatusQueryChildRetired": true,
+    "unknownJobExitCannotAcceptRetirement": true,
+    "windowsNativeCasesRegistered": 3,
+    "providerTaskOrAccountAuthorityGranted": false
+  },
+  "bounds": {
+    "chunkBytes": 16384,
+    "readableHighWaterMark": 32768,
+    "inputQueueBytes": 2097152,
+    "pendingWrites": 64,
+    "pendingControlBytes": 65536,
+    "controlFrameCharacters": 32768,
+    "startupMs": 30000,
+    "nativeAcknowledgementMs": 10000,
+    "stopBeforeHelperTerminationMs": 4000,
+    "nativeTreeExitMs": 3000,
+    "nativeCiGroupMs": 120000
+  },
+  "nativeTransportEvidence": "windows-editor-connection-native-summary.json",
+  "effects": {
+    "modelPrompts": 0,
+    "liveProviderTasks": 0,
+    "accountChanges": 0,
+    "hardwareOpened": false,
+    "frontendChanged": false,
+    "installedApplicationChanged": false,
+    "newDependencies": false,
+    "newNativeCompilation": true
+  },
+  "limitations": [
+    "Native Windows stdio round trip, guardian-loss descendant retirement and blocked-stream shutdown await their registered CI cases.",
+    "The Linux byte-stream cases use an explicit non-native guardian double.",
+    "Windows persistent Codex ownership, durable task/editor journal recovery, Suite routes and VS Code launching remain unfinished.",
+    "No live provider, model, account or installed application effect was used."
+  ],
+  "compilation": {
+    "sourceCount": 35,
+    "passed": true,
+    "warnings": 0,
+    "errors": 0,
+    "noPackageSources": true
+  },
+  "cleanup": {
+    "originalChildAndTreeRetirementVerified": true,
+    "compilerOwnerRemoved": true,
+    "compilerFilesRemoved": 33,
+    "compilerBytesRemoved": 1561459,
+    "noBundleStagingCreated": true
+  },
+  "success": true
+}

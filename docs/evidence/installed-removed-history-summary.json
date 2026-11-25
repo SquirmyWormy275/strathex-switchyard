@@ -1,0 +1,480 @@
+{
+  "schema": "switchyard-installed-removed-history-summary/v1",
+  "at": "2026-11-09T13:19:52.652825+00:00",
+  "readback": {
+    "schema": "switchyard-removed-history-installed-readback/v1",
+    "at": "2026-11-09T13:19:32.467Z",
+    "sourceCommit": "fd13fd038c9f85112e2cf80fe2360fae517d8e27",
+    "release": "ea4ae48345d8fc658658d1074bfc553d6042bad3c0a4a384ba6d58e2c3679f85",
+    "previous": "635d0718fd18734f65e2dd2f3ab537571d55d538d35815601884a14bddd2783d",
+    "frontend": "0d52f396a8e8e07a4e03b29a13a099aab4936190b6779ee81fccbc379011ec0e",
+    "assets": 36,
+    "files": 577,
+    "bytes": 5099740,
+    "checks": [
+      "current and one verified rollback; no additional installed version",
+      "new immutable frontend has its own authenticated private access; old frontend access is not reused",
+      "served index.html",
+      "served app.mjs",
+      "served model.mjs",
+      "served workspace.mjs",
+      "served connection.mjs",
+      "served vial-snapshot.mjs",
+      "served voice-ui.mjs",
+      "served observation-ui.mjs",
+      "served portable-ui.mjs",
+      "served scanner-ui.mjs",
+      "served feed-ui.mjs",
+      "served conversation-ui.mjs",
+      "served copilot-ui.mjs",
+      "served task-ui.mjs",
+      "served authority-ui.mjs",
+      "served execution-ui.mjs",
+      "served client-ui.mjs",
+      "served role-ui.mjs",
+      "served suite-ui.mjs",
+      "served workflow.mjs",
+      "served device-diagnostic-ui.mjs",
+      "served device-settings-ui.mjs",
+      "served vial-settings.mjs",
+      "served vial-keycodes.mjs",
+      "served vial-rules.mjs",
+      "served device-ui.mjs",
+      "served shell.mjs",
+      "served home.mjs",
+      "served catalog.mjs",
+      "served geometry.mjs",
+      "served keyboard-view.mjs",
+      "served model-f-catalog.json",
+      "served style.css",
+      "served sample-info.json",
+      "served sample-keymap.json",
+      "served sample-study-report.json",
+      "complete authenticated workspace inventory; no provider observation or authority",
+      "invalid history request refused before native queries",
+      "authenticated live catalog reports Omarchy vendor exclusion without changing portable recipe or native authority",
+      "All 54 user definitions, modes, conversations and pending keyboard-only record preserved; any original-owner shutdown revocation counter is separately verified",
+      "dated exact launcher/record backups and persistent entry readback verified",
+      "installed in-memory readable review retains current/index/history/excluded/discovered scope without backend effects",
+      "installed page contains the closed technical disclosure and exact metadata target",
+      "installed readable scanner review distinguishes selected deleted versions from current files",
+      "installed historical permission summary retains exact read-only scope without any task permission issuance",
+      "installed page contains deleted-history selection and separate removable historical permission controls"
+    ],
+    "workspaces": 54,
+    "semanticSnapshotsPreserved": false,
+    "exactSemanticSnapshots": 53,
+    "expectedShutdownChanges": [
+      {
+        "workspace": "personal",
+        "field": "taskAuthorityEpoch",
+        "before": 81,
+        "after": 82,
+        "at": 1794230312512,
+        "reason": "The previous owner invalidated its reviewed task permissions during normal shutdown."
+      }
+    ],
+    "userDefinitionsPreserved": true,
+    "sealedByteIdentical": 53,
+    "selectionPreserved": true,
+    "modesPreserved": true,
+    "conversations": 3,
+    "pendingKeyboardOnly": 1,
+    "backup": "2026-11-09T13-18-32.484Z-dc929254-bb4d-4048-8b53-5a11a13c816e",
+    "metadataReceipts": [
+      {
+        "name": "installed-agent-security-metadata-1794230328641.json",
+        "sha256": "48f6b98e21654c923658aabf74237f84562c2c5ad46b74705288fbf3d61db88c",
+        "checks": 44
+      },
+      {
+        "name": "installed-npm-archive-metadata-1794230328888.json",
+        "sha256": "5171a3d96058ef24339a41311ad22caabedea39f286e5833d3052778e59cbc89",
+        "checks": 3
+      },
+      {
+        "name": "installed-python-inventory-metadata-1794230329156.json",
+        "sha256": "eaa2a79549c5dfbab6da288ddd80dbcb319dc9a1466e3110e8e11c2a54372f2e",
+        "checks": 14
+      },
+      {
+        "name": "installed-cargo-inventory-metadata-1794230329421.json",
+        "sha256": "d86f12cba98dce72e2ccda29e305e51034cebc320b315bb8f52f6894ea072086",
+        "checks": 10
+      },
+      {
+        "name": "installed-workflow-identity-metadata-1794230330147.json",
+        "sha256": "3f4264cf670eaca9d4b7dff2fb5f27541f949dec87fd6d70b58e329c2ab40ba4",
+        "checks": 10
+      },
+      {
+        "name": "installed-task-owner-metadata-1794230330740.json",
+        "sha256": "579df6984875de352ddd5cbd85b9129078211b48bb71f46bb9ff7cfee27d905b",
+        "checks": 18
+      },
+      {
+        "name": "installed-copilot-journal-metadata-1794230352273.json",
+        "sha256": "091d6c17b65137d59d3e0bc40beaa7808442ef43fba518c32fe603dbc251d53f",
+        "checks": 7
+      },
+      {
+        "name": "installed-signed-intent-metadata-1794230352471.json",
+        "sha256": "b259d831715a0ecad87b55a5482e1ac4a2dd4767eb83807b067d71609bdcdb81",
+        "checks": 9
+      },
+      {
+        "name": "installed-codex-editor-metadata-1794230352670.json",
+        "sha256": "0c75065aa449dd5cd0e5edecccfddd08df084a719ad60f23ed3d7621418975b6",
+        "checks": 14
+      }
+    ],
+    "metadataChecks": 129,
+    "exactModuleHashes": 67,
+    "hardwareOpened": false,
+    "nativeProviderRequests": 0,
+    "microphoneOpened": false,
+    "visualAcceptance": false
+  },
+  "cleanup": {
+    "schema": "switchyard-removed-history-prepared-cleanup/v1",
+    "at": "2026-11-09T13:19:52.652825+00:00",
+    "release": "ea4ae48345d8fc658658d1074bfc553d6042bad3c0a4a384ba6d58e2c3679f85",
+    "removedFiles": 578,
+    "removedBytes": 5203957,
+    "rootIdentityVerified": true,
+    "exactPathsIdentitiesHashesVerified": true,
+    "installedCopyIndependentlyVerified": true,
+    "preparedCopyRemoved": true,
+    "manifestComparison": "Exact semantic equality of differently formatted manifests and all 577 payload hashes verified before cleanup",
+    "sourceAndRuntimeCopiesPreserved": true
+  },
+  "additionalValidation": {
+    "originalPackageGroups": 18,
+    "packageCases": 26,
+    "sourceIntegrationGroups": 25,
+    "sourceIntegrationPasses": 195,
+    "existingIntegrationSkips": 0,
+    "verifierGuardPasses": 8
+  },
+  "limitations": [
+    "Actual browser task/visual review remains blocked by the browser control tool before page access.",
+    "No installed native provider/task, scanner, hardware, microphone or guest action was started.",
+    "The new immutable frontend has its own authenticated private access; all three changed assets and the complete 36-file bundle verify.",
+    "Complete Windows and Linux source a7958c4 acceptance predates this deleted-history checkpoint; normal-push native follow-up remains separate."
+  ],
+  "retainedVerifierFailure": {
+    "receipt": "installed-copilot-journal-metadata-1794230330926.json",
+    "reason": "Six checks passed before the stale Home hash assertion stopped verification. The verifier was pinned to the tested new frontend and all seven checks then passed.",
+    "userStateChanged": false,
+    "productionChanged": false
+  },
+  "originalLocalReceipts": [
+    {
+      "receiptId": "91c0157e-23ce-4390-ba6c-a99b4db36454",
+      "receiptSha256": "46bdfb2205a28a4ad27e9cf2a436a1dcdedf4264ed07c870ebccc4e8a84855a4",
+      "totals": {
+        "required": 18,
+        "passed": 18,
+        "failed": 0,
+        "tests": 26,
+        "passedTests": 26,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "children": [
+        {
+          "file": "deployment/suite/release.test.mjs",
+          "pattern": null,
+          "durationMs": 2436,
+          "effectiveTimeoutMs": 45000,
+          "tests": {
+            "total": 5,
+            "passed": 5,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "deployment/suite/application.test.mjs",
+          "pattern": null,
+          "durationMs": 4307,
+          "effectiveTimeoutMs": 45000,
+          "tests": {
+            "total": 5,
+            "passed": 5,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "deployment/suite/installation.test.mjs",
+          "pattern": "installation keeps current and one rollback version, records dated backups, preserves data and removes only owned entries",
+          "durationMs": 2852,
+          "effectiveTimeoutMs": 120000,
+          "tests": {
+            "total": 1,
+            "passed": 1,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "deployment/suite/installation.test.mjs",
+          "pattern": "unowned or edited desktop entries and corrupted new releases preserve the current application",
+          "durationMs": 1235,
+          "effectiveTimeoutMs": 120000,
+          "tests": {
+            "total": 1,
+            "passed": 1,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "deployment/suite/installation.test.mjs",
+          "pattern": "a failed persistent write restores every earlier launcher and the exact previous installation record",
+          "durationMs": 1656,
+          "effectiveTimeoutMs": 120000,
+          "tests": {
+            "total": 1,
+            "passed": 1,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "deployment/suite/installation.test.mjs",
+          "pattern": "forced owner exit leaves a durable journal; another installer restores the exact before state without touching unrelated files",
+          "durationMs": 1695,
+          "effectiveTimeoutMs": 120000,
+          "tests": {
+            "total": 1,
+            "passed": 1,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "deployment/suite/installation.test.mjs",
+          "pattern": "recovery preflights all edits before writing, and respects a committed update whose pending marker survived",
+          "durationMs": 1679,
+          "effectiveTimeoutMs": 120000,
+          "tests": {
+            "total": 1,
+            "passed": 1,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "deployment/suite/installation.test.mjs",
+          "pattern": "active host connections block uninstall before any application stop or persistent mutation",
+          "durationMs": 1220,
+          "effectiveTimeoutMs": 120000,
+          "tests": {
+            "total": 1,
+            "passed": 1,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "deployment/suite/installation.test.mjs",
+          "pattern": "uninstall verifies exact owner exit and restores host connections before removing persistent program entries",
+          "durationMs": 1287,
+          "effectiveTimeoutMs": 120000,
+          "tests": {
+            "total": 1,
+            "passed": 1,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "deployment/suite/installation.test.mjs",
+          "pattern": "a restoration conflict retains all program entries and resumes the previous running application",
+          "durationMs": 1205,
+          "effectiveTimeoutMs": 120000,
+          "tests": {
+            "total": 1,
+            "passed": 1,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "deployment/suite/installation.test.mjs",
+          "pattern": "a second registered instance blocks uninstall without stopping either owner",
+          "durationMs": 1205,
+          "effectiveTimeoutMs": 120000,
+          "tests": {
+            "total": 1,
+            "passed": 1,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "deployment/suite/installation.test.mjs",
+          "pattern": "unconfirmed owner exit leaves a durable removal journal and blocks restoration until recovery",
+          "durationMs": 1239,
+          "effectiveTimeoutMs": 120000,
+          "tests": {
+            "total": 1,
+            "passed": 1,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "deployment/suite/installation.test.mjs",
+          "pattern": "a failed uninstall write restores the owned program and keeps restart recovery durable",
+          "durationMs": 1235,
+          "effectiveTimeoutMs": 120000,
+          "tests": {
+            "total": 1,
+            "passed": 1,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "deployment/suite/installation.test.mjs",
+          "pattern": "a dated verified recovery entry restores an interrupted uninstall even after the main loader was removed",
+          "durationMs": 1525,
+          "effectiveTimeoutMs": 120000,
+          "tests": {
+            "total": 1,
+            "passed": 1,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "deployment/suite/installation.test.mjs",
+          "pattern": "an explicit no-start update stops the previous generation without restarting the new one",
+          "durationMs": 1617,
+          "effectiveTimeoutMs": 120000,
+          "tests": {
+            "total": 1,
+            "passed": 1,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "deployment/suite/installation.test.mjs",
+          "pattern": "the stable installed loader verifies and addresses the actual application across update and rollback",
+          "durationMs": 3998,
+          "effectiveTimeoutMs": 120000,
+          "tests": {
+            "total": 1,
+            "passed": 1,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "deployment/suite/installation.test.mjs",
+          "pattern": "pre-promotion owner loss recovers only verified staging copies and exact incomplete source prefixes",
+          "durationMs": 1418,
+          "effectiveTimeoutMs": 120000,
+          "tests": {
+            "total": 1,
+            "passed": 1,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        },
+        {
+          "file": "deployment/suite/installation.test.mjs",
+          "pattern": "interrupted installation recovery accepts the full release file ceiling plus its manifest and preserves unrelated edits",
+          "durationMs": 1763,
+          "effectiveTimeoutMs": 120000,
+          "tests": {
+            "total": 1,
+            "passed": 1,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        }
+      ],
+      "duplicateReceiptRemoved": true
+    },
+    {
+      "receiptId": "4cea3b30-3e72-41ba-b3ac-f7036c260bd4",
+      "receiptSha256": "c96832e614f93c4f9413dfde93b8729c8be36eb6bf5719129028455879f12c50",
+      "totals": {
+        "required": 1,
+        "passed": 1,
+        "failed": 0,
+        "tests": 8,
+        "passedTests": 8,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "children": [
+        {
+          "file": "scripts/verify-copilot-journal-host.test.mjs",
+          "pattern": null,
+          "durationMs": 2746,
+          "effectiveTimeoutMs": 45000,
+          "tests": {
+            "total": 8,
+            "passed": 8,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        }
+      ],
+      "duplicateReceiptRemoved": true
+    }
+  ],
+  "verifierPins": {
+    "scripts/verify-task-owner-host.mjs": "97344c94fca0f6fb8f12f1d8ee9948d4d0d9d08239460cfa84f64d9985672758",
+    "scripts/verify-copilot-journal-host.mjs": "51726f15dd10dd0bd239de009b53fe6a9a7c22f82131adc10bc64eff57cc0ce6",
+    "scripts/verify-agent-security-host.mjs": "55e8c7283056540cb338ab180633a7efcd4fcf983ae45c5c248c7267c994659d"
+  }
+}

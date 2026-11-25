@@ -1,0 +1,44 @@
+{
+  "schema": "switchyard-protected-task-metadata-owner/v1",
+  "basis": "8c6f91a7fc0d4e816c12b79a6dedfea3f93a0e1d",
+  "sourceSha256": {
+    "tools/layout-studio/coding-task-owners.mjs": "3e096adb5b3719beb2cb342e8c25ababfd776d4db08f610f96e0689fef22049f",
+    "tools/layout-studio/coding-task-owners.test.mjs": "8c875079b20a407312e5dab98ae66246d2ecf8f6911589eb464c40e57f9b3c2f",
+    "tools/layout-studio/codex-unix-tasks.mjs": "3b227fb4fbb49b33b088c1865cb837b8c43d084164fb6e5ce936accb07dd98a7",
+    "tools/layout-studio/codex-unix-tasks.test.mjs": "cd8959f8390fc3eff76fe288a8cd79a0f1e4bc5755646e1b46da9abc32578432",
+    "tools/layout-studio/suite-store.mjs": "5d0a1bc21c6ba8e2093ae95e0e61c22c7b73f8b664e55dd6c1d111859eb8860a",
+    "scripts/run-isolated-tests.mjs": "eb6ec0c2baae0012a0c890518064b496d93da64519211f0b2a6c5e9bc65b1039"
+  },
+  "behavior": [
+    "Protected per-task owner reservations use real kernel leases, preserve request UUIDs and reject replacement before original exit verifies.",
+    "Directory, guardian, socket and authenticated-account checkpoints persist before later metadata delivery; the original task/account/repository and owner identity are rechecked.",
+    "Shutdown joins the owned driver and listener; recovery retires only exact saved ownership and never adopts or kills another host process.",
+    "Only metadata ownership is implemented here. No thread creation, resume, model request or IDE attachment is inferred."
+  ],
+  "cohort": {
+    "receipt": "isolated-test-68ca3072-da94-450a-8833-e28728943705.json",
+    "groups": 5,
+    "testsPassed": 76,
+    "allChildAndTreeCleanupVerified": true
+  },
+  "finalRegistryAndPackaging": {
+    "receipt": "isolated-test-143b4e37-b4aa-4b9c-b2c8-dc73e1c2c852.json",
+    "groups": 2,
+    "testsPassed": 13,
+    "registryCases": 8,
+    "packagingCases": 5,
+    "allChildAndTreeCleanupVerified": true
+  },
+  "typecheck": true,
+  "nativeComposition": "A controlled provider double runs through the actual owned Unix listener, bridge and protected store. Real process/socket retirement verifies; no real provider account is contacted.",
+  "manifest": {
+    "linuxGroups": 242,
+    "newRegistryWindowsOnlySkip": 1,
+    "unixTaskWindowsSkips": 6
+  },
+  "limits": [
+    "Explicit backend service; production Studio task routes remain on stdio.",
+    "Task loading, authenticated IDE attachment, normal installed routing and actual registered-account acceptance remain unfinished.",
+    "The accepted complete Linux source predates this new 242-group manifest."
+  ]
+}

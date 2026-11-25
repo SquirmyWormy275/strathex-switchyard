@@ -1,0 +1,28 @@
+{
+  "schema": "switchyard-retirement-native/v1",
+  "sourceCommit": "6e967a3d45e46aafd36da85a86bf73b7693e241d",
+  "executionCommit": "da80bf1660af8b220ddac54232f775972db8b208",
+  "sourceAndExecutionTree": "e78b3ad17174b3f68521ec514fcd6e27e3c35110",
+  "runId": 42271740559,
+  "jobId": 128078155531,
+  "artifactId": 13531115638,
+  "archiveBytes": 969,
+  "archiveSha256": "1643062c6e1ce3ced8bb8ec8b5719f2f19418b26b803ea060ec7781dc3c6544c",
+  "zipSavedLocally": false,
+  "success": true,
+  "totals": {
+    "required": 1,
+    "passed": 1,
+    "failed": 0,
+    "tests": 23,
+    "passedTests": 23,
+    "failedTests": 0,
+    "skippedTests": 0,
+    "cancelledTests": 0,
+    "todoTests": 0
+  },
+  "privateReceipt": "windows-osv-source-6e967a3-native.json",
+  "allChildAndTreeCleanupVerified": true,
+  "publicQueriesPerformed": 0,
+  "installedChanged": false
+}

@@ -1,0 +1,130 @@
+{
+  "schema": "switchyard-cargo-inline-manifest-source/v1",
+  "at": "2026-11-07T03:20:48.830436+00:00",
+  "baseSource": "37091ca70c8885dd9f7fb96768a7b408275cb18d",
+  "sourceFiles": {
+    "tools/layout-studio/shield-scanner-engine.mjs": "0791c7c3f312086d76c0b41f594f6f8ed7d9caf25545034f46dabb34de902d40",
+    "tools/layout-studio/repository-shield.mjs": "3eaac8062d1e5f00cf1af157e495b0906f565067a3ed76d9a924da4f08ddf8ef",
+    "tools/layout-studio/cargo-archive.test.mjs": "cbd5ef318d3ddae6129309b1c00c4b140471142218845a067dfb6d6651f41080",
+    "tools/layout-studio/test-support/shield-scanner-fixture.mjs": "e0a2d704ce0ba16531780a953906e2c0880d193f0586f291266e2434d29c6433",
+    "tools/layout-studio/test-support/cargo-archive-fixture.mjs": "29f47202ded50a6acc87005fe8477773bd9571a07954c20c6893a99d2520e132",
+    "tools/layout-studio/test-support/npm-archive-fixture.mjs": "dbc8aa1f1cec3d022e5489778c929c86a017af6c4575844c3da93372ee7c76f5",
+    "tools/layout-studio/test-support/assert-cargo-archive-shield.mjs": "2785709c8d1e16a288ea357e4ff9c8488e9b8d6b0a71c430663be062c872431a",
+    "tools/layout-studio/repository-shield-cargo-archives.test.mjs": "5e9c6b8d683a65f46f6166e5545c356b8e5ddcb86d7fb2c0931866e8af93cab0",
+    "tools/layout-studio/repository-windows-shield-cargo-archives.test.mjs": "365f9046d35aa27934acf9c11e8db180f2b8287fca9b63ef8c6682150ed8561a",
+    "scripts/generate-cargo-archive-oracle.py": "8df25cb55b0f67119c291f93a5a4ef8edf08898bbc76ad35e911af030682d705",
+    "scripts/fixtures/cargo-archive-oracle.json": "7371721d7fac79948956506d194f675882ef91352674e62a856f569ca97bb324",
+    "scripts/verify-cargo-inventory-host.mjs": "5d0b9e317e29afade294bdb514cc866835f3556b4b2905be2083c26068b84f5e",
+    "scripts/verify-python-inventory-host.mjs": "bceef465179c97cd165b794f452903a627da11fffa091b1da76d7b04fc009086"
+  },
+  "receipts": [
+    {
+      "name": "isolated-test-2a021eb7-30d5-4f69-8dfb-27eec6f62bdf.json",
+      "sha256": "c91507f27ac0f517e227fe212339d10a8594467acadc595747b74dfb69a7195f",
+      "success": false,
+      "totals": {
+        "required": 1,
+        "passed": 0,
+        "failed": 1,
+        "tests": 7,
+        "passedTests": 6,
+        "failedTests": 1,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "name": "isolated-test-5ed1074a-f781-42ef-a879-b583f8587ed2.json",
+      "sha256": "eaf7e014a5ac58957ed322e368a6f4e4d1e49de06ce1bf9fdc496df57bdd49fa",
+      "success": true,
+      "totals": {
+        "required": 1,
+        "passed": 1,
+        "failed": 0,
+        "tests": 7,
+        "passedTests": 7,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "name": "isolated-test-8de0f562-cab8-471c-95f1-2f6e55a1045b.json",
+      "sha256": "14d8d4e881954074fc45132785852abf304a612ada23926ca0339e2208a2a184",
+      "success": true,
+      "totals": {
+        "required": 6,
+        "passed": 6,
+        "failed": 0,
+        "tests": 64,
+        "passedTests": 64,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "name": "isolated-test-c2988a82-9951-480f-9441-72eae37630b3.json",
+      "sha256": "21cab8948a3bc403e6d628bc4a77610dc64dc2352e2105636d28fced15feb481",
+      "success": true,
+      "totals": {
+        "required": 4,
+        "passed": 4,
+        "failed": 0,
+        "tests": 32,
+        "passedTests": 32,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    }
+  ],
+  "distinctFocusedGroups": 10,
+  "distinctFocusedPasses": 96,
+  "independentReference": {
+    "python": "3.15.2",
+    "libraries": [
+      "tomllib",
+      "tarfile.USTAR_FORMAT",
+      "gzip"
+    ],
+    "cases": 112,
+    "supportedCases": 57
+  },
+  "actualLinuxCargoJourneys": 6,
+  "windowsCargoGuestDoubles": 6,
+  "originalCommandsBoundsAndSkipsVerified": true,
+  "typecheck": "passed",
+  "originalPackageBounds": "passed",
+  "cleanup": {
+    "everyChildVerified": true,
+    "everyTreeVerified": true,
+    "emptyOwnedRootRemoved": true
+  },
+  "effects": {
+    "cargoInvocations": 0,
+    "archiveExtractions": 0,
+    "packageExecutions": 0,
+    "newDependencyDownloads": 0,
+    "providerRequests": 0,
+    "accountChanges": 0,
+    "hardwareOperations": 0
+  },
+  "failureNotes": [
+    "The previous archive inspector refused ordinary Cargo inline dependency tables in the expanded independent reference cases; the original failed receipt remains retained."
+  ],
+  "limitations": [
+    "This is a closed manifest grammar, not a complete TOML parser or Cargo resolver.",
+    "Dotted field definitions, arrays of inline tables, multiline strings, mixed arrays, floats and eight-digit Unicode escapes remain unsupported. Inline nesting is bounded to sixteen tables.",
+    "Target predicates are parsed as literal table keys and never evaluated.",
+    "Installed source acceptance and actual Windows guest/provider/hardware validation remain separate."
+  ],
+  "privateReceipt": {
+    "name": "cargo-inline-manifest-source.json",
+    "sha256": "9c7f8eed4aa4051a2abc32008d4bd53ea2eff71816248bd431f1927c13704d1d"
+  }
+}

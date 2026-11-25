@@ -1,0 +1,88 @@
+{
+  "schema": "switchyard-workspace-boundary-installed/v1",
+  "at": "2026-11-24T20:46:16.702Z",
+  "success": true,
+  "sourceCommit": "65b5aacc8df8ebb1cb7f592eafff2d3c2000ba86",
+  "release": "dd9cc05a13cada0f5585571374b8889cc7260576674fcc4955d5950c25a6d642",
+  "previousRelease": "d355673fb2ac994f596a8d2a0f1d2bad3b5d3635f3e92428a1e216ac1c27773e",
+  "frontend": "9accbd4c1ca31233c66cb00ffa28a151eee22647c70c61bfa7ce360dab297a17",
+  "payloadFiles": 578,
+  "payloadBytes": 5108882,
+  "servedAssets": 36,
+  "workspaceCount": 54,
+  "workflowDefinitions": 57,
+  "conversations": 3,
+  "selected": "personal",
+  "unchangedStateFiles": 54,
+  "changedStateFiles": [
+    "personal.sealed.json"
+  ],
+  "semanticWorkspacesPreserved": 54,
+  "personalAuthorityEpoch": {
+    "before": 83,
+    "after": 83
+  },
+  "secondReadbackUnchanged": true,
+  "retainedVersions": 2,
+  "keyboardOpened": false,
+  "microphoneOpened": false,
+  "providerRequestsMade": false,
+  "visualAcceptance": false,
+  "installationBackupVerified": true,
+  "personalAudit": {
+    "before": 896,
+    "after": 900,
+    "unchangedPrefix": true,
+    "appendedOperations": [
+      "repository-effect-journal",
+      "restart-recovery",
+      "claude-creation-recovery",
+      "repository-effect-journal"
+    ]
+  },
+  "protectedBackupFilesVerified": 55,
+  "cleanup": {
+    "files": 579,
+    "bytes": 5213246,
+    "independentInstalledPayloadVerified": true
+  },
+  "receiptHashes": [
+    {
+      "file": "copilot-metadata.json",
+      "sha256": "8e73a89eeb37a4b13e285e6ad19c0b337e031e35c2fa1529b0987cad2b888517"
+    },
+    {
+      "file": "task-owner-metadata.json",
+      "sha256": "6da75456f96485386cb1bb0660e65bd7dcbac6683326112ed373a4a241170d51"
+    },
+    {
+      "file": "focused-a4911005-0ae9-48bb-a741-e76aec441f7d.json",
+      "sha256": "4e531a7c6e1db623594ab2446004ac009246c2b54230e953e73ea53c546ccee7"
+    },
+    {
+      "file": "focused-eca33dd0-744e-407a-8eb8-f95bd22e4600.json",
+      "sha256": "830631407212ebfc44bfc5ddf4504cbc708351aeedc898a7ea4a64b7361f1a52"
+    },
+    {
+      "file": "focused-d0b2202b-ae4a-4f57-bbe6-406384f0badd.json",
+      "sha256": "c3cd22bf0f037b6d73d4c087fc248026a70aebad08366f564e8ee78142d5e70b"
+    }
+  ],
+  "metadataVerifiers": [
+    {
+      "scope": "Copilot request journal",
+      "checks": 7,
+      "sha256": "8e73a89eeb37a4b13e285e6ad19c0b337e031e35c2fa1529b0987cad2b888517"
+    },
+    {
+      "scope": "Task owners, editor refusal and offline advisory/license metadata",
+      "checks": 18,
+      "sha256": "6da75456f96485386cb1bb0660e65bd7dcbac6683326112ed373a4a241170d51"
+    }
+  ],
+  "limits": [
+    "Browser task and visual acceptance remain blocked before page loading.",
+    "Complete Linux and normal-push platform checks are running separately.",
+    "No keyboard, microphone, model, account or native-task operation was performed."
+  ]
+}

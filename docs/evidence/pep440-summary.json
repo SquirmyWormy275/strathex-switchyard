@@ -1,0 +1,43 @@
+{
+  "schema": "switchyard-pep440-summary/v1",
+  "sourceParentCommit": "60e879430f4bb98d7ad18ff77aa434d3cf9b887d",
+  "sourceSha256": {
+    "tools/layout-studio/shield-scanner-engine.mjs": "1fdc2c7bd9366836eedffa783d3ad3580f9a572f8f4f0cf7b2388e8f3b7b30d1",
+    "tools/layout-studio/osv-advisory-source.mjs": "c2313a83b903984c4e19649390caf3f9d3a70788f4f37618a0b26c03792c7113",
+    "scripts/verify-shield-host.mjs": "0833a14e9063eb0573d38d53b9aad7ad278883ff414cc530fefa98bff1e8b34d"
+  },
+  "receipt": "isolated-test-d0b35482-f3d4-433f-83af-6f5a49fe0761.json",
+  "receiptSha256": "a12c3d3c723cc8fe0de63f64d66d65715f78c4616c139e429e10019e2e94a942",
+  "groups": 6,
+  "checks": 62,
+  "allChildCleanup": true,
+  "typecheckPassed": true,
+  "oracle": "PyPA packaging.version.Version",
+  "oracleVersion": "26.3",
+  "oracleSourceSha256": "558b2fb50fd198c660a4c082f96b8919c565911b6b4b6e07f34b6b60c074be97",
+  "oracleFixtureSha256": "56a9398f7ac985056b363881e37d475ff70f2cc3d84db92e4b7193c38eecd408",
+  "oracleCases": 295,
+  "orderedComparisons": 87025,
+  "semanticKeysCheckedForEveryPair": true,
+  "nativeLinuxScanActions": [
+    "shield_supply_chain",
+    "release_shield"
+  ],
+  "nativeWindowsGuestExecuted": false,
+  "windowsTransportGuestDoubled": true,
+  "literalInventoryVersionRetained": true,
+  "normalizedEquivalentFeedDuplicatesRefused": true,
+  "advisoryLookupIndexedByNormalizedIdentity": true,
+  "packageUrlVersionCaseFoldedAndPercentEncoded": true,
+  "originalFiveMiBPackageLimitPreserved": true,
+  "noNewRuntimeDependency": true,
+  "installedAcceptance": false,
+  "unresolved": [
+    "requirements/specifier formats including extras, markers and ranges",
+    "dependency resolution",
+    "installed artifacts and licenses",
+    "publisher provenance",
+    "broader ecosystems",
+    "native Windows guest acceptance"
+  ]
+}

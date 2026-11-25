@@ -1,0 +1,69 @@
+{
+  "schema": "switchyard-spdx-catalog-source/v1",
+  "basis": "22027204431792112a3e1929ec518002241ee519",
+  "sourceSha256": {
+    "tools/layout-studio/shield-scanner-engine.mjs": "b94ee954a4160e50cf8062d5d696acf885d2db383be648621035fdd65ea94938",
+    "tools/layout-studio/repository-shield.mjs": "e23946a7682d229a35d75b8c4b1249f38aa9b8a2200381a40eeb2231b5973e86",
+    "tools/layout-studio/shield-scanner-engine.test.mjs": "1cb637ecaa6837cbbc4b44d4c822f5ba79201256647255eb354456e7ac50cfbc",
+    "tools/layout-studio/test-support/shield-scanner-fixture.mjs": "78eaf5ad7bdc09795385503cffaaecae77029d7d8be7709d94235b5b3ffe0482",
+    "tools/layout-studio/test-support/assert-license-shield.mjs": "afb8bdabe20927808feecb2d486c1959a55b89705a2fa6ba97817d8ced2da15f",
+    "scripts/generate-spdx-license-catalog.mjs": "a7d810b39586379ff9569bfea9981139075f797fe234f944d50653b0e0ce1a4b",
+    "scripts/data/spdx-license-identifiers.json": "3d34782ac9952b0cac692d00f6629b5edb8a82b2f0cd7992ba94bcba3263041c",
+    "docs/evidence/switchyard-development.cdx.json": "0da184821316d3102dac4843f5166750197ed8e3960323c9fb43870e9098ada6"
+  },
+  "catalog": {
+    "version": "3.29.0",
+    "licenses": 740,
+    "exceptions": 86,
+    "sourceCommit": "31ba1a50e5397e00a304dbadc76531740e89ee48",
+    "sourceProjectionBytes": 19887,
+    "upstreamByteIdentityChecked": true,
+    "upstreamSignatureVerified": false
+  },
+  "focused": {
+    "receipt": "isolated-test-1fc2095d-d541-42b4-b339-ea3ade4b3d0d.json",
+    "totals": {
+      "required": 7,
+      "passed": 7,
+      "failed": 0,
+      "tests": 47,
+      "passedTests": 47,
+      "failedTests": 0,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    },
+    "allChildAndTreeCleanupVerified": true
+  },
+  "typecheckPassed": true,
+  "developmentSbomRegenerationPassed": true,
+  "applicationAndReleasePackagingPassed": true,
+  "originalPackageBudgetBytes": 5242880,
+  "behavior": [
+    "All expression branches use separate license/exception namespaces.",
+    "Literal signed policy cannot remove unknown identifier metadata gaps.",
+    "Deprecated identifiers remain declared, with no inferred replacement or permission.",
+    "Host admission recomputes exact fixed BOM membership properties and requires unknown metadata gaps.",
+    "Four composed scans use real Linux containment and Windows guest doubles, exact signed feeds, replay refusal and unchanged original repository state."
+  ],
+  "installedChanged": false,
+  "licenseTextVerified": false,
+  "publisherVerified": false,
+  "legalApproval": false,
+  "nativeWindowsGuestAccepted": false,
+  "finalEngineFollowup": {
+    "receipt": "isolated-test-383a6a54-c556-4807-9bdf-b57c218d6001.json",
+    "totals": {
+      "required": 1,
+      "passed": 1,
+      "failed": 0,
+      "tests": 29,
+      "passedTests": 29,
+      "failedTests": 0,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    },
+    "allChildAndTreeCleanupVerified": true
+  }
+}

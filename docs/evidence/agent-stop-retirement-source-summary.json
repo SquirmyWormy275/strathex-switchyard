@@ -1,0 +1,52 @@
+{
+  "schema": "switchyard-agent-stop-retirement-source-summary/v1",
+  "baseCommit": "e24a16acb07854fcc9b8f27709c990a83c8913b8",
+  "sourceFiles": {
+    "tools/layout-studio/custom-agents.mjs": "c6cfeb97f06575ff117647ac32063a0e9bee738a2356d0202b2aa59042bbadf5",
+    "tools/layout-studio/agent-revocation.test.mjs": "c490c96ab412e9c33884a79553d8e93a5afeb4b32cd1832c81d21a01d161aa50"
+  },
+  "beforeCorrection": {
+    "name": "isolated-test-08eb956f-87f9-49b8-9456-8f104da4d581.json",
+    "sha256": "3c44aca237cd8ce21caa7fddbe5ebdea3034675c419902e4f9cb36e9ffbdc6bb",
+    "totals": {
+      "required": 1,
+      "passed": 0,
+      "failed": 1,
+      "tests": 15,
+      "passedTests": 12,
+      "failedTests": 3,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    },
+    "success": false
+  },
+  "corrected": {
+    "name": "isolated-test-d3937c96-4440-455d-8281-004b347778b6.json",
+    "sha256": "9c4c7e4484468ae7c51a43061003d81790dc1f546bfe854f8b13e19a6d68d708",
+    "totals": {
+      "required": 8,
+      "passed": 8,
+      "failed": 0,
+      "tests": 94,
+      "passedTests": 94,
+      "failedTests": 0,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    },
+    "success": true
+  },
+  "newRegressionTests": 3,
+  "typecheckPassed": true,
+  "originalCompletePackageBudgetPassed": true,
+  "allChildAndTreeCleanupVerified": true,
+  "ownedFocusedRootRemoved": true,
+  "sourceEncryptedFixtures": true,
+  "actualAuthenticatedHttpAndBundledNodeIntegrationIncluded": true,
+  "liveInstalledAgentsChanged": false,
+  "nativeWindowsAccepted": false,
+  "frontendChanged": false,
+  "modelRequests": 0,
+  "hardwareOperations": 0
+}

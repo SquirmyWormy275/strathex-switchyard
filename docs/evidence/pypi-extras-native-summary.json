@@ -1,0 +1,96 @@
+{
+  "schema": "switchyard-pypi-extras-native/v1",
+  "results": [
+    {
+      "sourceCommit": "9193471ac9a1de6154badfebd79c311b9a3ed78a",
+      "executionCommit": "a63fe443b01a3f8dfaf17ac1ff89e07783babd0b",
+      "sourceAndExecutionTree": "daee00378e275dea202b4dc404bcbf41809e0eba",
+      "runId": 42284298707,
+      "artifactId": 13537157944,
+      "archiveBytes": 1005,
+      "archiveSha256": "e55286d25e466b2ebc1bec336b8c92b0b6b87e0d66ef2594efc12d87259f7ac7",
+      "privateReceipt": "windows-boundary-9193471-13537157944.json",
+      "receiptSha256": "6244e64be2cfe1437ecc088523d92134225c69af3a0aa07a11a4ffd4ca6750e8",
+      "totals": {
+        "required": 1,
+        "passed": 1,
+        "failed": 0,
+        "tests": 12,
+        "passedTests": 10,
+        "failedTests": 0,
+        "skippedTests": 2,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "success": true,
+      "allChildAndTreeCleanupVerified": true,
+      "zipSavedLocally": false,
+      "groups": [
+        {
+          "file": "tools/layout-studio/repository-shield-pypi-artifacts.test.mjs",
+          "pattern": null,
+          "success": true,
+          "timeout": false,
+          "effectiveTimeoutMs": 300000,
+          "testCounts": {
+            "total": 12,
+            "passed": 10,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 2,
+            "todo": 0
+          }
+        }
+      ]
+    },
+    {
+      "sourceCommit": "9193471ac9a1de6154badfebd79c311b9a3ed78a",
+      "executionCommit": "a63fe443b01a3f8dfaf17ac1ff89e07783babd0b",
+      "sourceAndExecutionTree": "daee00378e275dea202b4dc404bcbf41809e0eba",
+      "runId": 42284298707,
+      "artifactId": 13536694960,
+      "archiveBytes": 985,
+      "archiveSha256": "e0aff310b7564a8b66cc9fc5e1d4165590f54383c2c7b505851d0b9185e7e7f0",
+      "privateReceipt": "windows-boundary-9193471-13536694960.json",
+      "receiptSha256": "fffadf05b175f563c0bb820bed14bf8a81bbee438051457c2f3746374c746554",
+      "totals": {
+        "required": 1,
+        "passed": 1,
+        "failed": 0,
+        "tests": 4,
+        "passedTests": 4,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "success": true,
+      "allChildAndTreeCleanupVerified": true,
+      "zipSavedLocally": false,
+      "groups": [
+        {
+          "file": "tools/layout-studio/repository-windows-shield-pypi.test.mjs",
+          "pattern": null,
+          "success": true,
+          "timeout": false,
+          "effectiveTimeoutMs": 300000,
+          "testCounts": {
+            "total": 4,
+            "passed": 4,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        }
+      ]
+    }
+  ],
+  "acceptedPassingTests": 14,
+  "declaredLinuxOnlySkips": 2,
+  "sourceAndMergeTreeEqualityVerified": true,
+  "guestExecutionDoubled": true,
+  "actualGuestOrInstalledWindowsAccepted": false,
+  "completeReleaseAccepted": false,
+  "archiveFilesSavedLocally": 0
+}

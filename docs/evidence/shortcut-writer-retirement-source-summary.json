@@ -1,0 +1,74 @@
+{
+  "schema": "switchyard-shortcut-writer-retirement-source/v1",
+  "baseCommit": "129229675dc5220984d9460798f3d22341fc7675",
+  "sourceFiles": [
+    {
+      "path": "deployment/suite/shortcut-process.mjs",
+      "sha256": "e1043a0264613dd7852af799b39948e47220904f55ee386307e1bb1885e83bf7"
+    },
+    {
+      "path": "deployment/suite/shortcut-process.test.mjs",
+      "sha256": "b9ef52be5896fd5856fef6d72f7988bbab4abee25c3fbdf384502ea657360298"
+    },
+    {
+      "path": "deployment/suite/launcher.mjs",
+      "sha256": "40cc414e3629e218a877b2519c3e75c190c100351b6bb5cb0c5a2f6f020e4016"
+    },
+    {
+      "path": "scripts/run-isolated-tests.mjs",
+      "sha256": "bd4102ec433faf7a4ba528131ee25b0e611883e32219be22ffba9249175dd02a"
+    },
+    {
+      "path": "scripts/verify-windows-storage-contracts.mjs",
+      "sha256": "268f728c21d013cb97eb9d55d99a5ba41a2fc058b5084ce8bfc6a8878629fdf3"
+    }
+  ],
+  "receipts": [
+    {
+      "name": "isolated-test-7cadafa7-87fc-430b-a7e2-c174fc3be57b.json",
+      "sha256": "d2330c2a93c15004cb4b9db72bf83cec122c9dd88edd36fdb010210459685bce",
+      "totals": {
+        "required": 23,
+        "passed": 23,
+        "failed": 0,
+        "tests": 67,
+        "passedTests": 67,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "allChildAndTreeCleanupVerified": true
+    },
+    {
+      "name": "isolated-test-bb330564-2195-4853-906a-9cf3cd0dc4a5.json",
+      "sha256": "00cca45f4e85027bc13c07f6949db2818368e7127b953e2c6cd192361b1ae70c",
+      "totals": {
+        "required": 1,
+        "passed": 1,
+        "failed": 0,
+        "tests": 9,
+        "passedTests": 9,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "allChildAndTreeCleanupVerified": true
+    }
+  ],
+  "distinctGroups": 23,
+  "distinctAcceptedTests": 69,
+  "originalExecutionTimeoutMs": 10000,
+  "ownedDirectChildStopGraceMs": 1500,
+  "ownedDirectChildStopFinalMs": 1500,
+  "nativeShortcutOrComExecuted": false,
+  "actualControlledNodeWriters": 2,
+  "unconfirmedExitPreservesOwnedStaging": true,
+  "allOwnedTestParentsRemoved": true,
+  "installedChanged": false,
+  "frontendChanged": false,
+  "extensionActivationChanged": false,
+  "nativeWindowsAcceptance": false,
+  "timeoutRootCauseEstablished": false
+}

@@ -1,0 +1,70 @@
+{
+  "schema": "switchyard-native-vscode-evidence/v1",
+  "sourceCommit": "dd0cad16430c0871af52df8d7edb7dff132d6eac",
+  "applicationRelease": "c50a7624c39c2866c59e2c7275c0e7156f5142a73543360751468fcd8309f805",
+  "success": true,
+  "scope": "exact native application navigation only",
+  "updateChecks": 6,
+  "installedVscodeChecks": 5,
+  "installedChatgptCompatibilityChecks": 5,
+  "windowCountScope": "verified-target-process",
+  "sourceGatewayVerified": true,
+  "processBirthIdentityUnchanged": true,
+  "unauthenticatedAndKeyboardOnlyRefused": true,
+  "validationRestored": true,
+  "ownedEditorCgroupEmptyOrRemoved": true,
+  "ownedProfileAndExtensionsRemoved": true,
+  "otherEditorInstancesClosed": false,
+  "ownedGatewayFixtureAndProofCheckoutRemoved": true,
+  "disposablePackageRemoved": true,
+  "userSettingsUnchanged": true,
+  "classOnlyFallbackRefusedAfterOwnedEditorExit": true,
+  "modelPromptsSubmitted": 0,
+  "providerAccountAccepted": false,
+  "repositoryAccepted": false,
+  "agentSessionAccepted": false,
+  "keyboardOpened": false,
+  "receipts": [
+    {
+      "localReceipt": "native-vscode-gateway-1793881739644.json",
+      "receiptSha256": "ca970cb59d62a732f20c8b0ab39fcbf23d3302b05071b98bc40704049ef2a16a"
+    },
+    {
+      "localReceipt": "installed-native-main-window-1793882002589.json",
+      "receiptSha256": "108a5322ecd23c71a7b2cf015acbc223b4d4bc32bf857bc70e7d1f484bc9dd61"
+    },
+    {
+      "localReceipt": "installed-native-main-window-1793882003855.json",
+      "receiptSha256": "d0b49e355b9099b6f937752d3003b7e14e7b67aa79f1466b54e4f2f6c5c7c128"
+    },
+    {
+      "localReceipt": "owned-vscode-retirement-1793882075618.json",
+      "receiptSha256": "18fcf5b09451255b751d5928b46b67b1f7eba0746251570adcf3abac2ee36256"
+    },
+    {
+      "localReceipt": "native-vscode-no-fallback-1793882102370.json",
+      "receiptSha256": "a15ee32ffd7f83fd31f7f302dea395f1be505a87b5e3c65a38b58efdca2fbb7a"
+    },
+    {
+      "localReceipt": "assignment-legends-1793881866189.json",
+      "receiptSha256": "b98c8489de6472b9dfc2ee421bbf2dc7213da93c5d5222a5eb186e5e2e301f8b"
+    }
+  ],
+  "failedPrototypesPreserved": [
+    {
+      "localReceipt": "native-vscode-gateway-failed-1793881702084.json",
+      "receiptSha256": "3673a2b7c49e4ae45ad030244ca952a1940f32d2b9a778526e80c411072f2923",
+      "failed": true
+    },
+    {
+      "localReceipt": "installed-native-main-window-1793881867658.json",
+      "receiptSha256": "d96ca8744a53cd7c047985f0c30fcfc6201d9bb9eec31900fa8b4029808466ce",
+      "failed": true
+    },
+    {
+      "localReceipt": "installed-native-main-window-1793881951293.json",
+      "receiptSha256": "7d3c5a3aab157c1cbecbc0d7a44a8150147c5808b83e4e9c94c13ab24adba26b",
+      "failed": true
+    }
+  ]
+}

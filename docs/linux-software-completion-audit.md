@@ -41,9 +41,11 @@ This is not acceptance evidence. All 27 gates remain **NOT ACCEPTED**.
 ## Verification authority
 
 The authoritative hosted check is `.github/workflows/b122-linux.yml` on the
-exact commit. It runs the full isolated suite, TypeScript typecheck, all package
+exact commit. It runs the shared and native Linux test files, TypeScript typecheck, all package
 builds/dry-runs, ShellCheck, official Node digest verification, release
 structure/manifest tests, install-update-rollback-uninstall lifecycle tests,
 and an installed companion smoke inside a real D-Bus Secret Service session.
 Windows-local skips are not Linux evidence; a merged Linux completion claim
 requires the exact Linux workflow to pass on `main`.
+
+The local `npm test` Linux lane now records the shared and native Linux groups in one isolated receipt. The October 2026 source-lane repair aligned the runtime's injected clock with its budget and cancellation registries, supplied a private `XDG_RUNTIME_DIR` to isolated tests, and added the loader's `/lib64` path to the fixed Bubblewrap mount set. The real namespace proof passed on the owner's Omarchy host after that mount correction. This is still local host evidence, not hardware, adversarial isolation, or merged release acceptance. Windows-only runtime tests remain in the Windows lane and in `npm run test:all` for cross-host diagnostics.

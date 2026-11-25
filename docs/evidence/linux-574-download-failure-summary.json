@@ -1,0 +1,12 @@
+{
+  "schema": "switchyard-ci-prerequisite-failure/v1",
+  "source": "574958fcce264723ca761e6507592c739959dba0",
+  "runId": 42570104922,
+  "jobId": 129005270185,
+  "logSha256": "b5eb46de5b295eb46f7932726209f941bdd09d7e39ac24873ff10832af1314ef",
+  "failure": "Pinned Bubblewrap 0.13.1 HTTPS download returned HTTP 504; curl exit 22 before source checksum/build and before tests.",
+  "testsStarted": false,
+  "manualRetry": false,
+  "deadlinesChanged": false,
+  "sourceChecksumChanged": false
+}

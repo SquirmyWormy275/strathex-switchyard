@@ -1,0 +1,40 @@
+{
+  "schema": "switchyard-linux-complete-summary/v1",
+  "sourceCommit": "0ad510eeebc4da0a6b8cffec527994e2fa480668",
+  "receipt": "isolated-test-3bc89538-b6f1-447f-a772-01c3bfb77f39.json",
+  "totals": {
+    "required": 255,
+    "passed": 255,
+    "failed": 0,
+    "tests": 1693,
+    "passedTests": 1682,
+    "failedTests": 0,
+    "skippedTests": 11,
+    "cancelledTests": 0,
+    "todoTests": 0
+  },
+  "allChildAndTreeCleanupVerified": true,
+  "ownedCleanupReceipt": "linux-0ad510e-cleanup-1793965709121.json",
+  "ownedCleanup": {
+    "schema": "switchyard-owned-linux-checkout-cleanup/v1",
+    "source": "0ad510eeebc4da0a6b8cffec527994e2fa480668",
+    "runReceipt": "isolated-test-3bc89538-b6f1-447f-a772-01c3bfb77f39.json",
+    "runAccepted": true,
+    "allChildAndTreeCleanupVerified": true,
+    "exactRootIdentityVerified": true,
+    "dependencyAliasesVerifiedRemoved": true,
+    "ownedBuildsRemoved": true,
+    "emptyArtifactsDirectoryRemoved": true,
+    "checkoutRemoved": true,
+    "rootRemoved": true,
+    "markerRemoved": true,
+    "ownedTestParentRemoved": true
+  },
+  "scope": "Complete Linux manifest from immutable published 0ad510e source, including protected editor journal, crash recovery, signed routing, typed client and joined Suite transitions.",
+  "limits": [
+    "Eleven declared Windows-only skips; no native Windows, guest or ordinary-user acceptance is inferred.",
+    "Real Linux carriers use synthetic providers/terminals. No native account, TUI, model or keyboard effect ran.",
+    "The later retained Terminal composition at 97a7727 and idempotent retired-stop correction have separate focused evidence.",
+    "Installed source remains 5a2c324. Frozen frontend and hardware/account acceptance remain separate."
+  ]
+}

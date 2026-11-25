@@ -1,0 +1,59 @@
+{
+  "schema": "switchyard-npm-semver-summary/v1",
+  "basis": "6f2097b5a70c64620ff347a67082a858d52a23df",
+  "sourceSha256": {
+    "scripts/collect-osv-advisories.mjs": "a32fdebe5733ae7c0fb92b49eade64b6ddfdafa4cbe097d3609b2f7edfb8dc54",
+    "scripts/run-isolated-tests.mjs": "5afc0ea7bfef99043fcdf834aae52e3a452f33518e62ee7f7006f57115f298a6",
+    "tools/layout-studio/osv-advisory-source.mjs": "b46661c5fec47674f68591421810c26379167762ceb50bf19b8c1520865585e6",
+    "tools/layout-studio/osv-advisory-source.test.mjs": "ec132df7f38632b74c625339f69c92a131f7b5f1d387033651ef0e2835aa244d",
+    "tools/layout-studio/repository-shield-osv-source.test.mjs": "b41d2955a0dd27ba906b20144657d80d68b776bbbf998effab6ee5e4aa51b67c",
+    "tools/layout-studio/repository-shield.mjs": "828f67e520aff5c1a203c75e5b05249cf57e01c7dc193b3e0e164fc37d1a6aaf",
+    "tools/layout-studio/shield-scanner-engine.mjs": "9ebe63b5b2f3b9fc50cf9c7d82e54d4484a552b0576df10130e2bc5f1db1ce5c",
+    "tools/layout-studio/shield-scanner-engine.test.mjs": "dfb0b1a4374bb6cd3af1cee7d3c7305ce05a4b2e3319b726b71776eb63ded8c1",
+    "tools/layout-studio/test-support/repository-shield-fixture.mjs": "84bd5860da4b1a3f1f95407a6d51ec910599b88aaac07a8953304726b231c199",
+    "tools/layout-studio/test-support/windows-execution-fixture.mjs": "b5bf6e526bb31afac53b63e375b185336123518ce104c1fc4025bbc8bbbc8aae"
+  },
+  "isolated": {
+    "receipt": "isolated-test-12a20b04-744f-460c-938c-7477dabd67d5.json",
+    "totals": {
+      "required": 12,
+      "passed": 12,
+      "failed": 0,
+      "tests": 101,
+      "passedTests": 101,
+      "failedTests": 0,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    },
+    "allChildAndTreeCleanupVerified": true
+  },
+  "reference": {
+    "receipt": "npm-semver-reference-1793973866162.json",
+    "reference": {
+      "name": "semver",
+      "version": "7.7.3",
+      "files": 52,
+      "bytes": 97740,
+      "inventorySha256": "6035c34423423773e6ff9e8998e54391bfaeab4c8b6f2562f4a783bb20323b8f",
+      "origin": "existing pinned Node 24.14.0 npm distribution; no download or install"
+    },
+    "grammarCases": 556,
+    "acceptedCases": 526,
+    "precedenceComparisons": 276676,
+    "limits": "Strict literal spelling and safe-integer numeric prerelease identifiers intentionally reject node-semver's normalization and imprecise numeric inputs.",
+    "stagingCreated": false
+  },
+  "typecheckPassed": true,
+  "initialSelectionFailure": "The first local launcher incorrectly assumed one manifest group per file. Windows scenario groups expand that file; selection stopped before creating a test parent. The launcher now verifies that every requested file is represented.",
+  "behavior": [
+    "Collector 8 accepts strict literal npm prereleases and build metadata through the same bounded parser as scanner inventory and closed host validation.",
+    "SemVer precedence ignores builds, while queries, explicit affected-version lists, signed-feed lookup and BOM identity preserve exact build strings.",
+    "Both Supply Chain and Release join controlled OSV transport, actual signed feeds, real Linux namespace scans or Windows guest doubles, encrypted receipts, replay refusal and verified exact cleanup. Original lockfile, Git index and HEAD remain unchanged."
+  ],
+  "limits": [
+    "Versions are at most 256 ASCII characters; core and numeric prerelease identifiers are at most 9007199254740991. Prefixes, whitespace, coercion, ranges and malformed identifiers refuse.",
+    "No live OSV query, provider/model/task/account or hardware operation ran. No new dependency, SDK, model or reference package was downloaded.",
+    "Missing provenance, artifact verification and repository coverage remain gaps; affected findings remain failed/incomplete. Installed and native Windows guest acceptance remain separate."
+  ]
+}

@@ -1,0 +1,62 @@
+{
+  "schema": "switchyard-windows-winexe-source/v1",
+  "basis": "d5686a56a637fe938f405c025802f5fdfaad0298",
+  "sourceSha256": {
+    "apps/desktop-hotkeys/Switchyard.Hotkeys.csproj": "7899ae082b5466060647d11580d6f9083349cae8e70723aa8cf47beb1ac79679",
+    "deployment/windows/test-support/storage-broker-protocol/LeaseConsoleProbe.cs": "8c7d0556424b1573e36776b10d869fe42839e097d0ae9906a528c75ed0decea7",
+    "scripts/windows-restricted-owner-report.mjs": "bd7e4d65190a95d0461cc9bd3074096648cf2b0f924c75cede7f74a83a86e86c",
+    "scripts/windows-restricted-owner-report.test.mjs": "d165e9d0e0cc6cfe6e5ec0c3c3887b62531b344dc22f549f1439c56a1fb21ff2"
+  },
+  "unchangedBoundarySha256": {
+    "tools/layout-studio/state-lock.mjs": "2030b5d03116231b62dd031de637bbf2d9466858ef097037371efb03e11edd7c",
+    "tools/layout-studio/keyless-lease-pool.mjs": "9a324867eec0c3568a5f2c57a2cdc73693ead6df7316bdfbb7fbee0ebf8aa153",
+    "apps/desktop-hotkeys/StateLeaseWorker.cs": "46c9eb654470a8a3c43b8c8851d0e7fd44be8f0938039a16b49b5b1c080a412a",
+    "deployment/windows/test-support/storage-broker-protocol/NativeRestrictedHostProof.cs": "3a64e18d82e0af11db1d1c4851f6a9a47a21a44384a2e2fad6569bc62afeb5b2",
+    "deployment/windows/test-support/storage-broker-protocol/RestrictedSelfTokenQuery.cs": "2f93772b6c6e762dfaf0727f89a679f4a87d425cc06b5095e799c939b58c9266"
+  },
+  "managed": {
+    "receipt": "winexe-managed-1793967323455.json",
+    "builds": [
+      {
+        "name": "helper",
+        "warnings": 0,
+        "errors": 0,
+        "managedAssemblySha256": "f376edd107f581a20d04d18bf4bd7832f08d351535fa77036dc926e2b16c90bc",
+        "managedPeSubsystem": 2
+      },
+      {
+        "name": "proof",
+        "warnings": 0,
+        "errors": 0,
+        "managedAssemblySha256": "79bfe51561f77d8edbabe9bfcb0d07b7ab3d2d846e90151966d71ca632adfbc0",
+        "managedPeSubsystem": 3
+      }
+    ],
+    "portableChecks": 1975,
+    "ownedCleanup": {
+      "files": 122,
+      "bytes": 3176400,
+      "removed": true
+    },
+    "nativeWindowsApphostBuilt": false
+  },
+  "isolated": {
+    "receipt": "isolated-test-6270553f-008e-4203-84cc-05dc7dfa8288.json",
+    "groups": 4,
+    "passed": 42,
+    "allChildAndTreeCleanupVerified": true
+  },
+  "typecheckPassed": true,
+  "retainedFailure": {
+    "receipt": "winexe-managed-1793967262917.json",
+    "cause": "Changing the intermediate output path in the original checkout included pre-existing obj-generated attributes in the compiler glob. Corrected verification builds only copied tracked source.",
+    "ownedScratchRemoved": true,
+    "existingFilesPreserved": true
+  },
+  "candidate": "Build the existing helper with the Windows GUI subsystem while preserving ordinary Node spawn and parent-loss containment. The native proof checks the held digest-pinned PE before either console-mode probe. Diagnostic v2 binds the subsystem, while historical v1 evidence remains parseable.",
+  "limits": [
+    "No native Windows startup repair is accepted by this source-only build. The original restricted owner still requires all eight unchanged checks.",
+    "This does not establish installed helper behavior, ordinary-user/guest acceptance, or complete Windows release acceptance.",
+    "No production detached fallback, token/privilege/default-DACL/SID/account/runtime fallback or model/hardware action is introduced."
+  ]
+}

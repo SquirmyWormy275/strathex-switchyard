@@ -1,0 +1,42 @@
+{
+  "schema": "switchyard-cvss-v2-acceptance/v1",
+  "basis": "e007b9942df9cd36b55f011a14fabab4949eb002",
+  "referenceReceipt": "cvss-v2-reference-1793943295706.json",
+  "referenceCleanupReceipt": "cvss-v2-reference-cleanup-1793943509071.json",
+  "independentReference": "RedHatProductSecurity/cvss",
+  "referenceCommit": "2f149099257ae06b98cef252efc440bddafe61e5",
+  "caseCount": 417285,
+  "cohorts": {
+    "base": 729,
+    "all-base-temporal": 72900,
+    "all-base-requirements": 46656,
+    "adjusted-temporal-distribution": 297000
+  },
+  "resultSha256": "e23650345ef13e678617861f6255fb2220fe6c9d33da1f11b34e2ee2e231156b",
+  "calculatorSha256": "95f14c2a261e6deb74e083f870edc726e76d8f8ae344f61730ab41a31f185312",
+  "collectorVersion": "switchyard-osv-collector/4",
+  "focused": [
+    {
+      "receipt": "isolated-test-bfd24e14-d114-4192-b062-7de9ed830806.json",
+      "groups": 7,
+      "passedTests": 53
+    },
+    {
+      "receipt": "isolated-test-e2930155-935d-4cfc-85d5-b647513bcdcd.json",
+      "groups": 2,
+      "passedTests": 25
+    }
+  ],
+  "allChildAndTreeCleanupVerified": true,
+  "typecheck": true,
+  "actualLinuxJourneys": [
+    "V2 high Supply Chain remains failed and incomplete despite zero supplied environmental score",
+    "mixed V2/V3 critical Release remains failed and incomplete; duplicate returns original receipt"
+  ],
+  "limits": [
+    "Windows scanner journey uses controlled guest doubles; actual Windows acceptance remains separate.",
+    "Installed application remains source 4b5e3cc. This later severity implementation is source-tested.",
+    "CVSS 4, source metric correctness, verified local environment, publisher authenticity and whole-repository coverage remain unfinished.",
+    "Only input vectors, numeric result digests and hashes are shipped; no external reference code or package installation."
+  ]
+}

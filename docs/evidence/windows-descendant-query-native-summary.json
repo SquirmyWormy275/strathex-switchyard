@@ -1,0 +1,58 @@
+{
+  "kind": "descendant-query",
+  "sourceCommit": "cff471eeb27a05300642bc9c0218362ea9756ae9",
+  "executionCommit": "4f1857f24b029c4d3b14cc51f58f4d86f0c934e4",
+  "sourceAndExecutionTree": "df5fc6ae011cb627207e628f88a342071be08f46",
+  "runId": 42254962793,
+  "jobId": 128020062595,
+  "artifactId": 13521609168,
+  "archiveBytes": 4557,
+  "archiveSha256": "6f4e7885b868da80d2f44e21a3d686c86929c0b512f341ec96a07dcc5eb64185",
+  "zipSavedLocally": false,
+  "schema": "switchyard-descendant-query-native/v1",
+  "privateReceipt": "windows-descendant-cff-native.json",
+  "restrictedHostPhase": "bounded-owner-journey",
+  "originalColdAndNodeEvidenceCount": 2,
+  "originalOwnerRequiredChecks": 8,
+  "childExit": {
+    "waitResult": 0,
+    "exitCode": 2,
+    "resultAvailable": true,
+    "childReportedSuccess": false,
+    "ownerReportedSuccess": false,
+    "completedChecks": 0,
+    "failedPhase": "probe-identity-created-native-self-birth",
+    "failureCategory": "Error",
+    "stateLockFailure": null
+  },
+  "descendants": [
+    {
+      "sequence": 1,
+      "role": "guardian",
+      "status": "verified",
+      "originalJobVerified": true,
+      "liveBirthVerified": true,
+      "pinnedImageVerified": true,
+      "processHandleClosedVerified": true,
+      "query": {
+        "schema": "switchyard-child-self-query-acl/v1",
+        "scope": "descendant-guardian",
+        "status": "verified",
+        "grantedMask": 8,
+        "changeRequested": true,
+        "beforeAclSha256": "ce7e628ffee9c22e6fcea45b4d6efd30b0b6b28203a0d719080836410f93cfe0",
+        "afterAclSha256": "85ae6f74a0f7ae9c371ff386486a8c92094d0a4b09d9a85d8426c45250592224",
+        "originalAcesPreserved": true,
+        "exactQueryEntryVerified": true,
+        "tokenRestrictionsRechecked": true,
+        "handlesClosedVerified": true,
+        "buffersClearedVerified": true
+      }
+    }
+  ],
+  "jobCreationClearedInferredFromLaterPhase": true,
+  "workerAndStatusExercised": false,
+  "restrictedOwnerAccepted": false,
+  "broaderFailedFixtureRemovalVerified": false,
+  "installedChanged": false
+}

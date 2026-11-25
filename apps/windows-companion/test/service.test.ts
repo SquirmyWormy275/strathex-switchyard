@@ -534,7 +534,9 @@ test("acceptance and scanner administration cross only installed user-presence-b
   const scannerFixture = { id: "scanner-feed-1", kind: "scanner" as const, packageRoot: "C:\\state\\scanner-feed-1", manifestSha256: "d".repeat(64), installedAt: "2026-08-24T00:00:00.000Z", installedBy: "TEST\\Security", status: "active" as const };
   const scannerAdministration: NonNullable<CompanionServiceOptions["scannerAdministration"]> = {
     async installTrust(path) { calls.push(`scanner trust ${path}`); return scannerTrust; }, async listTrust() { return [scannerTrust]; }, async revokeTrust() { calls.push("scanner trust revoke"); },
-    async installFixture(path) { calls.push(`scanner fixture ${path}`); return scannerFixture; }, async listFixtures() { return [scannerFixture]; }, async revokeFixture() { calls.push("scanner fixture revoke"); }
+    async installFixture(path) { calls.push(`scanner fixture ${path}`); return scannerFixture; }, async listFixtures() { return [scannerFixture]; }, async revokeFixture() { calls.push("scanner fixture revoke"); },
+    async storageUsage() { return { maximumBytes: 67108864, maximumAllocations: 32, allocatedBytes: 0, remainingBytes: 67108864, allocatedCount: 0, allocations: [] }; },
+    async removeFixture() { calls.push("scanner fixture remove"); }
   };
   const service = new CompanionService({ acceptanceAdministration, scannerAdministration });
   assert.equal((await service.handle(request("trust", "acceptance.trust.install", { sourcePath: "C:\\reviewed\\trust.json" }))).ok, true);

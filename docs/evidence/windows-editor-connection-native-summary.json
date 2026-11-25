@@ -1,0 +1,56 @@
+{
+  "schema": "switchyard-windows-editor-connection-native-summary/v1",
+  "sourceCommit": "f1167c98cb9487688754dc47c06529c7dcf0c401",
+  "mergeCommit": "5dd2471b30a8bb8b23fead496e06c522c123a0d2",
+  "equalSourceAndMergeTree": "ec0d78591c0bdd74062b6b6da763c4d74f3c3fc3",
+  "workflowRun": 42352800798,
+  "clientJob": 128344520563,
+  "helperBuildJob": 128344343923,
+  "overallClientWorkflowPassed": true,
+  "sourceFiles": {
+    "apps/desktop-hotkeys/Program.cs": "bb93aace81a0b40651a489f950ce89dfba0beda1d276c63f4315b41d131afcc0",
+    "apps/windows-companion/provider-desktop-helper/Program.cs": "04f0c5fd546aed1099aeca89377db623c79ac08124fb985009417100c2fec6dc",
+    "tools/layout-studio/windows-terminal-process.mjs": "fe0ed2b7e4d635130c6e734440dd23daf838aad3213837734d9d75f96ae6da7f",
+    "tools/layout-studio/windows-terminal-process.test.mjs": "6c79e27b8f9737fdd38a0923ce933ce02a58fed9fdec7f1db78c00762a71bb1b",
+    "tools/layout-studio/windows-terminal-peer.test.mjs": "e83f37af27b9a47094fdb23ff81fd9d65c0c48ad02c7fafb8fab6fa16b72b9a2",
+    "tools/layout-studio/windows-codex-editor-connection.mjs": "0e630a0bf2e17b46c87ffefc1047d1088b81c109cbd55bb2b53137b34b809bc6",
+    "tools/layout-studio/windows-codex-editor-connection.test.mjs": "de8d47435a4a464608158a01b3e72e315adb6c3d45b9e4fda4c738b332ac14a6",
+    "tools/layout-studio/codex-editor-protocol.mjs": "80017a54595c6b9c7b53717d0ed54a09d04caa13281298aba6f851feb45c779f",
+    "tools/layout-studio/codex-editor-relay.mjs": "83dcecdc48950825050d532d5a722cfe70b742c80370533d89c470454f725057",
+    "tools/layout-studio/windows-editor-ingress.mjs": "7c49607d024205f3c05c725a96a4043e75e8164d696e5382f7856851dfff5571",
+    "tools/layout-studio/windows-editor-ingress.test.mjs": "dcf381d0487754f65077487b84570114d28c918218f03c361754369e7bb83681",
+    "tools/layout-studio/editor-websocket-frames.mjs": "56ba5da76b9e7b3e0473e17b6408d6dd3baf5e4727e4f2aeeea58e345e1f9637",
+    "tools/layout-studio/editor-websocket-frames.test.mjs": "4a7bdcb0d0e48697c95b935cf53a0d41fa91b427f426373bcb418126236d7d74",
+    "scripts/verify-client-platform.mjs": "c2984488e1661a2bb029a27cc663752dd0f63210b3cd47791f1f419d44f39aa7",
+    ".github/workflows/client-platform.yml": "b435b6ebdd8a178531a8c6f692e85286129c8704a4b2100f275f50104b762abf"
+  },
+  "manifestSha256": "98faa2c49afebc7cf1c8b188fdd02ff34f595ae0e87c5c8a59010a017d65eefc",
+  "receipt": "isolated-test-596f386f-51d4-43d1-aae1-59b32f759730.json",
+  "receiptSha256": "0835dd40ceb55f851c091f02329f507ac0abec8af5fee2192bf7573d3c9affc5",
+  "artifact": {
+    "id": 13566516500,
+    "bytes": 2229,
+    "sha256": "7a1a6b5bdb825e645da42d8856119e98ee437479661138a1abb192fdcc131dd5",
+    "archiveReadInMemoryOnly": true
+  },
+  "groups": 12,
+  "passedTests": 127,
+  "skippedTests": 0,
+  "originalCommandsBoundsSkipsAndCleanupVerified": true,
+  "actualNativeProcessQueryAccepted": true,
+  "actualNativeTcpPeerQueryAccepted": true,
+  "actualNativeAuthenticatedWebSocketRoundTripAccepted": true,
+  "scope": [
+    "Exact owned Node fixture PID, birth, held executable file identity and SHA-256, current user and session.",
+    "Exact established loopback TCP tuple; wrong client PID, reversed tuple and closed connection refuse.",
+    "Original supervised helper exit and QUERY mask 8.",
+    "Authenticated WebSocket upgrade and bidirectional JSON with an owned Windows Node process; original socket and helper retirement."
+  ],
+  "limitations": [
+    "Composed task-protocol cases use explicit provider and process-query doubles; the separate carrier case uses actual Windows process queries.",
+    "The later persistent Windows stdio owner is outside this source.",
+    "This does not establish Windows task attachment, Suite/editor routing, live provider/account interaction or interactive native focus.",
+    "Full Windows release and physical device acceptance remain separate."
+  ],
+  "success": true
+}

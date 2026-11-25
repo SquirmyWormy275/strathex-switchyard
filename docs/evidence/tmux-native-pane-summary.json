@@ -1,0 +1,45 @@
+{
+  "schema": "switchyard-native-tmux-navigation-summary/v1",
+  "success": true,
+  "privateReceipt": "tmux-native-pane-1793887673453.json",
+  "cleanupReceipt": "tmux-native-cleanup-1793887736504.json",
+  "realTmuxAndFoot": true,
+  "syntheticCliIdentity": true,
+  "realClaudeAccountAccepted": false,
+  "installedApiAccepted": false,
+  "exactPaneAndWindowReadbackVerified": true,
+  "providerIdentityChecks": 3,
+  "modelPromptsSubmitted": 0,
+  "keyboardOpened": false,
+  "ownedProcessesRetired": 5,
+  "ownedUnitsStopped": 2,
+  "ownedSocketAndDirectoryRemoved": true,
+  "ownedWindowsRemaining": 0,
+  "userTerminalConfigurationChanged": false,
+  "earlierUiFixtureFailure": "tmux-native-pane-failed-1793887591081.json",
+  "earlierUiFixtureFailureRemainsFailed": true,
+  "sourceSha256": {
+    "tools/layout-studio/native-process.mjs": "e3469db560f1741ae0681f7c4819e5d8831f6f65910aa700344355c861e11560",
+    "tools/layout-studio/task-window.mjs": "b974efa953c5ee4ee013ba00d0d256f2863ff01691f34c5573c0bc61e7283d41",
+    "tools/layout-studio/tmux-task-window.mjs": "cc2912a3e3fdef6d4af653cb109e9e9f98027c4cb9f86eee11eac75fbde31b9d",
+    "tools/layout-studio/claude-coding.mjs": "11d34687362af2536a6e36650a1cf5bcd8668cbf4fd4dbc55bf007fd30703619"
+  },
+  "focusedVerification": [
+    {
+      "groups": 6,
+      "tests": 64,
+      "receipt": "isolated-test-e19720fc-dd7a-4f52-93f2-f2e35e421f60.json"
+    },
+    {
+      "groups": 3,
+      "tests": 31,
+      "receipt": "isolated-test-96c87367-a936-4d53-b097-cf2b35330a02.json"
+    },
+    {
+      "groups": 3,
+      "tests": 29,
+      "receipt": "isolated-test-6433a903-5ebf-407f-867d-146566cce51c.json"
+    }
+  ],
+  "everyChildCleanupVerified": true
+}

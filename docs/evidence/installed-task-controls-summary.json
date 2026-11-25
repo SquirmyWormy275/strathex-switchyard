@@ -1,0 +1,144 @@
+{
+  "schema": "switchyard-installed-task-controls-summary/v1",
+  "at": "2026-11-09T03:39:27.083269+00:00",
+  "readback": {
+    "schema": "switchyard-task-installed-readback/v1",
+    "sourceCommit": "cf6a94a7359847addf3209b04dd8ca3f2370a2b6",
+    "release": "4330746ca22b5544dd0257e646a129dfb2275ab6b325c5ec5f9c5b5bb727f99c",
+    "previous": "db142f7c6fa6d2717856d709d739135bfd6cf04ddeb2dca2e8c4f500196ff916",
+    "frontend": "f96ce01b96b12459fd39b89eca9e16ca826177eab8e749467d73584f48ac45c8",
+    "assets": 34,
+    "files": 569,
+    "bytes": 4964724,
+    "workspaces": 54,
+    "semanticSnapshotsPreserved": true,
+    "sealedByteIdentical": 53,
+    "allConversationSemanticsPreserved": true,
+    "conversationCount": 3,
+    "selectionPreserved": true,
+    "allModesPreserved": true,
+    "privateAccessChangedForNewFrontend": true,
+    "datedBackupVerified": true,
+    "managedLauncherReadbackVerified": true,
+    "currentAndOneRollbackOnly": true,
+    "ready": true,
+    "checks": [
+      "served index.html",
+      "served app.mjs",
+      "served model.mjs",
+      "served workspace.mjs",
+      "served connection.mjs",
+      "served vial-snapshot.mjs",
+      "served observation-ui.mjs",
+      "served portable-ui.mjs",
+      "served scanner-ui.mjs",
+      "served feed-ui.mjs",
+      "served conversation-ui.mjs",
+      "served task-ui.mjs",
+      "served authority-ui.mjs",
+      "served execution-ui.mjs",
+      "served client-ui.mjs",
+      "served role-ui.mjs",
+      "served suite-ui.mjs",
+      "served workflow.mjs",
+      "served device-diagnostic-ui.mjs",
+      "served device-settings-ui.mjs",
+      "served vial-settings.mjs",
+      "served vial-keycodes.mjs",
+      "served vial-rules.mjs",
+      "served device-ui.mjs",
+      "served shell.mjs",
+      "served home.mjs",
+      "served catalog.mjs",
+      "served geometry.mjs",
+      "served keyboard-view.mjs",
+      "served model-f-catalog.json",
+      "served style.css",
+      "served sample-info.json",
+      "served sample-keymap.json",
+      "served sample-study-report.json",
+      "metadata coding/authority/list",
+      "metadata coding/execution/list",
+      "metadata coding/scanner-save/list",
+      "metadata host/scanner-fixtures/list"
+    ],
+    "hardwareOpened": false,
+    "nativeProviderRequests": 0,
+    "visualAcceptance": false
+  },
+  "finalState": {
+    "schema": "switchyard-task-installed-final-state/v1",
+    "release": "4330746ca22b5544dd0257e646a129dfb2275ab6b325c5ec5f9c5b5bb727f99c",
+    "workspaces": 54,
+    "allSemanticSnapshotsPreserved": true,
+    "allModesAndConversationsPreserved": true,
+    "sealedByteIdentical": 53,
+    "selectionPreserved": true,
+    "verifiersCompleted": 8
+  },
+  "metadataReceipts": [
+    {
+      "name": "installed-agent-security-metadata-1794195537025.json",
+      "sha256": "2984a2272a19ddd3b5d727fc2a9879061b47a98f333135ab461387d7bbe33e0f",
+      "checks": 30
+    },
+    {
+      "name": "installed-npm-archive-metadata-1794195537059.json",
+      "sha256": "18862e42ef8cbdab4cc747a93b27a7a6bf54a57d209ee61f03dadc3d1a7e40ee",
+      "checks": 3
+    },
+    {
+      "name": "installed-python-inventory-metadata-1794195537107.json",
+      "sha256": "b2d2ea9eba522d4fd6292894f21e1f40cf0e2882508906fe6b04e98d5c778c97",
+      "checks": 14
+    },
+    {
+      "name": "installed-cargo-inventory-metadata-1794195537090.json",
+      "sha256": "083014b40ef34686fe4784110c4113c24fc8a8c371cc59bb16b8f49c13e8c304",
+      "checks": 10
+    },
+    {
+      "name": "installed-workflow-identity-metadata-1794195537581.json",
+      "sha256": "287fdb9e58035c66992383aa02c7239941bc7eae4728818349c412f713f5996b",
+      "checks": 10
+    },
+    {
+      "name": "installed-task-owner-metadata-1794195543308.json",
+      "sha256": "2217dd2fdb936ce0f256468e2d8cc16d814ac497e1bc8ab63803957374d1eca1",
+      "checks": 18
+    },
+    {
+      "name": "installed-copilot-journal-metadata-1794195543491.json",
+      "sha256": "ccaed03889a3cf5f60f78c4575d42d43890f664a3add12aab03cd89a9ed007d2",
+      "checks": 7
+    },
+    {
+      "name": "installed-signed-intent-metadata-1794195543686.json",
+      "sha256": "b54f75a00edcfb8dfff0e8750ddc21b08e5bb0770ede2cc9b2653e8c44890fe8",
+      "checks": 8
+    }
+  ],
+  "metadataChecks": 100,
+  "exactModuleHashes": 58,
+  "workflowsVerified": 57,
+  "sourceProvenance": "task-ui-source-summary.json",
+  "cleanup": {
+    "schema": "switchyard-task-prepared-cleanup/v1",
+    "release": "4330746ca22b5544dd0257e646a129dfb2275ab6b325c5ec5f9c5b5bb727f99c",
+    "dev": "58",
+    "ino": "34062850",
+    "files": 570,
+    "bytes": 5067650,
+    "manifestSha256": "ee8258921eb431864d10c8908eae6dc1a151b320c01b412714ecc2a18272f763",
+    "allPayloadHashesVerified": true,
+    "installedReadbackPassed": true,
+    "reason": "Remove only the exact owned prepared copy after installed assets, state and all eight metadata verifiers pass.",
+    "removed": true
+  },
+  "limitations": [
+    "Browser control remains blocked before inspection; visual/responsive acceptance is not inferred from HTTP.",
+    "No actual native account/task/model, HID, microphone or IDE operation occurred.",
+    "Latest full Linux/Windows acceptance belongs to separately recorded earlier sources.",
+    "Claude background-task controls, approved-work recovery/account controls and exact interactive attachment remain separate work."
+  ]
+}

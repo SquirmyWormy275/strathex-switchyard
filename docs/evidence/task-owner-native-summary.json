@@ -1,0 +1,140 @@
+{
+  "kind": "task-owners",
+  "sourceCommit": "9fde0a3d4534193a5248ba9d89a2d6b0afbcfa72",
+  "executionCommit": "304fb9159b4f33be35c000e4c713245fa66f6047",
+  "sourceAndExecutionTree": "20f857447c6337886faa093b0e8ac5ac836aacfa",
+  "runId": 42264278450,
+  "artifactId": 13525533479,
+  "archiveBytes": 4715,
+  "archiveSha256": "f51f11cc0e4af4d9ef0b25e55c36edcd4409d0e8e28b64122e2fbb295e10ae45",
+  "zipSavedLocally": false,
+  "schema": "switchyard-task-owner-native/v1",
+  "privateReceipt": "windows-task-owners-9fde-native.json",
+  "jobId": 128052450101,
+  "success": true,
+  "totals": {
+    "required": 26,
+    "passed": 26,
+    "failed": 0,
+    "tests": 26,
+    "passedTests": 24,
+    "failedTests": 0,
+    "skippedTests": 2,
+    "cancelledTests": 0,
+    "todoTests": 0
+  },
+  "maximumCaseDurationMs": 12491,
+  "originalTimeoutMs": 45000,
+  "allChildAndTreeCleanupVerified": true,
+  "originalCases": [
+    {
+      "file": "tools/layout-studio/coding-task-owners.test.mjs",
+      "pattern": "persistent metadata ownership binds one original task/account/repository without task creation or IDE authority"
+    },
+    {
+      "file": "tools/layout-studio/coding-task-owners.test.mjs",
+      "pattern": "two service instances serialize duplicate admission through the real private kernel lease"
+    },
+    {
+      "file": "tools/layout-studio/coding-task-owners.test.mjs",
+      "pattern": "changed creator account or original task repository refuses binding and retires the exact owned listener"
+    },
+    {
+      "file": "tools/layout-studio/coding-task-owners.test.mjs",
+      "pattern": "persistence failures preserve no-replay request identity and cannot deliver later task reads"
+    },
+    {
+      "file": "tools/layout-studio/coding-task-owners.test.mjs",
+      "pattern": "unconfirmed native exit blocks replacement and recovery can only retire the original saved identity"
+    },
+    {
+      "file": "tools/layout-studio/coding-task-owners.test.mjs",
+      "pattern": "replaced protected ownership or revoked permission cannot return metadata from an older live connection"
+    },
+    {
+      "file": "tools/layout-studio/coding-task-owners.test.mjs",
+      "pattern": "protected task registry composes the actual owned Unix listener and bridge while the provider is a controlled double",
+      "expectedSkipped": 1
+    },
+    {
+      "file": "tools/layout-studio/coding-task-owners.test.mjs",
+      "pattern": "late ownership drift and stopped startup cannot acknowledge a retained connection as current"
+    },
+    {
+      "file": "tools/layout-studio/coding-task-owners.test.mjs",
+      "pattern": "verified exit of an in-memory owner cannot retire a substituted protected native identity"
+    },
+    {
+      "file": "tools/layout-studio/coding-task-owners.test.mjs",
+      "pattern": "reviewed owned loading consumes one exact token and preserves request identity across duplicate and restarted callers"
+    },
+    {
+      "file": "tools/layout-studio/coding-task-owners.test.mjs",
+      "pattern": "load refuses substituted token, changed owner contents, policy or task permissions before a native resume"
+    },
+    {
+      "file": "tools/layout-studio/coding-task-owners.test.mjs",
+      "pattern": "active and unfamiliar task states refuse loading without changing running permissions"
+    },
+    {
+      "file": "tools/layout-studio/coding-task-owners.test.mjs",
+      "pattern": "load boundaries refuse asynchronous drift and retain exact late acknowledgement without replay"
+    },
+    {
+      "file": "tools/layout-studio/coding-task-owners.test.mjs",
+      "pattern": "concurrent reviewed requests cannot load one original owner twice"
+    },
+    {
+      "file": "tools/layout-studio/coding-task-owners.test.mjs",
+      "pattern": "shutdown joins an in-flight load and prevents its late native effect"
+    },
+    {
+      "file": "tools/layout-studio/coding-task-owners.test.mjs",
+      "pattern": "authenticated Studio routes compose real protected review/load state without accepting prompts or granting IDE authority"
+    },
+    {
+      "file": "tools/layout-studio/coding-task-owners.test.mjs",
+      "pattern": "normal workspace selection retires exact owned connections and refuses inactive or externally selected task routes"
+    },
+    {
+      "file": "tools/layout-studio/coding-task-owners.test.mjs",
+      "pattern": "keyboard-only mode joins task-owner shutdown and preserves failed retirement without enabling new starts"
+    },
+    {
+      "file": "tools/layout-studio/coding-task-owners.test.mjs",
+      "pattern": "an external workspace change during native project setup refuses the late task effect"
+    },
+    {
+      "file": "tools/layout-studio/coding-task-owners.test.mjs",
+      "pattern": "a failed bridge close still attempts original native owner retirement and cannot upgrade the uncertain bridge exit"
+    },
+    {
+      "file": "tools/layout-studio/coding-task-owners.test.mjs",
+      "pattern": "a dedicated editor client uses only the original acknowledged task owner and rechecks after registration"
+    },
+    {
+      "file": "tools/layout-studio/coding-task-owners.test.mjs",
+      "pattern": "authenticated editor routes consume one reviewed launch permission without launching a terminal or exposing its protected record"
+    },
+    {
+      "file": "tools/layout-studio/coding-task-owners.test.mjs",
+      "pattern": "editor target preparation binds the acknowledged load and original endpoint without another resume, launch or authority claim"
+    },
+    {
+      "file": "tools/layout-studio/coding-task-owners.test.mjs",
+      "pattern": "editor preparation refuses stale load, changed policy/account, non-idle task and incomplete endpoint identity"
+    },
+    {
+      "file": "tools/layout-studio/coding-task-owners.test.mjs",
+      "pattern": "asynchronous editor inspection cannot conceal load replacement, endpoint drift or a policy change at its last boundary"
+    },
+    {
+      "file": "tools/layout-studio/coding-task-owners.test.mjs",
+      "pattern": "the editor client authenticates the real Studio route and reads original protected target metadata without another native effect",
+      "expectedSkipped": 1
+    }
+  ],
+  "providerDoubles": true,
+  "installedChanged": false,
+  "completeWindowsReleaseAccepted": false
+}

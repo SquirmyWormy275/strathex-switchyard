@@ -1,0 +1,46 @@
+{
+  "schema": "switchyard-custom-agent-outcome-source/v1",
+  "baseCommit": "6742550b93fb52c3ecfa095fd58369bbba57ffaa",
+  "sourceFiles": {
+    "tools/layout-studio/custom-agents.mjs": "860bb7d7040abcd88b8011d0d10f05f869c135c6706ceca31fd20b7117fbc9b3",
+    "tools/layout-studio/agent-observation.mjs": "35619e691cf11a3aef8eb5b1bb249635302d9a48e99e2edc192ab001fd3b1dfe",
+    "tools/layout-studio/agent-revocation.test.mjs": "680220cb8f09d917aedb1ce740c4f023da8ee22711bf0ef7ff50ccb2399ca12e",
+    "tools/layout-studio/agent-observation.test.mjs": "d63ddc68d3e2a69c2572972884237002e6324ad70907e8e542208d455cc6a96c",
+    "tools/layout-studio/suite.mjs": "4238bdee81e40f1e42c763deb40a1fc904f00530561a2532dfc44154f6f7dcd3",
+    "packages/control-plane/src/confirmations.ts": "51e87bee8cb375bdbe0e8c5cc277733307c152b31d30ad7c870c55e747b6b2f4"
+  },
+  "verificationReceipt": "isolated-test-23b98f70-edd0-4be2-9b7f-61cade7e6cc4.json",
+  "verificationReceiptSha256": "ecd58ff459c74e88c11a326c28284156476566cb07da663d1b953c8fec4d8d08",
+  "totals": {
+    "required": 8,
+    "passed": 8,
+    "failed": 0,
+    "tests": 91,
+    "passedTests": 91,
+    "failedTests": 0,
+    "skippedTests": 0,
+    "cancelledTests": 0,
+    "todoTests": 0
+  },
+  "newRegressionCases": 5,
+  "authenticatedHttpReviewJourney": true,
+  "lateAcknowledgementRacesTested": true,
+  "failedPersistencePreservesClaimAndObservations": true,
+  "unreviewedUncertaintyPreservedAtCapacity": true,
+  "externalOutcomeVerified": false,
+  "automaticReplayAdded": false,
+  "allChildAndTreeCleanupVerified": true,
+  "ownedTemporaryRootRemoved": true,
+  "typecheckPassed": true,
+  "completePackageBudgetPreserved": true,
+  "nativeWindowsAcceptance": false,
+  "installedChanged": false,
+  "frontendChanged": false,
+  "liveUserCredentialsUsed": false,
+  "success": true,
+  "excludedInitialAttempt": {
+    "receipt": "isolated-test-8ffd6ebf-6bd7-41ff-9141-c5645456ade0.json",
+    "failedTests": 2,
+    "reason": "Two synthetic recording fixtures omitted their required updatedAt timestamp and were removed by the existing retention filter. The fixtures now carry complete timestamps; no production retention rule, deadline or assertion was relaxed."
+  }
+}

@@ -1,0 +1,62 @@
+{
+  "schema": "switchyard-complete-windows-dependency-fix/v1",
+  "failure": {
+    "sourceCommit": "754660e0c97bd115eb229b536240671a9dbfd863",
+    "mergeCommit": "4f2aaa6a591a53283e5477dbbee95fc823d676e4",
+    "sourceTree": "a15ca37f6593bad607713ad144e25023567b0662",
+    "runId": 42390824164,
+    "jobId": 128458030239,
+    "artifactId": 13582166117,
+    "zipSha256": "cc67cf5c00340a1567578c0e7e41f4024b2b85774d04545a1ec48486af6e27a0",
+    "envelopeSha256": "94c38dcd2bac5ddb17ad0636ff137482ad7b283a73e0f3aeb668918b1b3a9dc9",
+    "receiptId": "11d68291-ccc6-4d94-82ab-a4a157d56346",
+    "receiptSha256": "71376266003efbcb447ee9c81ea559dd52a05a6f87104787e930b755cff08513",
+    "totals": {
+      "required": 23,
+      "passed": 22,
+      "failed": 1,
+      "tests": 183,
+      "passedTests": 164,
+      "failedTests": 1,
+      "skippedTests": 18,
+      "cancelledTests": 0,
+      "todoTests": 0
+    },
+    "file": "apps/provider-adapter-host/test/tls-network-e2e.test.ts",
+    "pattern": "packaged provider host lifecycle and the production pinned network broker interoperate over exact loopback TLS",
+    "error": "ENOENT reading the provider host compiled dist directory on an independent worker.",
+    "timeout": false,
+    "effectiveTimeoutMs": 300000,
+    "originalManifestCommandsBoundsAndCleanupVerified": true
+  },
+  "correction": {
+    "files": [
+      {
+        "path": "scripts/windows-complete-shards.mjs",
+        "sha256": "2d4b1857afafec0eb4339edd3674e22d27e52c441e4cb02c788e8ba232eaebf0"
+      },
+      {
+        "path": "scripts/windows-complete-shards.test.mjs",
+        "sha256": "2ea1679902c97e956467a5868ee620421539ad27978f598f8cb36671bc86c354"
+      }
+    ],
+    "description": "Keep both exact TLS lifecycle scenarios on the assembly worker after the original provider-host build. No test, assertion, skip, child/job bound or package verification is removed or relaxed.",
+    "focusedReceipt": {
+      "id": "49cc1c12-5aa3-42db-8d56-63bccf71da5a",
+      "sha256": "c6ebc535fe82a00d065c96d90332318a2940b07ed2b0a023f3cfafa0801c34dd",
+      "totals": {
+        "required": 5,
+        "passed": 5,
+        "failed": 0,
+        "tests": 45,
+        "passedTests": 45,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    "nativeAcceptance": false
+  },
+  "remaining": "Other workers are independently running; this failed source cohort cannot become complete acceptance. The package release workflow remains separate."
+}

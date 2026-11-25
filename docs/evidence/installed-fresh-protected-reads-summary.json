@@ -1,0 +1,52 @@
+{
+  "schema": "switchyard-installed-fresh-protected-reads-summary/v1",
+  "sourceCommit": "3319f922d17e70ec30eaf3422cff5599262cb08c",
+  "completeLinuxProductionReadCheckpoint": "9dc0a944f7ecbbf39d7936b89ccc9297d69f9f80",
+  "applicationRelease": "70e2efa43660c0badace1b67d5088bb6a5ac5bcefef5223dbe15718f838f5c44",
+  "normalUpdateAndMetadata": [
+    {
+      "receipt": "assignment-legends-1793916337569.json",
+      "sha256": "a7bbe341aa95138fe3bc085fc5b700db3ea87de7f22b13a4e4e465c33b01fa15",
+      "checks": 6
+    },
+    {
+      "receipt": "installed-copilot-journal-metadata-1793916337777.json",
+      "sha256": "c1a91635f343ef6e29efe658b417448607c559e07cecf6188761f205e1eb10ca",
+      "checks": 7
+    }
+  ],
+  "nativeReceipt": "installed-shield-baseline-1793916962249.json",
+  "nativeReceiptSha256": "b4ff5ca60143659ec7d1dab999de17591958ebdeb3f74dbe7b1d7306fc2eb4b0",
+  "nativeChecks": 16,
+  "nativeEmptyTaskCreated": 1,
+  "nativeScannerProcessesIndependentlyExited": 2,
+  "modelPromptsSubmitted": 0,
+  "publicAdvisoryQueriesMade": 0,
+  "keyboardOpened": false,
+  "microphoneOpened": false,
+  "accountLoginOrLogoutPerformed": false,
+  "freshSnapshotPermissionPathExercised": true,
+  "findingsCase": {
+    "status": "failed",
+    "findings": 1
+  },
+  "cleanCase": {
+    "status": "incomplete",
+    "findings": 0
+  },
+  "completeShieldAccepted": false,
+  "duplicateExecutionSuppressed": true,
+  "signedFeedRetirementAndQuotaReleaseVerified": true,
+  "sourceAndSigningScratchRemoved": true,
+  "cleanupReceipt": "fresh-read-success-cleanup-1793917586801.json",
+  "cleanupReceiptSha256": "ed62bea3c781ad77410392512eab20dae5eefb310cfe49e3c13e93384f207524",
+  "onlyNewOwnedWorkspaceReversiblyArchived": true,
+  "nativeIdentityEncryptedRecoveryAndOsCredentialPreserved": true,
+  "originalWorkspaceInventoryRestored": 54,
+  "originalWorkspacesRemoved": 0,
+  "applicationOwnerExitAndRestartVerified": true,
+  "privateLinkAndHomePreserved": true,
+  "homeSha256": "20ba0095a6b9650046df34541872aa7e0a7cdc7db5182f065abb009127c6c130",
+  "frontendDigest": "24100ef601b810efb0cda95e4fe0842d2944560734b02c4cf482c25e19150543",
+  "ownedCheckoutAndBundleRemoved": true
+}

@@ -1,0 +1,54 @@
+{
+  "schema": "switchyard-lease-console-source-summary/v1",
+  "basis": "d243d8166993de56d16dd597bcfcd48b9c2b772a",
+  "sourceSha256": {
+    "deployment/windows/test-support/storage-broker-protocol/LeaseConsoleProbe.cs": "1ba308145c78ef6883e13d0ee692a7e2187cbc18cc7dac826eb9886da2b263de",
+    "deployment/windows/test-support/storage-broker-protocol/RestrictedSelfTokenQuery.cs": "2f93772b6c6e762dfaf0727f89a679f4a87d425cc06b5095e799c939b58c9266",
+    "deployment/windows/test-support/storage-broker-protocol/RestrictedChildPipes.cs": "98fc7b7d00511df601d7715941c3c367a175decc309a76d0b1d4eae34ce48a61",
+    "deployment/windows/test-support/storage-broker-protocol/RestrictedChildStderrProof.cs": "a0a0b5690dc1c66b2758bc590229789fa98a50dbeaf81c98ab97354d9aeba752",
+    "deployment/windows/test-support/storage-broker-protocol/NativeRestrictedHostProof.cs": "3a64e18d82e0af11db1d1c4851f6a9a47a21a44384a2e2fad6569bc62afeb5b2",
+    "deployment/windows/test-support/storage-broker-protocol/Program.cs": "96f1f18c91558b634e762341ad9347fafb0373c5a6f8a32fd1f324e7dee4ee3a",
+    "scripts/windows-restricted-owner-report.mjs": "e44e4888c7cffd04aa1601098311517617623a0615e06186185aceefe5c5a919",
+    "scripts/windows-restricted-owner-report.test.mjs": "c0e044ce3f458053803018f1bf68f2e378ce9b837dc462bc528acb0babd7d2b7"
+  },
+  "scope": "CI-only two-child startup comparison; original production Node lock-worker spawn mode and its libuv Job ownership are unchanged.",
+  "comparison": [
+    "The exact installed helper image is hashed and held open. Both --state-lease-worker children use the same private desktop, bounded environment, three owned pipes, creation-time Job and verified restricted primary identity/privileges/SIDs.",
+    "Each actual suspended child receives only the previously verified current-user TOKEN_QUERY ACE, with original ACE/readback/restriction checks. Probe ACL evidence is separate from the unchanged two original owner/probe records.",
+    "CREATE_NO_WINDOW versus DETACHED_PROCESS is the only console-mode variable. Immediate stdin EOF intentionally prevents a lock request or state access. Each child has a five-second observation bound and independently verified Job retirement.",
+    "Only a fixed leading lease-entry marker, finite phase/exit/status and cleanup facts are retained; no native paths, raw output or private state. The unchanged original Node/eight-check owner journey still executes afterward and remains the acceptance requirement."
+  ],
+  "managed": {
+    "receipt": "managed-source-build-1793960254533.json",
+    "builds": 2,
+    "warnings": 0,
+    "errors": 0,
+    "portableChecks": 1975,
+    "newEntryMarkerChecks": 10,
+    "existingSdk": "8.0.424",
+    "ownedScratchRemoved": true
+  },
+  "projection": {
+    "receipt": "isolated-test-13d8f18a-5b25-4da0-af49-5cadb1de0506.json",
+    "passed": 18,
+    "childTreeAndTemporaryCleanupVerified": true
+  },
+  "research": {
+    "nodeSource": "https://raw.githubusercontent.com/nodejs/node/v24.14.0/deps/uv/src/win/process.c",
+    "windowsFlags": "https://learn.microsoft.com/en-us/windows/win32/procthread/process-creation-flags",
+    "finding": "Pinned libuv selects CREATE_NO_WINDOW for hidden piped children. Its detached option also skips libuv child-Job assignment, so a direct production detached-flag change was withdrawn before commit. The CI comparison preserves an explicit creation-time Job for both modes."
+  },
+  "unpublishedCandidate": {
+    "receipt": "isolated-test-a9005a63-476e-4349-96cc-ddc907181f9c.json",
+    "linuxPassed": 37,
+    "windowsOnlySkip": 1,
+    "published": false,
+    "productionSourceRestored": true,
+    "reason": "Linux checks cannot verify the Windows launch mode or compensate for removed libuv Job assignment."
+  },
+  "limits": [
+    "Native comparison pending. No cause, repair or complete-owner acceptance is inferred from compilation or projection tests.",
+    "The fixed EOF probes do not acquire a lease, create state, load a provider, change an account or launch a guest. Their success cannot replace the original failing owner journey.",
+    "No broader token rights, privilege/SID/default-DACL/account/runtime fallback or deadline extension is used."
+  ]
+}

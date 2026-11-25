@@ -1,0 +1,71 @@
+{
+  "schema": "switchyard-claude-status-consent/v1",
+  "sourceParent": "495ad34ed66e273907c5b6ba8c9922f58c5d7319",
+  "sourceFiles": {
+    "tools/layout-studio/claude-coding.mjs": "3c8724c1f4112c6ab5fda1cbd4731dc03bc57e67fbaebaa2989d9356b475a053",
+    "tools/layout-studio/claude-coding.test.mjs": "131b3e356f3e32adfa0bf0a3c06abeeeeba0889ab6edf1fc007d9071e125ae58",
+    "scripts/verify-agent-security-host.mjs": "4cceda2079e8aa0babf3d3bb78f3c01c149b7daa6dc4bf1704b025662d8a1420"
+  },
+  "previousAdapterSha256": "46ed20a000d31ab78c72ba146fda25416b13b9cbec9bb548c0605f7e076ea02a",
+  "originalFailures": [
+    "An older Claude inventory result entered a renewed recording with the same timestamp.",
+    "A forty-second state-write delay replaced the observation time and advertised stale provider status as fresh."
+  ],
+  "correction": "Capture the recording generation before native inventory and the arrival timestamp before ownership, account and state-lock waits; persist the original observation and apply only the captured consent under the state mutation.",
+  "receipts": [
+    {
+      "id": "8c6537e6-ac14-45fe-a0bf-24b91cd4fc5f",
+      "sha256": "0a990b57b27001bb8856690cc46408892229ddbcd3eee7335d196c253379e6ff",
+      "success": false,
+      "totals": {
+        "required": 1,
+        "passed": 0,
+        "failed": 1,
+        "tests": 21,
+        "passedTests": 19,
+        "failedTests": 2,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "id": "d0b4e190-bb56-4d30-8187-e2157e2f22f1",
+      "sha256": "128bc314febf04a2602f4b2eef49f13b33a0237a6e6d3039702cc9ab24c0bbbb",
+      "success": true,
+      "totals": {
+        "required": 7,
+        "passed": 7,
+        "failed": 0,
+        "tests": 113,
+        "passedTests": 113,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    }
+  ],
+  "acceptedGroups": 7,
+  "acceptedTests": 113,
+  "skippedTests": 0,
+  "typecheck": true,
+  "originalCommandsBoundsAndCleanupVerified": true,
+  "regressionCases": [
+    "renewed-generation-same-clock",
+    "new-recording",
+    "initially-paused-recording",
+    "pause-before-mutation",
+    "Claude-exclusion-before-mutation",
+    "original-arrival-time-and-staleness"
+  ],
+  "liveTaskOperations": 0,
+  "modelRequests": 0,
+  "loginChanges": 0,
+  "frontendChanged": false,
+  "limitations": [
+    "These are isolated encrypted-store fixtures using an explicit native CLI double, not live provider/task acceptance.",
+    "This corrects existing status polling; it adds no native subscription, terminal attachment or provider authority.",
+    "Installed adoption and native Windows execution of the later regressions remain separate until verified."
+  ]
+}

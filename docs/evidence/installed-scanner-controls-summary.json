@@ -1,0 +1,146 @@
+{
+  "schema": "switchyard-installed-scanner-controls-summary/v1",
+  "at": "2026-11-09T03:14:55.765094+00:00",
+  "readback": {
+    "schema": "switchyard-scanner-installed-readback/v1",
+    "sourceCommit": "1b00198c71ef41d85995d3d974e104fa7859c613",
+    "release": "db142f7c6fa6d2717856d709d739135bfd6cf04ddeb2dca2e8c4f500196ff916",
+    "previous": "47143a9fa5de873a1d6f10bc738ef5c703be64af15727eb8e31ffddfa629ffc7",
+    "frontend": "82309a37b568526dcf3f64d1ab0e4d9b6d2ffaa61eaf63e4da101911b4cadd67",
+    "assets": 32,
+    "files": 567,
+    "bytes": 4936344,
+    "workspaces": 54,
+    "semanticSnapshotsPreserved": true,
+    "sealedByteIdentical": 53,
+    "allConversationSemanticsPreserved": true,
+    "conversationCount": 3,
+    "selectionPreserved": true,
+    "allModesPreserved": true,
+    "privateAccessChangedForNewFrontend": true,
+    "datedBackupVerified": true,
+    "managedLauncherReadbackVerified": true,
+    "currentAndOneRollbackOnly": true,
+    "ready": true,
+    "checks": [
+      "served index.html",
+      "served app.mjs",
+      "served model.mjs",
+      "served workspace.mjs",
+      "served connection.mjs",
+      "served vial-snapshot.mjs",
+      "served observation-ui.mjs",
+      "served portable-ui.mjs",
+      "served scanner-ui.mjs",
+      "served feed-ui.mjs",
+      "served authority-ui.mjs",
+      "served execution-ui.mjs",
+      "served client-ui.mjs",
+      "served role-ui.mjs",
+      "served suite-ui.mjs",
+      "served workflow.mjs",
+      "served device-diagnostic-ui.mjs",
+      "served device-settings-ui.mjs",
+      "served vial-settings.mjs",
+      "served vial-keycodes.mjs",
+      "served vial-rules.mjs",
+      "served device-ui.mjs",
+      "served shell.mjs",
+      "served home.mjs",
+      "served catalog.mjs",
+      "served geometry.mjs",
+      "served keyboard-view.mjs",
+      "served model-f-catalog.json",
+      "served style.css",
+      "served sample-info.json",
+      "served sample-keymap.json",
+      "served sample-study-report.json",
+      "metadata coding/authority/list",
+      "metadata coding/execution/list",
+      "metadata coding/scanner-save/list",
+      "metadata host/scanner-fixtures/list"
+    ],
+    "hardwareOpened": false,
+    "nativeProviderRequests": 0,
+    "visualAcceptance": false
+  },
+  "finalState": {
+    "schema": "switchyard-scanner-installed-final-state/v1",
+    "release": "db142f7c6fa6d2717856d709d739135bfd6cf04ddeb2dca2e8c4f500196ff916",
+    "workspaces": 54,
+    "allSemanticSnapshotsPreserved": true,
+    "allModesAndConversationsPreserved": true,
+    "sealedByteIdentical": 53,
+    "selectionPreserved": true,
+    "verifiersCompleted": 8
+  },
+  "metadataReceipts": [
+    {
+      "name": "installed-agent-security-metadata-1794193784094.json",
+      "sha256": "ee1981d58fc3ea7a6804d0ac6a4140f0789c0569cab78c2a3bcaa5a2c004de50",
+      "checks": 30
+    },
+    {
+      "name": "installed-npm-archive-metadata-1794193784145.json",
+      "sha256": "7190bd735253a42096161f0805cfea3056cb2df601781771e29157c1342c5f03",
+      "checks": 3
+    },
+    {
+      "name": "installed-python-inventory-metadata-1794193784212.json",
+      "sha256": "5a896e19f893937bb3f2e8b1798ee3e4cdbe23dc659b294d88c2df277688bc7f",
+      "checks": 14
+    },
+    {
+      "name": "installed-cargo-inventory-metadata-1794193784246.json",
+      "sha256": "1c93683ae9f517ec90c22d0baa07e037460872d59ee9a274c69827c73effee09",
+      "checks": 10
+    },
+    {
+      "name": "installed-workflow-identity-metadata-1794193785168.json",
+      "sha256": "f1ca972282b6774bf4e7bbcc52b94eea6b6e991e81a49af47dabab070b6b5fba",
+      "checks": 10
+    },
+    {
+      "name": "installed-task-owner-metadata-1794193793773.json",
+      "sha256": "832cf3caa9a8dc892e3705c03c9f0aa9b6be81da47fe723955037f806bae8687",
+      "checks": 18
+    },
+    {
+      "name": "installed-copilot-journal-metadata-1794193794087.json",
+      "sha256": "0f19e186dd8108c6bac29ddbdddd05ccf0be55f7b5af8a28ae18102deb9a569f",
+      "checks": 7
+    },
+    {
+      "name": "installed-signed-intent-metadata-1794193794424.json",
+      "sha256": "cd7f2c2a1007db4adcc5e0deee20df02e299af429bb1c71e520703dcfbd63fb9",
+      "checks": 8
+    }
+  ],
+  "metadataChecks": 100,
+  "exactModuleHashes": 58,
+  "workflowsVerified": 57,
+  "sourceProvenance": "feed-ui-source-summary.json",
+  "preflightFinding": {
+    "name": "scanner-controls-installed-preflight-finding.json",
+    "reason": "Read-only preflight assumed selected Personal was keyboard-only. Actual pre-existing mode was personal-companion; corrected capture preserves each original mode. No mutation preceded correction."
+  },
+  "cleanup": {
+    "schema": "switchyard-scanner-prepared-cleanup/v1",
+    "release": "db142f7c6fa6d2717856d709d739135bfd6cf04ddeb2dca2e8c4f500196ff916",
+    "dev": "58",
+    "ino": "34042190",
+    "files": 568,
+    "bytes": 5038815,
+    "manifestSha256": "57b0d616cd66dfd38f9be3d16187230193b13c07cc93b3fa8d445632eddd8e74",
+    "allPayloadHashesVerified": true,
+    "installedReadbackPassed": true,
+    "reason": "Remove only the exact owned prepared copy after installed assets, state and all eight metadata verifiers pass.",
+    "removed": true
+  },
+  "limitations": [
+    "No visual or responsive acceptance: browser control still fails before inspection.",
+    "No actual HID, matrix sample, native account, model request, microphone or IDE task was used.",
+    "Latest complete Windows and Linux acceptance belongs to separately documented earlier sources.",
+    "The retained Windows host-action assertion/deadline failure remains unresolved."
+  ]
+}

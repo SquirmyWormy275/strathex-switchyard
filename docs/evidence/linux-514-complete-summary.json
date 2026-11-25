@@ -1,0 +1,22 @@
+{
+  "schema": "switchyard-complete-linux-checkpoint-summary/v1",
+  "sourceCommit": "514bf685d5f103911fab6702613fe422d5bdc6a3",
+  "success": true,
+  "privateReceipt": "isolated-test-b38b595d-12b5-42e8-a2aa-6a15db4684a9.json",
+  "totals": {
+    "required": 232,
+    "passed": 232,
+    "failed": 0,
+    "tests": 1401,
+    "passedTests": 1391,
+    "failedTests": 0,
+    "skippedTests": 10,
+    "cancelledTests": 0,
+    "todoTests": 0
+  },
+  "allChildCleanupVerified": true,
+  "ownedFixturesAliasesCheckoutAndMarkerRemoved": true,
+  "originalDeadlinesUnchanged": true,
+  "laterSourceAcceptanceInferred": false,
+  "nativeWindowsGuestOrHardwareAcceptanceInferred": false
+}

@@ -1,0 +1,49 @@
+{
+  "schema": "switchyard-full-linux-source-summary/v1",
+  "sourceCommit": "a5520be3bf4a38d8ee3c04938cfedabf8ca3fc03",
+  "sourceTree": "f007ed685454541b1e403ea5f5037d82a733c7f9",
+  "verificationReceipt": "isolated-test-2dace5ce-4a05-4cac-8abf-e9f50e349d04.json",
+  "verificationReceiptSha256": "c6d23076ee900cc2b9850a19a0dd4c5b9ce5357c0aeb251e66ce2c27e9315436",
+  "success": true,
+  "totals": {
+    "required": 306,
+    "passed": 306,
+    "failed": 0,
+    "tests": 1798,
+    "passedTests": 1782,
+    "failedTests": 0,
+    "skippedTests": 16,
+    "cancelledTests": 0,
+    "todoTests": 0
+  },
+  "allChildAndTreeCleanupVerified": true,
+  "cleanupReceipt": "linux-a5520be-cleanup-1793988919868.json",
+  "cleanup": {
+    "schema": "switchyard-owned-full-linux-cleanup/v1",
+    "sourceCommit": "a5520be3bf4a38d8ee3c04938cfedabf8ca3fc03",
+    "verificationReceipt": "isolated-test-2dace5ce-4a05-4cac-8abf-e9f50e349d04.json",
+    "generatedFiles": 782,
+    "generatedBytes": 11766655,
+    "generatedDirectories": [
+      "apps/linux-companion/dist",
+      "apps/provider-adapter-host/dist",
+      "apps/vscode-extension/dist",
+      "apps/windows-companion/dist",
+      "packages/protocol/dist"
+    ],
+    "dependencyAliasCount": 9,
+    "trackedTreeClean": true,
+    "testChildrenExited": true,
+    "testParentEmpty": true,
+    "rootIdentityVerified": true,
+    "testParentIdentityVerified": true,
+    "worktreeRemoved": true,
+    "rootRemoved": true,
+    "testParentRemoved": true,
+    "markerRemoved": true,
+    "otherWorktreesPreserved": true
+  },
+  "providersAndWindowsGuestsDoubledWhereDeclared": true,
+  "nativeWindowsOwnerAccepted": false,
+  "installedChanged": false
+}

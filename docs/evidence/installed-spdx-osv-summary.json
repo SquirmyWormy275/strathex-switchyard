@@ -1,0 +1,40 @@
+{
+  "schema": "switchyard-installed-spdx-osv-boundaries/v1",
+  "at": "2026-11-06T18:44:00.686Z",
+  "sourceCommit": "d8a0a9657afc4df189aa6b6e75252b7682adc054",
+  "release": "ea1e1770c05bca00c932ad2e77fd28dc9fa4ac6e378992be4f7b437cf902cba1",
+  "previousRelease": "9f70e2a819488f8ce04a0f5c978544f3e16a08bd6d9d47dffafa0ca2dd8b8146",
+  "files": 532,
+  "bytes": 5104714,
+  "development": false,
+  "frontend": "24100ef601b810efb0cda95e4fe0842d2944560734b02c4cf482c25e19150543",
+  "workspaceCount": 54,
+  "allSemanticWorkspaceSnapshotsPreserved": true,
+  "selectedWorkspacePreserved": true,
+  "sealedByteIdenticalCount": 52,
+  "pendingKeyboardOnlyConversationPreserved": true,
+  "normalVersionedUpdate": true,
+  "datedBackupVerified": true,
+  "launcherReadbackVerified": true,
+  "currentAndOneRollbackOnly": true,
+  "metadataReceipts": [
+    "installed-task-owner-metadata-1793990585183.json",
+    "installed-copilot-journal-metadata-1793990601652.json"
+  ],
+  "taskOwnerMetadataChecks": 13,
+  "copilotMetadataChecks": 7,
+  "preparedBundleCleanup": {
+    "files": 533,
+    "bytes": 5219707,
+    "removed": true
+  },
+  "modelPrompts": 0,
+  "nativeTasks": 0,
+  "microsoftRequests": 0,
+  "publicQueries": 0,
+  "hidOpened": false,
+  "frontendChanged": false,
+  "visualAcceptance": false,
+  "success": true,
+  "privateReceipt": "installed-spdx-osv-d8a0a96.json"
+}

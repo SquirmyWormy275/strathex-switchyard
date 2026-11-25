@@ -1,0 +1,123 @@
+{
+  "schema": "switchyard-windows-editor-target-source-summary/v1",
+  "at": "2026-11-07T08:41:22.595Z",
+  "baseCommit": "fcfe38a9c5f60f12410b719b3ada8a74b334d4eb",
+  "sourceFiles": {
+    ".github/workflows/client-platform.yml": "b435b6ebdd8a178531a8c6f692e85286129c8704a4b2100f275f50104b762abf",
+    "apps/desktop-hotkeys/OwnedStdioRunner.cs": "8a1a4021f4e3f3a5820c4540a0b72578f5f0424c898de926446bda37fa035a00",
+    "apps/desktop-hotkeys/RuntimeCommandRunner.cs": "707abda45e13d70ea7a8a9fa0bb5ab8ac342ae491b9c5590118d3f3ba2047f5b",
+    "deployment/suite/application.test.mjs": "bfff39c8699b6d578edd54a80e1e26fd9d346c708b1707ac27e332e934d4b83b",
+    "deployment/suite/release.test.mjs": "bfdce3a7644ef2be90619ee410e4941e3deacff5cf387ed6c8697d8f8f5863ef",
+    "tools/layout-studio/codex-editor-relay.mjs": "f3e714807076a5fc870e79edb5e92b4a28e022d8b5977cf290ab1cafb826f40a",
+    "tools/layout-studio/codex-retained-editor-client.mjs": "8c01e115daa41ea67649f1cdccb2bb6fbfbcf6adecfc7c6eba8ed626026665d9",
+    "tools/layout-studio/codex-retained-editor-client.test.mjs": "62d10cd7b554189ec4140758d150850bda5c3fbf88f72fac283ec0e075ad9005",
+    "tools/layout-studio/codex-windows-owner.mjs": "15fd127de59f0f21334e7132eb748ed7968cc268101a82183464135f56487007",
+    "tools/layout-studio/codex-windows-tasks.mjs": "c9d9afd24f6941a39d4eeec1230940a05a36d3496172fb6d8ac5a49c75e8d030",
+    "tools/layout-studio/codex-windows-tasks.test.mjs": "18250705c3f7ad16da8dc6ec5cf4ed435d408dcefd75b776d53436c7ec0624aa",
+    "tools/layout-studio/coding-editor-authorizations.test.mjs": "ee485ff79a93024780f0a11b286453eb0377f71129cebeb43eb958900f221d94",
+    "tools/layout-studio/coding-task-owners.mjs": "5d1f51fd67f4f242c820448dbb13110995ee62e561365613d06842a5566d4f70",
+    "tools/layout-studio/coding-task-owners.test.mjs": "9498fb2ba26aae1cd3ffde67e573f6747dce428c350632a75bca118f763e0aff",
+    "tools/layout-studio/suite.test.mjs": "18d65cf5a39999ae18be36a9eb2662f29823e9710aef941e2f31f6ab76972521",
+    "tools/layout-studio/test-support/codex-windows-stdio-fixture.cjs": "06709fe0f6de17b4e77ad720a7fd9b1e8ca98c2fe750d03923f5516f227d2d9f",
+    "tools/layout-studio/windows-codex-binding.mjs": "9d94b0c92d1cc78b9f85e7c693839d1b9bdaaae8d42f67b16710c20bc8925f92",
+    "tools/layout-studio/windows-owned-stdio.mjs": "d336c610168dec5b4a6fea716880ec9f43914c7abfedfc74636f483d99f9a426",
+    "tools/layout-studio/windows-terminal-process.test.mjs": "6c79e27b8f9737fdd38a0923ce933ce02a58fed9fdec7f1db78c00762a71bb1b"
+  },
+  "receipts": [
+    {
+      "name": "isolated-test-1eca783c-c9e3-4047-8c06-1cfa560e8fb4.json",
+      "sha256": "0642aa863d5e39aa6dc2865db1ec550bc660ed06046ca82b4d42684f3ccaeb4f",
+      "totals": {
+        "required": 30,
+        "passed": 30,
+        "failed": 0,
+        "tests": 61,
+        "passedTests": 59,
+        "failedTests": 0,
+        "skippedTests": 2,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "name": "isolated-test-e9aee65e-afa0-4987-9815-d10c7afe6bb5.json",
+      "sha256": "32ee3d200bd568f3e9d79e857fba7f4b12391f5530709bfea805036e841e3566",
+      "totals": {
+        "required": 33,
+        "passed": 33,
+        "failed": 0,
+        "tests": 105,
+        "passedTests": 103,
+        "failedTests": 0,
+        "skippedTests": 2,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "name": "isolated-test-0656cba1-f1bb-4702-b1c1-578b5d33b03e.json",
+      "sha256": "f7fd85b0f7b1b7b1825453caa872c9f5a6a3a3e6bf14a8e40cb4d951680b30f7",
+      "totals": {
+        "required": 1,
+        "passed": 1,
+        "failed": 0,
+        "tests": 13,
+        "passedTests": 12,
+        "failedTests": 0,
+        "skippedTests": 1,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    }
+  ],
+  "groups": 33,
+  "passedTests": 104,
+  "skippedTests": 2,
+  "originalCommandsBoundsSkipsAndCleanupVerified": true,
+  "typecheck": {
+    "command": "npm run typecheck",
+    "node": "24.14.0",
+    "passed": true
+  },
+  "scope": {
+    "originalJobAndProcessBindingValidated": true,
+    "heldImageAndProcessReinspection": true,
+    "originalReviewedLoadAccountTaskPolicyAndRepositoryRechecked": true,
+    "targetPreparationHasNoResumeOrTerminalEffect": true,
+    "originalLogicalEditorRegistrationBound": true,
+    "heldInspectionsJoined": true,
+    "uncertainProbeCannotSkipJobRetirement": true,
+    "protectedRegistryAndKernelLeasesExercised": true,
+    "actualWindowsProtectedTargetCaseRegistered": true
+  },
+  "nativeProcessEvidence": "retained-editor-client-native-summary.json",
+  "retainedFailure": {
+    "receipt": "isolated-test-d0557aad-fe84-4f8c-99a8-45f5eee87ae7.json",
+    "sha256": "3ce5be46224461dcea6586f13d3421548fe06c48a979872c1604cb0199dd0a07",
+    "meaning": "The synthetic unknown-helper test initially failed teardown because driver.close propagated the expected refusal. The fixture now accepts that expected refusal only after all explicit transport/client doubles are closed; production retirement remains strict.",
+    "correctedReceipt": "isolated-test-0656cba1-f1bb-4702-b1c1-578b5d33b03e.json",
+    "originalChildAndTreeCleanupVerified": true
+  },
+  "effects": {
+    "liveModelPrompts": 0,
+    "liveProviderTasks": 0,
+    "accountChanges": 0,
+    "hardwareOpened": false,
+    "frontendChanged": false,
+    "installedApplicationChanged": false,
+    "newDependencies": false,
+    "newCompilation": false
+  },
+  "limitations": [
+    "Local Windows target/process proof checks use explicit provider and native-query doubles with real protected state and leases.",
+    "The earlier retained channel passes native Windows CI at fcfe38a; the newer target reinspection and protected-registry composition await the extended native case.",
+    "Windows durable editor journal/recovery, Suite editor connections and VS Code launching remain unfinished.",
+    "No live account/task/model/hardware operation or frontend activation is claimed."
+  ],
+  "cleanup": {
+    "originalChildAndTreeRetirementVerified": true,
+    "noCompilerOrBundleStagingCreated": true,
+    "fixtureRootsRemoved": true
+  },
+  "success": true
+}

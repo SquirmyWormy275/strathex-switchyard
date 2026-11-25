@@ -1,0 +1,129 @@
+{
+  "schema": "switchyard-claude-hook-source-evidence/v1",
+  "scope": "Separately opted-in exact-session local Claude hook observations, settings preview and empty-output command bridge",
+  "runs": [
+    {
+      "receiptId": "c90641eb-8b91-4bb0-9926-bf9abbf7b130",
+      "sha256": "479fb84238c32a995e1e7bbc6ba2ab86669c047c517c83bbaf6cdb606780a2fc",
+      "success": false,
+      "totals": {
+        "required": 8,
+        "passed": 7,
+        "failed": 1,
+        "tests": 111,
+        "passedTests": 110,
+        "failedTests": 1,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "files": [
+        "scripts/windows-backend-shards.test.mjs",
+        "scripts/run-isolated-tests.test.mjs",
+        "deployment/suite/release.test.mjs",
+        "tools/layout-studio/agent-observation.test.mjs",
+        "tools/layout-studio/suite.test.mjs",
+        "tools/layout-studio/claude-hook-observation.test.mjs",
+        "tools/layout-studio/observation-ui.test.mjs",
+        "tools/layout-studio/design-observations.test.mjs"
+      ],
+      "originalBoundsPreserved": true,
+      "ownedCleanupComplete": true
+    },
+    {
+      "receiptId": "7106037b-07d8-4d79-9fc2-0d5284efd0d4",
+      "sha256": "581aabcb7483ce08c7597805e94c90f652ef74a6c15b400d1c0b2d927ec1203a",
+      "success": true,
+      "totals": {
+        "required": 8,
+        "passed": 8,
+        "failed": 0,
+        "tests": 111,
+        "passedTests": 111,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "files": [
+        "scripts/windows-backend-shards.test.mjs",
+        "scripts/run-isolated-tests.test.mjs",
+        "deployment/suite/release.test.mjs",
+        "tools/layout-studio/agent-observation.test.mjs",
+        "tools/layout-studio/suite.test.mjs",
+        "tools/layout-studio/claude-hook-observation.test.mjs",
+        "tools/layout-studio/observation-ui.test.mjs",
+        "tools/layout-studio/design-observations.test.mjs"
+      ],
+      "originalBoundsPreserved": true,
+      "ownedCleanupComplete": true
+    }
+  ],
+  "addedHookCases": 10,
+  "addedInteractionCases": 2,
+  "sourceFiles": {
+    "tools/layout-studio/claude-hook-observation.mjs": "eb202b6ed3f1617448e418add6391bca8e805ec6ee9b6f9499f7c81485543f6e",
+    "tools/layout-studio/claude-hook-observation.test.mjs": "efc2122f317fca13e7f8715c60a26a522c88c28fbf3481583c71290633b7fabc",
+    "integrations/claude-hook.mjs": "f66931d1d915375e5a90e61fdd0d281a24a76cf8041aa60b3d99dad67fd81065",
+    "tools/layout-studio/observation-ui.mjs": "c096ff225b5464cd94efa1b7f0f51911a9339262c0ef38c54bebc172b0be8996",
+    "tools/layout-studio/observation-ui.test.mjs": "a59bcda3a781fa715b4be7a7125d9305ae2fc452088133b527de0e87434c2a11",
+    "tools/layout-studio/index.html": "1c519cbc0965b1ce7f16c10a93e89c38363eea6d05872e1250b9c105867f5c94",
+    "tools/layout-studio/suite-ui.mjs": "59d4be49e488316aa5859d15199f4482b203913288a11f1ad96f2c8db80a9d7d",
+    "tools/layout-studio/suite.mjs": "887c3f898370de9613167d0224d794af0efe704dc996322c802dad000de3056d",
+    "tools/layout-studio/design-observations.mjs": "981bfec751577035b85f212a81df3eaf60f42d09bbda4b1c6494e6723f9fa6f6",
+    "scripts/run-isolated-tests.mjs": "e2333ec85f9df84c99e6efefcd32582c9be9230b4dc1892738cfef6c3c42ed68",
+    "scripts/demo-switchyard-ui.mjs": "5db2625551b7481c755214123c88e2504ea4a3681bc5459a714cb25460ffcf51",
+    "deployment/suite/release.mjs": "3c0f52e5571d34cf549f7ecb5fd6483683a87eb3acaf0b8abc6c65c157036f61"
+  },
+  "livePreview": {
+    "schema": "switchyard-claude-hook-live-preview/v1",
+    "origin": "http://127.0.0.1:35351",
+    "checks": [
+      "exact served index.html",
+      "exact served observation-ui.mjs",
+      "exact served suite-ui.mjs",
+      "unauthenticated settings preview refused",
+      "keyboard-only hook setup refused",
+      "separate hook source starts without recording ordinary agent events",
+      "recipe preview creates no native settings or authority",
+      "six fixed event recipes pin exact session and observation with separate executable arguments",
+      "settings preview refuses command authority fields",
+      "settings preview refuses malformed native identity",
+      "paused destination remains reviewable without resuming capture",
+      "inactive Personal setup refused",
+      "Work hook setup refused",
+      "other saved data unchanged and selected Personal retains only the isolated paused destination"
+    ],
+    "served": {
+      "index.html": "1c519cbc0965b1ce7f16c10a93e89c38363eea6d05872e1250b9c105867f5c94",
+      "observation-ui.mjs": "c096ff225b5464cd94efa1b7f0f51911a9339262c0ef38c54bebc172b0be8996",
+      "suite-ui.mjs": "59d4be49e488316aa5859d15199f4482b203913288a11f1ad96f2c8db80a9d7d"
+    },
+    "synthetic": true,
+    "nativeClaudeInvocations": 0,
+    "providerRequests": 0,
+    "settingsWritten": false,
+    "microphoneOpened": false,
+    "hardwareOpened": false,
+    "visualAcceptance": false
+  },
+  "originalFailure": {
+    "receiptId": "c90641eb-8b91-4bb0-9926-bf9abbf7b130",
+    "cause": "The encrypted fixture used updatedAt=1 while createdAt and recordingSince were current. Existing retention correctly pruned that synthetic recording before the first worker.",
+    "correction": "Use a current updatedAt for the synthetic recording. Production retention, assertions and test bounds remain unchanged."
+  },
+  "primaryContract": {
+    "url": "https://code.claude.com/docs/en/hooks",
+    "checkedAt": "2026-11-09",
+    "documentedOnly": true,
+    "nativeVersionInvocationVerified": false
+  },
+  "boundaries": [
+    "Actual authenticated HTTP, encrypted state and independent Node hook processes use the existing kernel leases; vendor input and OS credentials are explicit doubles.",
+    "Existing agent-event consent never enables the new hook source. Exact destination, native-session string, selected workspace, Personal mode, exclusions and original recording generation are required.",
+    "Hook provenance remains unverified-local-claude-hook. Fixed metadata cannot establish native identity, task completion, time savings or attachment authority.",
+    "No real Claude process, account, task, settings, prompts, HID or microphone was touched. Settings preview writes nothing and uses documented direct executable arguments.",
+    "Pause/deletion, freshness, same-time ambiguity, out-of-order/duplicate suppression, capacity and reviewed aggregate privacy are covered without backfill or retries.",
+    "Browser control again failed before navigation with a timeoutMs property error; no visual acceptance is inferred. The active complete Linux run remains at earlier 4e3feb4 and excludes this source."
+  ]
+}

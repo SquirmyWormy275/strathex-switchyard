@@ -1,0 +1,222 @@
+{
+  "schema": "switchyard-conversation-role-boundaries-source-summary/v1",
+  "baseCommit": "be834d510a1b537445a213b919f928ad315c7ea0",
+  "sourceFiles": {
+    "tools/layout-studio/suite.mjs": "9d22248c953f502b13bc1ef34d8e34b7f8c153d5d1352806741a963cf5720990",
+    "tools/layout-studio/agents.mjs": "d48f8c0a83b81cc9ef98d6a3b942e18679e251f3667558e7e6ad763afb801b90",
+    "tools/layout-studio/copilot.mjs": "749fb8c6d3b8116900dbe663976ff5b9373a5423d210d7e84e4546fba7377d6f",
+    "tools/layout-studio/conversation-role-boundaries.test.mjs": "1251a50490f3c932e48c8880cb1cb757c42ad362f0ce4f364813b342f594946e",
+    "tools/layout-studio/agents-claude.test.mjs": "30dcbbdd9dcd28de366db1bb3d4291ced4369f4ec25b6120bb2ffb7ad87537a1",
+    "scripts/run-isolated-tests.mjs": "1033187440dd6e21f3a9470426b255ac04c0a69bc86c4332c0e992b84e7fee1e"
+  },
+  "receipts": [
+    {
+      "id": "d2acf047-e38a-47cb-8364-e0ea2b580779",
+      "classification": "fixture setup: synthetic conversation lacked retention timestamp",
+      "sha256": "7b87381a6c0ce2657d20a3a4f7244db55160edcd1a80439105c9e472f5ab8e97",
+      "success": false,
+      "totals": {
+        "required": 1,
+        "passed": 0,
+        "failed": 1,
+        "tests": 5,
+        "passedTests": 0,
+        "failedTests": 5,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "originalManifestCommandsBoundsSkipsAndCleanupVerified": true
+    },
+    {
+      "id": "77f85999-adfc-45b2-bd16-0bf3f1c57637",
+      "classification": "four original conversation regressions",
+      "sha256": "0d3db528d8a41285362a456d334ce989bba4be7481e4fd93e727277610b157ec",
+      "success": false,
+      "totals": {
+        "required": 1,
+        "passed": 0,
+        "failed": 1,
+        "tests": 5,
+        "passedTests": 1,
+        "failedTests": 4,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "originalManifestCommandsBoundsSkipsAndCleanupVerified": true
+    },
+    {
+      "id": "25b78084-18c5-41e8-a3f3-09d6bd9418cf",
+      "classification": "five original conversation regressions including cancellation",
+      "sha256": "6e7857baff587e52bf1915aa814205bd2fbd953e6e1ffda2cc391118310c5cf9",
+      "success": false,
+      "totals": {
+        "required": 1,
+        "passed": 0,
+        "failed": 1,
+        "tests": 6,
+        "passedTests": 1,
+        "failedTests": 5,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "originalManifestCommandsBoundsSkipsAndCleanupVerified": true
+    },
+    {
+      "id": "a395f3a9-eb84-4dd0-b558-b95f423757f6",
+      "classification": "one test expectation mismatch: existing SUBMISSION_BLOCKED wrapper correctly refused the prompt",
+      "sha256": "dac2351fb65628d1e3dd17a5cf464515a0851685e112a90e17d3d20236feb271",
+      "success": false,
+      "totals": {
+        "required": 1,
+        "passed": 0,
+        "failed": 1,
+        "tests": 6,
+        "passedTests": 5,
+        "failedTests": 1,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "originalManifestCommandsBoundsSkipsAndCleanupVerified": true
+    },
+    {
+      "id": "3a5afb72-67a0-4685-af45-c0d7c9cfe20b",
+      "classification": "six corrected conversation cases",
+      "sha256": "e278ebf594979ccbe384670189d316e35170e7e91aaa39c9a24c0c174b2ff5f2",
+      "success": true,
+      "totals": {
+        "required": 1,
+        "passed": 1,
+        "failed": 0,
+        "tests": 6,
+        "passedTests": 6,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "originalManifestCommandsBoundsSkipsAndCleanupVerified": true
+    },
+    {
+      "id": "bc1c854a-41b3-45b6-a02d-81266121dcd6",
+      "classification": "fixture setup: isolated Microsoft suite lacked its default personal workspace",
+      "sha256": "03e4d6420d091084de241ba6422339ebcc5fea5a7ace651e3fe2a8f517c3f7f0",
+      "success": false,
+      "totals": {
+        "required": 1,
+        "passed": 0,
+        "failed": 1,
+        "tests": 9,
+        "passedTests": 6,
+        "failedTests": 3,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "originalManifestCommandsBoundsSkipsAndCleanupVerified": true
+    },
+    {
+      "id": "a45f8cef-b227-473e-b45a-9855810bf100",
+      "classification": "three original Microsoft role regressions",
+      "sha256": "d2715bbfcda7281d2250e99ac2602382a5bbafee424954b11135d9733f03635d",
+      "success": false,
+      "totals": {
+        "required": 1,
+        "passed": 0,
+        "failed": 1,
+        "tests": 9,
+        "passedTests": 6,
+        "failedTests": 3,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "originalManifestCommandsBoundsSkipsAndCleanupVerified": true
+    },
+    {
+      "id": "331ae953-d080-4c82-85b9-1a26c85ca414",
+      "classification": "initial broad correction",
+      "sha256": "91afd10540a55d95264cee3d0612949ce9eede460a7539d3522b94a2f3e280f4",
+      "success": true,
+      "totals": {
+        "required": 18,
+        "passed": 18,
+        "failed": 0,
+        "tests": 225,
+        "passedTests": 224,
+        "failedTests": 0,
+        "skippedTests": 1,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "originalManifestCommandsBoundsSkipsAndCleanupVerified": true
+    },
+    {
+      "id": "b404a3de-309a-418f-b0e9-6a0f5e384320",
+      "classification": "final broad correction with atomic history and positive Microsoft cases",
+      "sha256": "601ce72ba0bbf70270c27260e069aede11f23787d13aea3652f06b2fc648fcf2",
+      "success": true,
+      "totals": {
+        "required": 18,
+        "passed": 18,
+        "failed": 0,
+        "tests": 227,
+        "passedTests": 226,
+        "failedTests": 0,
+        "skippedTests": 1,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "originalManifestCommandsBoundsSkipsAndCleanupVerified": true
+    },
+    {
+      "id": "f8b7eda5-912d-4ed3-86f8-60ed1d1d4d7b",
+      "classification": "final eleven cases additionally verify preserved Microsoft delivery uncertainty",
+      "sha256": "525e5dad65c3c4a39a2a01c4aab0cec2e497572188c30ff289fd9e186d318de1",
+      "success": true,
+      "totals": {
+        "required": 1,
+        "passed": 1,
+        "failed": 0,
+        "tests": 11,
+        "passedTests": 11,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "originalManifestCommandsBoundsSkipsAndCleanupVerified": true
+    }
+  ],
+  "accepted": {
+    "groups": 18,
+    "passed": 226,
+    "skipped": 1,
+    "finalConversationCases": 11,
+    "finalRepeatedCasesNotAddedToDistinctTotal": true
+  },
+  "typechecks": [
+    "tsconfig.json",
+    "apps/vscode-extension/tsconfig.build.json"
+  ],
+  "scope": {
+    "configurationResumeChecksBeforeEffectAndReturn": true,
+    "roleCancellationChecksBeforeOriginalControllerAbort": true,
+    "codexDesignChecksBeforeThreadAndTurnRequests": true,
+    "claudeDesignChecksAtNativeGuardianReadiness": true,
+    "microsoftDesignChecksBeforeFetchAndAfterBodyRead": true,
+    "encryptedProposalWritesCheckBindingUnderStateLease": true,
+    "lateReplyDoesNotBecomeReplacementRoleHistory": true,
+    "microsoftUncertainDeliveryPreservedWithoutAutomaticRetry": true,
+    "positiveCodexAndMicrosoftRolePathsDemonstrated": true
+  },
+  "limitations": [
+    "All provider/accounts/model messages are synthetic; Claude cases run bounded Node fixture children, not the installed CLI. No live account, model, task, window, keyboard or frontend effect occurred.",
+    "Source-only; installed application remains 738c1f7. Complete platform release and real provider/tenant/hardware acceptance remain separate.",
+    "Workspace generation remains local to the active Suite instance; an external selection round trip entirely between reads is not tracked.",
+    "A role change after an external effect cannot undo that effect. Existing uncertain outcomes and original owned-process cleanup are retained."
+  ]
+}

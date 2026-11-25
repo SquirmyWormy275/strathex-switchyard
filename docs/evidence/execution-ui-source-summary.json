@@ -1,0 +1,186 @@
+{
+  "schema": "switchyard-execution-ui-source-evidence/v1",
+  "scope": "Existing task permission selection, exact execution review, one-use run/stop, retained status and unknown-outcome recovery through real authenticated HTTP and encrypted state",
+  "runs": [
+    {
+      "receiptId": "5d53f3fe-1867-4d8a-be5d-3c9b3bbdc1f5",
+      "sha256": "34c442db234d00975b01d8447ac4a93991e30b41ec328aeeeeb996e14378dc02",
+      "success": true,
+      "totals": {
+        "required": 9,
+        "passed": 9,
+        "failed": 0,
+        "tests": 69,
+        "passedTests": 69,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "files": [
+        "scripts/windows-complete-shards.test.mjs",
+        "scripts/run-isolated-tests.test.mjs",
+        "deployment/suite/release.test.mjs",
+        "tools/layout-studio/repository-execution.test.mjs",
+        "tools/layout-studio/role-ui.test.mjs",
+        "tools/layout-studio/client-ui.test.mjs",
+        "tools/layout-studio/execution-ui.test.mjs",
+        "tools/layout-studio/portable-ui.test.mjs",
+        "tools/layout-studio/observation-ui.test.mjs"
+      ],
+      "originalBoundsPreserved": true,
+      "ownedCleanupComplete": true
+    },
+    {
+      "receiptId": "cff6ac69-5887-4f1e-9d76-6d4d3ea05817",
+      "sha256": "5df3574b46068a38572d03172e5e94b2ba53ad245efd71bea809862f6afcc42b",
+      "success": true,
+      "totals": {
+        "required": 9,
+        "passed": 9,
+        "failed": 0,
+        "tests": 69,
+        "passedTests": 69,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "files": [
+        "scripts/windows-complete-shards.test.mjs",
+        "scripts/run-isolated-tests.test.mjs",
+        "deployment/suite/release.test.mjs",
+        "tools/layout-studio/repository-execution.test.mjs",
+        "tools/layout-studio/role-ui.test.mjs",
+        "tools/layout-studio/client-ui.test.mjs",
+        "tools/layout-studio/execution-ui.test.mjs",
+        "tools/layout-studio/portable-ui.test.mjs",
+        "tools/layout-studio/observation-ui.test.mjs"
+      ],
+      "originalBoundsPreserved": true,
+      "ownedCleanupComplete": true
+    },
+    {
+      "receiptId": "19264ac7-4a49-46a7-a4eb-3b868e49d992",
+      "sha256": "35fe474f1f29c57290b99d52e95e644fb0d4379d4fe7775cbf21c043dd2d15cb",
+      "success": true,
+      "totals": {
+        "required": 1,
+        "passed": 1,
+        "failed": 0,
+        "tests": 7,
+        "passedTests": 7,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "files": [
+        "tools/layout-studio/execution-ui.test.mjs"
+      ],
+      "originalBoundsPreserved": true,
+      "ownedCleanupComplete": true
+    }
+  ],
+  "overlap": "The two nine-group runs overlap. The final seven-case UI run adds lost-successful-reply coverage; do not sum totals.",
+  "interactionCases": 7,
+  "originalFailure": {
+    "receiptId": "1778dfc8-1448-4eb9-baaa-a5dcda2a58cd",
+    "sha256": "9203230b704cf079542a9f55f9cb72be5f08970be63cf9862b04e3245f77dce9",
+    "success": false,
+    "totals": {
+      "required": 9,
+      "passed": 8,
+      "failed": 1,
+      "tests": 68,
+      "passedTests": 66,
+      "failedTests": 2,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    },
+    "files": [
+      "scripts/windows-complete-shards.test.mjs",
+      "scripts/run-isolated-tests.test.mjs",
+      "deployment/suite/release.test.mjs",
+      "tools/layout-studio/repository-execution.test.mjs",
+      "tools/layout-studio/role-ui.test.mjs",
+      "tools/layout-studio/client-ui.test.mjs",
+      "tools/layout-studio/execution-ui.test.mjs",
+      "tools/layout-studio/portable-ui.test.mjs",
+      "tools/layout-studio/observation-ui.test.mjs"
+    ],
+    "originalBoundsPreserved": true,
+    "ownedCleanupComplete": true,
+    "reason": "Two frontend assertions waited for the entire backend execution admission inside a two-second DOM-settle helper. The correction awaits the actual HTTP response under its original transport bound, then keeps the original two-second UI-settle bound. No production or test deadline changed."
+  },
+  "sourceFiles": {
+    "tools/layout-studio/execution-ui.mjs": "b18374715df861c9d8b3e5c0a4f0665eb25102c8a139367fcde54dee32ace5ac",
+    "tools/layout-studio/execution-ui.test.mjs": "cede28d8a01b55db6f06de6be4bc19bfc8c97129ab204f362172505e1c5711fc",
+    "tools/layout-studio/test-support/browser-ui.mjs": "a91caf55f887d4310d56c27533178158f191ac20b0dc031b4b3c37afb29ed821",
+    "tools/layout-studio/test-support/execution-fixture.mjs": "857485b257c566c05e3040b00508035ad8f9bd115c7c961bd969448cdd96c42f",
+    "tools/layout-studio/repository-execution.test.mjs": "8bd7c1f83891052bae0b76d92bbc99140c5257790e3f105091118b954339b0ee",
+    "scripts/demo-switchyard-execution.mjs": "75cfff4fc5a8b85bc8fef4ffe03482c76c73cdf7c472df1e12f17cf9b7103660",
+    "scripts/demo-switchyard-ui.mjs": "37537f6353e66134b4ef857349bd5cc4daa4ad74d35e5f4a3c7d1d6b1f7f5f08",
+    "tools/layout-studio/index.html": "e7faa8a4d137e22fc8c2965d9f42d8dc8f66d99841911258ee1a9b6163ed403d",
+    "tools/layout-studio/style.css": "0fec2b2082d0ebd65ef17d93e25acb83ea8a29123866de85fce73f7a0f36e46e",
+    "tools/layout-studio/suite-ui.mjs": "c53ab5654f93b2bcf512a5a476715d11099b32c6cd064684153df727ec049ba2",
+    "tools/layout-studio/serve.mjs": "781a72c896286955fb91892ffb8b86a9d7e0de17245684207551e04849eac2d5",
+    "deployment/suite/release.mjs": "bad0f3edcfbfdafec97abadd53d42ff9c8788aa285b69f40edbff187626ebd32"
+  },
+  "nativeDemonstration": {
+    "schema": "switchyard-execution-ui-native-demo/v1",
+    "at": "2026-11-09T02:21:32.606999+00:00",
+    "command": "node --experimental-transform-types scripts/demo-switchyard-execution.mjs --synthetic",
+    "exitCode": 0,
+    "checks": [
+      "saved synthetic authority inventory",
+      "separate exact recipe/input/policy/budget review",
+      "one actual owned Linux program through authenticated HTTP",
+      "independent exit/cleanup preserve original admission",
+      "duplicate approval retains original operation",
+      "original files/index/HEAD unchanged"
+    ],
+    "syntheticProvider": true,
+    "actualLinuxProgram": true,
+    "modelRequests": 0,
+    "hardwareOpened": false,
+    "userWorkspacesUsed": false,
+    "ownedStagingRemoved": true,
+    "taskCompletionVerified": false
+  },
+  "livePreview": {
+    "schema": "switchyard-execution-ui-preview/v1",
+    "origin": "http://127.0.0.1:40693",
+    "checks": [
+      "exact execution UI module served",
+      "execution form and separate review served",
+      "coding/authority/list remains empty metadata",
+      "coding/execution/list remains empty metadata",
+      "coding/execution/stop/list remains empty metadata",
+      "preview refuses coding/execution/review",
+      "preview refuses coding/execution/apply",
+      "preview refuses coding/execution/stop/apply"
+    ],
+    "realExecutions": 0,
+    "hardwareOpened": false,
+    "modelRequests": 0,
+    "visualAcceptance": false
+  },
+  "priorPreviewOwnedStateRemoved": true,
+  "limitations": [
+    "New task-permission issuance and scanner recipe creation remain frontend work.",
+    "Browser visual/responsive inspection remains blocked by browser-control failure.",
+    "Interaction cases use explicit native transport/namespace doubles; the separate demonstration uses an actual Linux program.",
+    "Actual Windows guest, installed application update and live native task/account acceptance are separate."
+  ],
+  "reviewBundle": {
+    "sourceCommit": "048cd10bae3db199d3cfc2edc1e9d7949143bc69",
+    "digest": "d5abd2fc0efd447a2e25d3b47ac4ec3afb8a61aa1ea21319112212395fee8dc0",
+    "assets": 29,
+    "allBytesVerified": true,
+    "priorPointerDatedBackupVerified": true,
+    "installed": false,
+    "visuallyAccepted": false
+  }
+}

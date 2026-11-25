@@ -1,0 +1,99 @@
+{
+  "schema": "switchyard-authority-ui-source-evidence/v1",
+  "scope": "Named saved-task selection, exact host permission review/issuance, revalidation and separate revocation through real authenticated HTTP and encrypted state",
+  "runs": [
+    {
+      "receiptId": "5c31351f-7e0f-41bb-a437-3db642b753fe",
+      "sha256": "67147dc26d1f922852784255bd56cb7a3c898aeedac01f393a39ee0bf10b7ae8",
+      "totals": {
+        "required": 8,
+        "passed": 8,
+        "failed": 0,
+        "tests": 66,
+        "passedTests": 66,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "files": [
+        "scripts/windows-complete-shards.test.mjs",
+        "scripts/run-isolated-tests.test.mjs",
+        "deployment/suite/release.test.mjs",
+        "tools/layout-studio/task-authority-ignored-trees.test.mjs",
+        "tools/layout-studio/task-authority-ignored-inputs.test.mjs",
+        "tools/layout-studio/task-authority.test.mjs",
+        "tools/layout-studio/execution-ui.test.mjs",
+        "tools/layout-studio/authority-ui.test.mjs"
+      ],
+      "originalBoundsPreserved": true,
+      "ownedCleanupComplete": true
+    },
+    {
+      "receiptId": "2f40a2b7-4e83-436f-aa9c-f11e46ca9dd1",
+      "sha256": "6b31a509de99aadee954c808306d53601cf42d99b1c2c1e83d68b02ecc0754e4",
+      "totals": {
+        "required": 1,
+        "passed": 1,
+        "failed": 0,
+        "tests": 8,
+        "passedTests": 8,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "files": [
+        "tools/layout-studio/authority-ui.test.mjs"
+      ],
+      "originalBoundsPreserved": true,
+      "ownedCleanupComplete": true
+    }
+  ],
+  "overlap": "Eight original groups pass 66 tests. The final eight-case UI run adds combined permission-to-execution selection; totals overlap.",
+  "interactionCases": 8,
+  "sourceFiles": {
+    "tools/layout-studio/authority-ui.mjs": "30577ff180ed80dbb928072689e669562bf96c2a8ecaeb8b0cd598204cd1d1c2",
+    "tools/layout-studio/authority-ui.test.mjs": "d6e0e9f11b9db7f13e4d7a044bf96f08855bcf532a02eae191254b46a54e4eed",
+    "tools/layout-studio/execution-ui.mjs": "36f1bf252fb49f979a758400c1297ad33f3f45c73e51b2c9a3c47cd6b5ce57e6",
+    "tools/layout-studio/suite-ui.mjs": "71a09f455d5ac9c74cafae3b91f8d64cb8a4994c6ce70ac6eacb8fdabb40b02d",
+    "tools/layout-studio/serve.mjs": "5dc81cd01c5b5b5b32d2fc71f519a10c9f4e3f6f4ab5f0dc5ef197c1c861b247",
+    "tools/layout-studio/index.html": "22419b5e1cae6356dbe6f10ec3fba33bd2cec0eb59d71d47cd8deb773532087d",
+    "deployment/suite/release.mjs": "fd5abb0dd6b5abb2bc174db315bdd9432ad8b2f41822d9a0e6433acd8143fb3c"
+  },
+  "interactionBoundary": "Actual temporary Git metadata, encrypted store, authority service and authenticated HTTP; native coding-task identity check is explicitly doubled. No live provider or user workspace is used.",
+  "livePreview": {
+    "schema": "switchyard-authority-ui-preview/v1",
+    "origin": "http://127.0.0.1:39229",
+    "checks": [
+      "exact permission UI module served",
+      "execution form and separate review served",
+      "coding/authority/list remains empty metadata",
+      "coding/execution/list remains empty metadata",
+      "coding/execution/stop/list remains empty metadata",
+      "preview refuses coding/authority/review",
+      "preview refuses coding/authority/issue",
+      "preview refuses coding/authority/revoke"
+    ],
+    "realExecutions": 0,
+    "hardwareOpened": false,
+    "modelRequests": 0,
+    "visualAcceptance": false
+  },
+  "priorPreviewOwnedStateRemoved": true,
+  "staticControlIdsPresent": 22,
+  "limitations": [
+    "Scanner-recipe creation is still independent frontend implementation work.",
+    "Browser visual/responsive inspection remains blocked by the browser tool failure.",
+    "No live native account/task inspection, installed update, hardware or model request is accepted by this checkpoint."
+  ],
+  "reviewBundle": {
+    "sourceCommit": "09de950f97383773d14dbcac4bc82b70628fe0d0",
+    "digest": "e599e9010326e4bcd02d2c577fc16aac62492ac78e3e3630328ce5a586f2f24a",
+    "assets": 30,
+    "allBytesVerified": true,
+    "priorPointerDatedBackupVerified": true,
+    "installed": false,
+    "visuallyAccepted": false
+  }
+}

@@ -1,0 +1,95 @@
+{
+  "schema": "switchyard-foreground-owner-source-summary/v1",
+  "baseCommit": "9a64d9fcda35dea432e91057c30f44cfa4a7715d",
+  "sourceFiles": {
+    "tools/layout-studio/foreground.mjs": "e34ebca1402a5b0701c10e2c7abc960b539999ec24dc22244d67bd394219e6be",
+    "tools/layout-studio/foreground.test.mjs": "a0d5f3375e0edef45ef85dd9ad5197174fedf80ee312149b31732d155d5b37e0",
+    "deployment/suite/release.mjs": "c5c21605f144fd6e62a771e5833d64257d8c602e11cacfff35914664b62e7e6c",
+    "deployment/suite/release.test.mjs": "f41717db9795c98348830b9fcd7be941f9e72fb5cbd362be272c7b4d7f50257e"
+  },
+  "ownershipRegressionBeforeCorrection": {
+    "name": "isolated-test-d0a745e0-094b-4878-b48d-7fa5bda73bb1.json",
+    "sha256": "fda3ba00e4291473be308c9b8221be5ec5a31ebbd4296e1e85998a2d74aa88b0",
+    "totals": {
+      "required": 1,
+      "passed": 0,
+      "failed": 1,
+      "tests": 1,
+      "passedTests": 0,
+      "failedTests": 1,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    },
+    "success": false
+  },
+  "intermediatePackageBudgetFailure": {
+    "name": "isolated-test-e286833b-3d6d-4a32-986d-8f4d8d72c18e.json",
+    "sha256": "1bff5de36f60d619f7f7599b79b084499e5488b3b66837e65f1f4c8378e4d515",
+    "totals": {
+      "required": 7,
+      "passed": 6,
+      "failed": 1,
+      "tests": 75,
+      "passedTests": 74,
+      "failedTests": 1,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    },
+    "success": false
+  },
+  "corrected": {
+    "name": "isolated-test-dc476f9d-5ad5-4221-a24d-355d5b3f8d0f.json",
+    "sha256": "d835fee0d987e6df73f8b4dd24f52b6ecc599abadd4538b013748d0bdddb6112",
+    "totals": {
+      "required": 10,
+      "passed": 10,
+      "failed": 0,
+      "tests": 87,
+      "passedTests": 87,
+      "failedTests": 0,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    },
+    "success": true
+  },
+  "finalForegroundFollowup": {
+    "name": "isolated-test-b32db095-c4c8-4e35-96ed-1b4c8681373f.json",
+    "sha256": "d3b85ecb178182c2dba2a68936df7a4ec80cbc584d7182cbf29c3ca0f30fb0b3",
+    "totals": {
+      "required": 1,
+      "passed": 1,
+      "failed": 0,
+      "tests": 11,
+      "passedTests": 11,
+      "failedTests": 0,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    },
+    "success": true
+  },
+  "newForegroundTests": 6,
+  "realControlledNodeChildren": 2,
+  "typecheckPassed": true,
+  "catalogModels": 27,
+  "catalogConfigurations": 104,
+  "sourceCatalogUnchanged": true,
+  "sourceProvenanceBytes": 108160,
+  "bundledProvenanceBytes": 98367,
+  "provenanceFieldsUnchanged": true,
+  "pinnedUpstreamFilesUnchanged": true,
+  "failedFullPackageBytes": 5244281,
+  "correctedFullPackageBytes": 5234949,
+  "originalPackageBudgetBytes": 5242880,
+  "allChildAndTreeCleanupVerified": true,
+  "ownedFocusedRootRemoved": true,
+  "installedChanged": false,
+  "nativeWindowsAccepted": false,
+  "interactiveDesktopAcceptance": false,
+  "frontendChanged": false,
+  "modelRequests": 0,
+  "hardwareOperations": 0
+}

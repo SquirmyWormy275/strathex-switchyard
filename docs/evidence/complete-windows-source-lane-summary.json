@@ -1,0 +1,78 @@
+{
+  "schema": "switchyard-complete-windows-source-lane-summary/v1",
+  "baseCommit": "b38ff75907992568cbdc69535d984827644e9d2a",
+  "files": [
+    {
+      "path": "scripts/windows-complete-shards.mjs",
+      "sha256": "2547059983f45ce107e5d4d505c2f331881e37720ecbfaabc4bd8a80fd531e19"
+    },
+    {
+      "path": "scripts/windows-complete-shards.test.mjs",
+      "sha256": "9bc2f496e435078a578a19558170a2edd3f4ac35f0eb4962124847fca00b2e23"
+    },
+    {
+      "path": "scripts/run-isolated-tests.mjs",
+      "sha256": "9e304c1e85f359aff8b0eec8d231573b4195290706450a12f853377bcec9f212"
+    },
+    {
+      "path": ".github/actions/prepare-complete-windows/action.yml",
+      "sha256": "2d8388fb5b8d1e6859aff9b4d67394af45e3015ca334b556c779c9940c17e528"
+    },
+    {
+      "path": ".github/workflows/switchyard-windows-complete.yml",
+      "sha256": "d1b26a8c148a819812c069ae38a73213551971926b0e83b4053045796709ffdf"
+    }
+  ],
+  "receipt": {
+    "id": "74e46202-12a5-4142-87b1-7e7cb6e96d99",
+    "sha256": "3669aebea836ff3acb3c82bb3e04cd00d2a171d12d51a44b5f9199722d8d0e4f",
+    "totals": {
+      "required": 5,
+      "passed": 5,
+      "failed": 0,
+      "tests": 45,
+      "passedTests": 45,
+      "failedTests": 0,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    },
+    "startedAt": "2026-11-07T16:18:57.311Z",
+    "endedAt": "2026-11-07T16:19:04.409Z"
+  },
+  "earlierFocusedReceipt": {
+    "id": "54bfc1f4-baa8-4646-9d76-cb08f358e535",
+    "sha256": "8dabbd96614c0990e8dfe871b0a834407716bfd71c05e4499fdc95ba212e159f",
+    "totals": {
+      "required": 5,
+      "passed": 5,
+      "failed": 0,
+      "tests": 45,
+      "passedTests": 45,
+      "failedTests": 0,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    },
+    "startedAt": "2026-11-07T16:14:28.727Z",
+    "endedAt": "2026-11-07T16:14:36.220Z"
+  },
+  "originalManifestCommandsBoundsSkipsAndCleanupVerified": true,
+  "yamlSyntax": "Both new YAML files parsed with existing Ruby Psych; no new dependency installed.",
+  "nativeAcceptance": false,
+  "packageAcceptance": false,
+  "design": {
+    "workers": 21,
+    "independentTestWorkers": 20,
+    "assemblyWorker": "Original builds, PowerShell groups and two compiled-output consumers retain manifest order.",
+    "jobTimeoutMinutes": 20,
+    "childLimitsChanged": false,
+    "releaseJobTimeoutMinutes": 90,
+    "manualDispatchOrRetry": false,
+    "acceptance": "All same-run original receipts must pass exact source/toolchain/manifest/command/bound/skip/cleanup auditing."
+  },
+  "limitations": [
+    "Focused Linux checks test scheduling and receipt rejection with synthetic native identities, not native Windows execution.",
+    "The independent source workflow does not replace the original complete Windows package verification or physical/live-account acceptance."
+  ]
+}

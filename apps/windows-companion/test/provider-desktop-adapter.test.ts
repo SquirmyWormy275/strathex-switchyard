@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import test from "node:test";
 
 import type { AdapterRequest } from "../../../packages/control-plane/src/adapters.ts";
@@ -35,10 +37,10 @@ class RecordingLifecycle implements InstalledProviderDesktopLifecyclePort {
     profile: {
       provider: "codex",
       profileName: "SXSY-B122 Codex",
-      canonicalLauncherPath: "C:\\Program Files\\SXSY\\sxsy-b122-provider-desktop-helper.exe",
+      canonicalLauncherPath: join(tmpdir(), "SXSY", "sxsy-b122-provider-desktop-helper.exe"),
       launcherSha256: "c".repeat(64),
       launcherProtocolVersion: 1,
-      canonicalExecutablePath: "C:\\Program Files\\SXSY\\codex.exe",
+      canonicalExecutablePath: join(tmpdir(), "SXSY", "codex.exe"),
       executableSha256: "a".repeat(64),
       signerSubject: "CN=Isolated Provider Test",
       signerThumbprint: "d".repeat(40),
@@ -114,8 +116,8 @@ test("installed provider adapter maps all six B122 commands to one exact provide
         provider: provider === "claude_code" ? "claude_code" : "codex",
         profileName: provider === "claude_code" ? "SXSY-B122 Claude Code" : "SXSY-B122 Codex",
         canonicalExecutablePath: provider === "claude_code"
-          ? "C:\\Program Files\\SXSY\\claude-code.exe"
-          : "C:\\Program Files\\SXSY\\codex.exe",
+          ? join(tmpdir(), "SXSY", "claude-code.exe")
+          : join(tmpdir(), "SXSY", "codex.exe"),
         executableSha256: provider === "claude_code" ? "d".repeat(64) : "a".repeat(64),
         productIdentity: provider === "claude_code"
           ? { productId: "anthropic.claude-code", displayName: "Claude Code", publisher: "Anthropic, PBC", role: "managed_terminal" }

@@ -1,0 +1,137 @@
+{
+  "schema": "switchyard-linux-complete-source-summary/v1",
+  "sourceCommit": "9266c1248af9a8f8c8bd355b5b0b150bcc957e0e",
+  "tree": "44cca4f72784c136ce186324e88f00b1d90fc90f",
+  "receipt": {
+    "id": "e19a2513-00d0-4f53-b1b1-726f467955f4",
+    "sha256": "6643d722735c05c856f66a0e43013d4ba0795f8818b5465bf1d98a4467f21f5e"
+  },
+  "startedAt": "2026-11-07T18:42:23.043Z",
+  "endedAt": "2026-11-07T19:04:52.220Z",
+  "success": true,
+  "totals": {
+    "required": 356,
+    "passed": 356,
+    "failed": 0,
+    "tests": 2365,
+    "passedTests": 2333,
+    "failedTests": 0,
+    "skippedTests": 32,
+    "cancelledTests": 0,
+    "todoTests": 0
+  },
+  "declaredSkips": [
+    {
+      "file": "tools/layout-studio/windows-scanner-recipe-files.test.mjs",
+      "pattern": null,
+      "count": 4
+    },
+    {
+      "file": "tools/layout-studio/windows-history-staging.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/client-launch.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/windows-terminal-process.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/windows-editor-endpoint.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/windows-terminal-peer.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/windows-editor-ingress.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/windows-owned-stdio.test.mjs",
+      "pattern": null,
+      "count": 3
+    },
+    {
+      "file": "tools/layout-studio/codex-windows-tasks.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/state-lock.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/runtime-command-suspended.test.mjs",
+      "pattern": null,
+      "count": 5
+    },
+    {
+      "file": "tools/layout-studio/windows-editor-recovery.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/windows-coding-editor-connections.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "apps/vscode-extension/test/named-pipe-transport.test.ts",
+      "pattern": null,
+      "count": 7
+    },
+    {
+      "file": "apps/vscode-extension/test/studio-windows-editor-files.test.ts",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "apps/provider-adapter-host/test/tls-network-e2e.test.ts",
+      "pattern": "provider secret generation validates and Initialize emits its exact ready-to-provision receipt",
+      "count": 1
+    },
+    {
+      "file": "apps/provider-adapter-host/test/tls-network-e2e.test.ts",
+      "pattern": "packaged provider host lifecycle and the production pinned network broker interoperate over exact loopback TLS",
+      "count": 1
+    }
+  ],
+  "originalManifestCommandsBoundsSkipsAndChildCleanupVerified": true,
+  "temporaryCheckoutCleanup": {
+    "completed": true,
+    "generatedFilesRemoved": 803,
+    "generatedBytesRemoved": 11910385,
+    "dependencyAliasesRemoved": 9,
+    "noNewDependencies": true,
+    "originalUnitExitVerified": true,
+    "originalCheckoutRemoved": true,
+    "emptyTestParentRemoved": true,
+    "otherWorktreesPreserved": true,
+    "markerRemoved": true
+  },
+  "startupFailures": [
+    {
+      "unit": "switchyard-verification-9266c12-1794076868.service",
+      "reason": "Temporary harness placeholder substitution corrupted environment property names; syntax failed before any test group started.",
+      "testGroupsStarted": 0,
+      "sha256": "e102abc582e3b427a05ccaf8dfc128a5731a816fe32cb897d60769622360c61a",
+      "exitCode": 1,
+      "privateRunnerRetained": true
+    }
+  ],
+  "limitations": [
+    "This complete source run includes saved-project discovery, guided roles, the connected backend demo, consent fences, paired-runner contracts and focus retirement diagnostics. It also includes exact Claude task-version admission and both named status-consent corrections. Installed source 9266c12 has separate metadata/refusal acceptance; source tests do not imply live provider acceptance.",
+    "Windows, live account/model tasks, interactive IDE behavior and physical hardware are not accepted by Linux software tests."
+  ]
+}

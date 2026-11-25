@@ -1,0 +1,54 @@
+{
+  "schema": "switchyard-provider-helper-native-correction/v1",
+  "sourceCommit": "75297186d08d15b9c5c740bd26bf8bd76f3a4fe1",
+  "mergeCommit": "1f2bf2d153eebedeaf488a911f1fe1812dac4d42",
+  "sourceTree": "ec96edb826e7ba408d9b3c1c2155cb2b3d51b1d3",
+  "workflowRunId": 42539354532,
+  "jobId": 128910595134,
+  "jobConclusion": "success",
+  "receipt": {
+    "bytes": 67597055,
+    "sha256": "d80f8c5e7b4cf1c287646efc8bf3e5e9b8e36043726996a9b0a7c1d8dfa7eea6",
+    "tokenAccessMask": 8,
+    "source": "1f2bf2d153eebedeaf488a911f1fe1812dac4d42",
+    "windowFocused": false,
+    "schema": "switchyard-provider-helper-preflight/v1",
+    "selfTestVerified": true
+  },
+  "exactSourceMergeTreeVerified": true,
+  "originalJobBoundMinutes": 15,
+  "existingPinnedOfflineToolchain": true,
+  "localNativeBinaryDownloaded": false,
+  "logSha256": "29afc4bebf806c54e3e279088b7d410ef3aeb53c12a8f68f4da99a3e1a99d048",
+  "compilerErrors": 0,
+  "packageAcceptance": false,
+  "adjacentVoiceCompilerCheck": {
+    "sourceCommit": "75297186d08d15b9c5c740bd26bf8bd76f3a4fe1",
+    "sourceFiles": [
+      {
+        "file": "Program.cs",
+        "sha256": "ed69687c033c4ab42d7ccb7607404f3787028bdb10485032ddf8787ee6720c88"
+      },
+      {
+        "file": "Sxsy.B122.VoiceHelper.csproj",
+        "sha256": "1a1005a8af1d0ba842dc3e916802b339c3f13443b96cd50d491dfa09f7466195"
+      }
+    ],
+    "targetFramework": "net8.0-windows",
+    "exitCode": 0,
+    "logSha256": "2cbdff33cc6a1f438a5a4d979b932aa293c062607d13b7fd7c5ea915d8752998",
+    "packageSources": [],
+    "packagesDownloaded": 0,
+    "nativeRuntimeExecuted": false,
+    "temporaryBuildRemoved": true,
+    "cleanup": {
+      "files": 33,
+      "bytes": 377415
+    }
+  },
+  "limitations": [
+    "This accepts standalone native publish and its own-process self-test. It does not accept the full release package, interactive desktop, live provider, account or hardware behavior.",
+    "The earlier complete package tests pass at db24634; the full release workflow must now complete its remaining publishing and packaging stages.",
+    "The voice target compiles on Linux with the existing SDK and no packages. Its Windows DPAPI self-test remains part of native release verification."
+  ]
+}

@@ -1,0 +1,86 @@
+{
+  "schema": "switchyard-codex-task-resume-role-boundary-source-summary/v1",
+  "baseCommit": "1943370b16569bc0fca087ef8e55da5f9ad7b7e7",
+  "sourceFiles": {
+    "tools/layout-studio/suite.mjs": "38da271d8913ccedd0ebd6dca1de91c49c61bade3b2712e50aba0704e0bba2ba",
+    "tools/layout-studio/coding-sessions.mjs": "f7acfa5bc18ca732fc7689283a92c284e5f2419194b180a69ffa87b43e2e3c92",
+    "apps/vscode-extension/src/codex-daemon-status.cjs": "b1327149e0c926ea4dd5f42fa3650c241fe58576456c654708ba9ac0be7fd719",
+    "tools/layout-studio/coding-sessions.test.mjs": "43d2174a6ad19fbdd5ade3ee6028da2cc2b2fdef4e81511ec7cb6a8b294255e4",
+    "scripts/codex-daemon-status.test.mjs": "51bc922ac97b399045d797faa1129d6ce69480885bd4a1e763c8653af6386ada"
+  },
+  "receipts": [
+    {
+      "id": "74b44180-f225-44c7-b459-524f142b73a2",
+      "sha256": "438f91eb833f53dd52617bdc61cfa7311dbfe0be18c503a7e840cdadc8609f80",
+      "success": false,
+      "totals": {
+        "required": 2,
+        "passed": 0,
+        "failed": 2,
+        "tests": 20,
+        "passedTests": 17,
+        "failedTests": 3,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "originalManifestCommandsBoundsSkipsAndCleanupVerified": true
+    },
+    {
+      "id": "d2e3f05f-823f-4a0d-aaf9-9bdc67db759b",
+      "sha256": "66e704e857a8fcbbf11633c04fa7add0e81967b711b9216faf6e141f2b127203",
+      "success": true,
+      "totals": {
+        "required": 2,
+        "passed": 2,
+        "failed": 0,
+        "tests": 20,
+        "passedTests": 20,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "originalManifestCommandsBoundsSkipsAndCleanupVerified": true
+    },
+    {
+      "id": "2c8d758a-ea1e-4e2c-a472-203f88cf23a2",
+      "sha256": "963fa7dd9ce945cc108a684539018779e8ef1466b9f884f4cb2e1641432069fe",
+      "success": true,
+      "totals": {
+        "required": 13,
+        "passed": 13,
+        "failed": 0,
+        "tests": 168,
+        "passedTests": 167,
+        "failedTests": 0,
+        "skippedTests": 1,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "originalManifestCommandsBoundsSkipsAndCleanupVerified": true
+    }
+  ],
+  "typechecks": [
+    "tsconfig.json",
+    "apps/vscode-extension/tsconfig.build.json"
+  ],
+  "scope": {
+    "originalRoleAndWorkspaceCheckedAfterStatusRead": true,
+    "trustedGuardForwardedToLegacyTransport": true,
+    "commandGuardRunsAfterHandshakeBeforeSend": true,
+    "lateAuthorizationCannotSendAfterDeadlineOrDisconnect": true,
+    "followupCommandsUseSameGuard": true,
+    "pendingAcknowledgementsCannotCrossBindingDigest": true,
+    "unchangedDirectRequestsStillShareOnePendingAcknowledgement": true,
+    "readOnlyPermissionsExactThreadAndRepositoryChecksPreserved": true,
+    "noPromptOrAutomaticRetryAdded": true
+  },
+  "reference": "https://learn.chatgpt.com/docs/app-server",
+  "limitations": [
+    "The real Unix socket/WebSocket demonstration uses a synthetic daemon; account/task metadata and native task operations are explicit doubles. No live account, thread, model, keyboard or frontend operation occurred.",
+    "This covers legacy owned read-only coding-task resume. Configuration-conversation resume, cancellation and design still need equivalent role checks.",
+    "No new CLI version, fallback, permissions or runtime support was added. Windows Unix-socket support remains unavailable and its two existing platform skips are unchanged.",
+    "Source-only; installed application remains 738c1f7. Complete-suite acceptance remains separate."
+  ]
+}

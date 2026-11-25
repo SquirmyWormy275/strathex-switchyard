@@ -1,0 +1,37 @@
+{
+  "schema": "switchyard-windows-native-independent-summary/v1",
+  "sourceCommit": "a87f0486d99ca9fea55a992ddfd4fb683cb973ca",
+  "executionCommit": "51a6232777dc468c537b03eb20179e7dae1f0484",
+  "workflowRun": 42056621293,
+  "lanes": [
+    {
+      "lane": "filesystem",
+      "jobId": 127346623129,
+      "artifactId": 13430996290,
+      "archiveSha256": "6eebbda87621166e94f6740b5193c73546d4bb29fa79341dab278caafa7d2474",
+      "digestVerified": true,
+      "privateReceipt": "windows-a87-filesystem-native.json",
+      "success": true,
+      "checks": 30,
+      "nativeCalls": 39,
+      "ownedVolumeDetached": true
+    },
+    {
+      "lane": "native-setup",
+      "jobId": 127346623071,
+      "artifactId": 13429554575,
+      "archiveSha256": "cbc360cc7acf9c6ffa064aab1ea69fb1180cd10eff988b09648d72434996fbe5",
+      "digestVerified": true,
+      "privateReceipt": "windows-a87-native-setup.json",
+      "success": true,
+      "checks": 6,
+      "restrictedMetadataChecks": 13,
+      "nativeExitVerified": true
+    }
+  ],
+  "restrictedPrimaryProcessAccepted": false,
+  "wholeWorkflowAccepted": false,
+  "ordinaryAccountOrUacAccepted": false,
+  "guestLaunched": false,
+  "keyboardOpened": false
+}

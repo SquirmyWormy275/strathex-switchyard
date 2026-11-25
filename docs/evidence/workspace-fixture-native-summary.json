@@ -1,0 +1,41 @@
+{
+  "schema": "switchyard-workspace-fixture-native-summary/v1",
+  "date": "2026-11-24",
+  "sourceCommit": "86ca7cb39768938523f0156d86ae648f7916a652",
+  "mergeCommit": "b3ef45d5778263ca9a8cf533eb18d4779018d71d",
+  "sourceTree": "bfc8076d24b88c9a7f546fd4427466e0e1ada84a",
+  "sourceTreeVerified": true,
+  "workflow": 45488049679,
+  "job": 138779540538,
+  "artifact": 14965288061,
+  "artifactSha256": "e441dd345ca89ad725fa977e3289ac69dec8aa58d77bbcabe66758e373bdd418",
+  "receiptSha256": "eba6f014bdb67276a4d3a8aebb33cbe57d1b2e35799d2cda4ed9a1193fa9ddbf",
+  "runId": "f8ecf51f-bd9b-4cdd-a782-d6daecf6e46b",
+  "totals": {
+    "required": 23,
+    "passed": 23,
+    "failed": 0,
+    "tests": 173,
+    "passedTests": 163,
+    "failedTests": 0,
+    "skippedTests": 10,
+    "cancelledTests": 0,
+    "todoTests": 0
+  },
+  "workspace": {
+    "file": "tools/layout-studio/workspace-ui.test.mjs",
+    "tests": {
+      "total": 5,
+      "passed": 5,
+      "failed": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "durationMs": 4801,
+    "effectiveTimeoutMs": 45000
+  },
+  "originalCommandsBoundsSkipsAndCleanupVerified": true,
+  "scope": "All five workspace boundary cases pass on a native Windows worker with exact HTTP/encrypted-state fixtures and joined UI teardown. The complete cohort remains failed because of the separate shortcut Unicode-path case. Graphical browser acceptance remains separate.",
+  "zipRetained": false
+}

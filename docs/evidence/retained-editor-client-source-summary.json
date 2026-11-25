@@ -1,0 +1,109 @@
+{
+  "schema": "switchyard-retained-editor-client-source-summary/v1",
+  "at": "2026-11-07T08:32:52.840Z",
+  "baseCommit": "0078893716badcb9bcc61dc09eb2171a6f600849",
+  "sourceFiles": {
+    ".github/workflows/client-platform.yml": "b435b6ebdd8a178531a8c6f692e85286129c8704a4b2100f275f50104b762abf",
+    "apps/desktop-hotkeys/OwnedStdioRunner.cs": "8a1a4021f4e3f3a5820c4540a0b72578f5f0424c898de926446bda37fa035a00",
+    "apps/desktop-hotkeys/RuntimeCommandRunner.cs": "707abda45e13d70ea7a8a9fa0bb5ab8ac342ae491b9c5590118d3f3ba2047f5b",
+    "deployment/suite/release.test.mjs": "bfdce3a7644ef2be90619ee410e4941e3deacff5cf387ed6c8697d8f8f5863ef",
+    "scripts/run-isolated-tests.mjs": "fda1b97844d87c7dc988046d8482b3d8deabe11c1317f445a7770d300f9b80b5",
+    "scripts/run-isolated-tests.test.mjs": "6edb77ff1cf097610fa4c193eb9f50b4a793312ce45c991768ce979a3cfa44c5",
+    "scripts/verify-client-platform.mjs": "f7854221d8d34f6eb89713752ad852b0e59ff5ae53165f0895cf4e22d84967dc",
+    "tools/layout-studio/agent-revocation.test.mjs": "c490c96ab412e9c33884a79553d8e93a5afeb4b32cd1832c81d21a01d161aa50",
+    "tools/layout-studio/agents.mjs": "71e43f23f227d7ed6a6c2aaf5f2337e016edd57638ac9b1822b7823c7511fd3a",
+    "tools/layout-studio/codex-editor-relay.mjs": "f3e714807076a5fc870e79edb5e92b4a28e022d8b5977cf290ab1cafb826f40a",
+    "tools/layout-studio/codex-editor-relay.test.mjs": "7a3ac25a8c82df7edaaabc1cfc3a36d788ca2c061fa4c3f6d7f9138c96f5bc61",
+    "tools/layout-studio/codex-retained-editor-client.mjs": "8c01e115daa41ea67649f1cdccb2bb6fbfbcf6adecfc7c6eba8ed626026665d9",
+    "tools/layout-studio/codex-retained-editor-client.test.mjs": "62d10cd7b554189ec4140758d150850bda5c3fbf88f72fac283ec0e075ad9005",
+    "tools/layout-studio/codex-stdio-tasks.test.mjs": "7a415277e37b9638019e41e3b2847dec4c532aaf55ff06c5338d2b8a66035f2f",
+    "tools/layout-studio/codex-submissions.test.mjs": "b2b6206c07ef9d73d76b5d4b74c0c1ca1bb510626f95ab876a8c3932c0e5cc6b",
+    "tools/layout-studio/codex-unix-tasks.test.mjs": "cd8959f8390fc3eff76fe288a8cd79a0f1e4bc5755646e1b46da9abc32578432",
+    "tools/layout-studio/codex-unix-transport.test.mjs": "59e6663ab5df53f29176aae386765f0b9f5436941dc14e7d75da3aa7268e3552",
+    "tools/layout-studio/codex-windows-owner.mjs": "d61ad641a332da715b3e4746964f176492c7056a1abfb2791fa8e5ee72c5a1ba",
+    "tools/layout-studio/codex-windows-tasks.mjs": "c9d9afd24f6941a39d4eeec1230940a05a36d3496172fb6d8ac5a49c75e8d030",
+    "tools/layout-studio/codex-windows-tasks.test.mjs": "5974ae72aedd2d88e33456879e6ea05cf0b2e56a51df40557471538aaf2d2243",
+    "tools/layout-studio/coding-editor-connections.test.mjs": "134fd8ecb7ed502d7644d09c70bd2bc4e84a70511f4f2d7ae676b60b68c4eecf",
+    "tools/layout-studio/coding-task-owners.test.mjs": "9498fb2ba26aae1cd3ffde67e573f6747dce428c350632a75bca118f763e0aff",
+    "tools/layout-studio/test-support/codex-windows-stdio-fixture.cjs": "06709fe0f6de17b4e77ad720a7fd9b1e8ca98c2fe750d03923f5516f227d2d9f",
+    "tools/layout-studio/windows-codex-editor-connection.mjs": "9d174b9eb2d691c74a283a5639deddf333833546ad9d5523466dbfb5f2d67448",
+    "tools/layout-studio/windows-codex-editor-connection.test.mjs": "56ac0f649857190b702d743d1873a0ef61e87154503c281d8ab5832e2e9e0de5",
+    "tools/layout-studio/windows-owned-stdio.mjs": "d336c610168dec5b4a6fea716880ec9f43914c7abfedfc74636f483d99f9a426"
+  },
+  "receipts": [
+    {
+      "name": "isolated-test-cc7d7ddd-7313-4e12-83c3-5b8957d0c496.json",
+      "sha256": "8eb452881297684a089728d83adf149273cddd309dc1b50674d6d86fa7b0cd0d",
+      "totals": {
+        "required": 4,
+        "passed": 4,
+        "failed": 0,
+        "tests": 33,
+        "passedTests": 32,
+        "failedTests": 0,
+        "skippedTests": 1,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "name": "isolated-test-8a0b0cd5-3ca4-422f-9abc-e9160a35126c.json",
+      "sha256": "27b035d3443e49f317d896107b94848997345db4a748d2bfbefe7a808f299123",
+      "totals": {
+        "required": 38,
+        "passed": 38,
+        "failed": 0,
+        "tests": 164,
+        "passedTests": 163,
+        "failedTests": 0,
+        "skippedTests": 1,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    }
+  ],
+  "groups": 38,
+  "passedTests": 163,
+  "skippedTests": 1,
+  "originalCommandsBoundsSkipsAndCleanupVerified": true,
+  "typecheck": {
+    "command": "npm run typecheck",
+    "node": "24.14.0",
+    "passed": true
+  },
+  "scope": {
+    "originalNativeInitializationRetained": true,
+    "noDuplicateNativeHandshake": true,
+    "originalNativeRpcIdsShared": true,
+    "logicalRetirementDoesNotClaimNativeExit": true,
+    "oneEditorPerOwner": true,
+    "registrationAndPendingRequestsJoined": true,
+    "exactTaskAccountAndPermissionsBound": true,
+    "accountBoundaryClosesOriginalOwner": true,
+    "aggregateRequestBoundsEnforced": true,
+    "authenticatedWebSocketCompositionExercised": true
+  },
+  "nativeProcessEvidence": "windows-codex-owners-native-summary.json",
+  "effects": {
+    "liveModelPrompts": 0,
+    "liveProviderTasks": 0,
+    "accountChanges": 0,
+    "hardwareOpened": false,
+    "frontendChanged": false,
+    "installedApplicationChanged": false,
+    "newDependencies": false,
+    "newCompilation": false
+  },
+  "limitations": [
+    "Local checks use the real CodexClient on explicit synthetic streams and real WebSocket sockets with provider/native-peer doubles.",
+    "The earlier Windows task/Job/RPC/recovery layer passes native CI at 0078893; the newer logical editor channel is pending native acceptance.",
+    "Windows editor targets, durable editor journal/recovery, Suite editor routes and VS Code launching remain unfinished.",
+    "The 0.166.0 protocol gate remains unchanged; no live account/task/model acceptance is claimed."
+  ],
+  "cleanup": {
+    "originalChildAndTreeRetirementVerified": true,
+    "noCompilerOrBundleStagingCreated": true,
+    "fixtureRootsRemoved": true
+  },
+  "success": true
+}

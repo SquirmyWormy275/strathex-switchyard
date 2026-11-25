@@ -1,0 +1,45 @@
+{
+  "schema": "switchyard-owned-codex-task-adapter-summary/v1",
+  "basis": "2d0cd0928b751f7836e3c44f637379f6a856a205",
+  "sourceSha256": {
+    "tools/layout-studio/codex-stdio-tasks.mjs": "285959d5ff39e5cbdfe532b91cf83d13449e4174c536b92a638890c19e00c15c",
+    "tools/layout-studio/codex-unix-tasks.mjs": "16f0b632d7fc2bed3d722336ca201a8671a0577936af4846a92776491a04c56b",
+    "scripts/verify-codex-unix-tasks.mjs": "d06ece16648b71593d9e2dd7b7ac63150f3c6b331a5e8095c38ed1a96cfe1d7d",
+    "deployment/suite/release.mjs": "cbdde7d822b7b221366309a700d2577ce3310eb20005130438fdf2cc15f905c8",
+    "tools/layout-studio/model-f-source.mjs": "51c9b99e14c3aef1618ac3746a1ace69fa2593f95246e6d7de4813fa9c75ace3"
+  },
+  "software": {
+    "taskFiles": 7,
+    "taskTestsPassed": 78,
+    "receipt": "isolated-test-f2b5830b-26ce-4ac9-bc76-46f44a561478.json",
+    "receiptOverallPassed": false,
+    "originalFailure": "The additional release group exceeded the unchanged 5 MiB fixture budget.",
+    "releaseFollowup": {
+      "groups": 5,
+      "testsPassed": 52,
+      "receipt": "isolated-test-300c1fe6-3ff2-4876-9782-8f263239b2a5.json",
+      "allCleanupVerified": true,
+      "bundleBytes": 5055445,
+      "budgetBytes": 5242880
+    },
+    "typecheck": true
+  },
+  "native": {
+    "receipt": "codex-unix-tasks-1793933613069.json",
+    "checksPassed": 3,
+    "listeners": 1,
+    "accountOperations": 2,
+    "freshVerifierPermissionFence": true,
+    "originalExitAndCleanupVerified": true,
+    "threadsCreated": 0,
+    "modelTurns": 0,
+    "loginChanges": 0
+  },
+  "limits": [
+    "Explicit adapter; main Studio composition and complete task/IDE attachment remain unfinished.",
+    "Native proof uses a verifier-only compartment permission boundary. Real protected store revocation has separate software coverage.",
+    "No live account switching, task creation or model turn was exercised.",
+    "The initial broader receipt remains failed; separate corrected package followup is recorded."
+  ],
+  "package": "Backend shares the exact frozen frontend Model F catalog without changing its bytes or the UI."
+}

@@ -1,0 +1,50 @@
+{
+  "schema": "switchyard-full-linux-source-summary/v1",
+  "sourceCommit": "39db1fe6ca5f7dce4737d4847e794354b8bc63c9",
+  "sourceTree": "10e3684a9e90f6c9b54ce9e1ce708c8cdb507dab",
+  "verificationReceipt": "isolated-test-19b25f5c-5e2c-4e50-8fa2-c583f97639aa.json",
+  "verificationReceiptSha256": "a5f5d3ef1fae1c5852a0ce3567947af097511a6aa282a8207b1d7aad1b58834b",
+  "success": false,
+  "failure": "scripts/windows-backend-shards.test.mjs exceeds the unchanged historical workload budget after new groups",
+  "totals": {
+    "required": 314,
+    "passed": 313,
+    "failed": 1,
+    "tests": 1927,
+    "passedTests": 1910,
+    "failedTests": 1,
+    "skippedTests": 16,
+    "cancelledTests": 0,
+    "todoTests": 0
+  },
+  "allChildAndTreeCleanupVerified": true,
+  "cleanupReceipt": "linux-39db1fe-cleanup-1794009569463.json",
+  "cleanup": {
+    "schema": "switchyard-owned-full-linux-cleanup/v1",
+    "sourceCommit": "39db1fe6ca5f7dce4737d4847e794354b8bc63c9",
+    "verificationReceipt": "isolated-test-19b25f5c-5e2c-4e50-8fa2-c583f97639aa.json",
+    "generatedFiles": 782,
+    "generatedBytes": 11766823,
+    "generatedDirectories": [
+      "apps/linux-companion/dist",
+      "apps/provider-adapter-host/dist",
+      "apps/vscode-extension/dist",
+      "apps/windows-companion/dist",
+      "packages/protocol/dist"
+    ],
+    "dependencyAliasCount": 9,
+    "trackedTreeClean": true,
+    "testChildrenExited": true,
+    "testParentEmpty": true,
+    "rootIdentityVerified": true,
+    "testParentIdentityVerified": true,
+    "worktreeRemoved": true,
+    "rootRemoved": true,
+    "testParentRemoved": true,
+    "markerRemoved": true,
+    "otherWorktreesPreserved": true,
+    "dependencyAliasIdentityAndTargetVerified": true
+  },
+  "providersAndWindowsGuestsDoubledWhereDeclared": true,
+  "installedChanged": false
+}

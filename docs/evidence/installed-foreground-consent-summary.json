@@ -1,0 +1,162 @@
+{
+  "schema": "switchyard-installed-foreground-consent-summary/v1",
+  "at": "2026-11-07T14:24:03.204Z",
+  "sourceCommit": "eebfe054a91a7a95fe3228f87d16bfe245185919",
+  "release": "3760be8d85dfbacf69d6bc76012a3e941d7a6d12df5f8550be5ab460f0c10071",
+  "previous": "d68481192c3687ef7b897be29e9a92884ef82ef80804de9edaa0db6e7c0b1e18",
+  "files": 553,
+  "bytes": 4731216,
+  "frontend": "24100ef601b810efb0cda95e4fe0842d2944560734b02c4cf482c25e19150543",
+  "workspaces": 54,
+  "semanticSnapshotsPreserved": true,
+  "sealedByteIdentical": 53,
+  "pendingKeyboardOnlyConversationPreserved": true,
+  "selectionPreserved": true,
+  "privateReviewLinkPreserved": true,
+  "datedBackupVerified": true,
+  "managedLauncherReadbackVerified": true,
+  "currentAndOneRollbackOnly": true,
+  "ready": true,
+  "visualAcceptance": false,
+  "metadataChecks": 88,
+  "metadataReceipts": [
+    {
+      "receipt": "installed-agent-security-metadata-1794061443466.json",
+      "sha256": "03ffae69fa31d36e449214809c250eb908759e421fdc732c38f748e78536d6bb",
+      "checks": 21
+    },
+    {
+      "receipt": "installed-npm-archive-metadata-1794061443485.json",
+      "sha256": "0b2de7ee8af1936142142410e6b1c42574d78f1ee9f19d2abda1fa26aa145ce4",
+      "checks": 3
+    },
+    {
+      "receipt": "installed-python-inventory-metadata-1794061443502.json",
+      "sha256": "848859295b1989829001aef3cdb9a8ce334437af638d2bfe19a2d3f2b70ce1e6",
+      "checks": 14
+    },
+    {
+      "receipt": "installed-cargo-inventory-metadata-1794061443515.json",
+      "sha256": "fb5cfae8bb3087da435948f8500a34c49975c98d358b05e723d02fb92d0459f9",
+      "checks": 10
+    },
+    {
+      "receipt": "installed-workflow-identity-metadata-1794061444097.json",
+      "sha256": "285045084922cf9dc4cfda7de08d69847fa5c42bd684aaba348864a0496db802",
+      "checks": 10
+    },
+    {
+      "receipt": "installed-task-owner-metadata-1794061454905.json",
+      "sha256": "2076286f93bfd5a8c99e718f5090f31775ca5ca096e0a7d8f2e886669d94c9ae",
+      "checks": 13
+    },
+    {
+      "receipt": "installed-copilot-journal-metadata-1794061455102.json",
+      "sha256": "57bb8e1589d83944b6c01d3ebc2b3ac1d394c9cf2e1e3e07242873722f91a2a2",
+      "checks": 7
+    },
+    {
+      "receipt": "installed-signed-intent-metadata-1794061455314.json",
+      "sha256": "1a55c96eb28d905c0331cbcaec4332d7dd320fe47c735c6b483da4e91cbfb74a",
+      "checks": 8
+    },
+    {
+      "receipt": "foreground-consent-installed-profile-readback.json",
+      "sha256": "df1126c4dd0aec225c3d91b0f8516102f8db4543fef664e1019391c008b9bf43",
+      "checks": 2
+    }
+  ],
+  "moduleDigests": {
+    "tools/layout-studio/credential-process.mjs": "7aa7cc5bc68f038385bbb40e6aba10fcda73017c207c5812957c125f8b4edb3a",
+    "tools/layout-studio/custom-agents.mjs": "f0f48685ed4413824224a28dcbc5c8b86ff5e76d2ac5fe79acda63769b1cac66",
+    "tools/layout-studio/agent-observation.mjs": "79052bbf1dfe8d35d811e1f5cd43061db171035ca64a66a864204cfaac4161c6",
+    "tools/layout-studio/codex-turn.mjs": "871a6f75f2c40e8ad7270fb53b4d77d036340efd566c5d357bd3cde0bb6d9b8b",
+    "tools/layout-studio/agents.mjs": "a200bc6c0bba609e74767e356faa4e27f5e40923b1ca511f452c1ce7c093d0d1",
+    "tools/layout-studio/reviewed-task-text.mjs": "2c9d710b0f54be05056e8d2bdf9784e765fe4ec851c9efb15ae25281cc7ac6d2",
+    "tools/layout-studio/design-observations.mjs": "0b6789628cfde72059eac00771101675b0ec83fef872c3baf3c90056652bde60",
+    "tools/layout-studio/foreground.mjs": "e34ebca1402a5b0701c10e2c7abc960b539999ec24dc22244d67bd394219e6be",
+    "tools/layout-studio/windows-host.mjs": "864decd9aeee7686995cea1ff55851bd6968ee78763dd371c0f8082b4657909d",
+    "tools/layout-studio/git-index-inputs.mjs": "acc33e03ece6e44b60d491da13524ae2f4cf81d5b17fb3eb54401e48f9251306",
+    "tools/layout-studio/git-history-inputs.mjs": "33865705014bb6b08fbb1e60f4113d6b23cb28e681c4197b56a0c6bdc7412e79",
+    "tools/layout-studio/repository-inspection.mjs": "2c2e24d0e41ad4a18bdcd81736a964ac59be6ffa49b95773a166250f7d691ebd",
+    "packages/control-plane/src/git-inspector.ts": "eac3faa787f0aec6ee9b62b971803aa948d9aec40bc14b8627f51f9d9a6a34a9",
+    "packages/control-plane/src/git-index-tree.ts": "13f4a69ecd8a3c51b4de98a41c90ecadc5c752301a4b3f76df7cf13dda1390d7",
+    "tools/layout-studio/codex-requests.mjs": "43736911d5f429d85db960e1e0d6dcd99e5310d1bd2b46f6453bc3300ee6e093",
+    "tools/layout-studio/codex-submissions.mjs": "6aaabf0145983639965507d258d6b964f1a42301555f3995580723d381be3ffa",
+    "tools/layout-studio/catalog-source.mjs": "84b61bf3a8cfcbb4af5f878db1ae056f9a19fdc2c579928907cc215ac7fa474f",
+    "tools/layout-studio/haptic-capabilities.mjs": "9f3ee37d3f0e6a8fab58993dcaef24e9adaef9325f18f2c7f64fdfca5735f1b3",
+    "tools/layout-studio/scanner-fixtures.mjs": "56340103c4f01295212acc3ffb3cb1043932af6c2f36b2863ce8af6f59ca2d9f",
+    "apps/windows-companion/src/scanner-fixtures.ts": "31f4eafa61ec9cb8092b37adf62735eab74b3f35ef41c91763e493640268acb3",
+    "tools/layout-studio/copilot.mjs": "749fb8c6d3b8116900dbe663976ff5b9373a5423d210d7e84e4546fba7377d6f",
+    "tools/layout-studio/coding-sessions.mjs": "f7acfa5bc18ca732fc7689283a92c284e5f2419194b180a69ffa87b43e2e3c92",
+    "apps/vscode-extension/src/codex-daemon-status.cjs": "b1327149e0c926ea4dd5f42fa3650c241fe58576456c654708ba9ac0be7fd719",
+    "tools/layout-studio/claude-coding.mjs": "a2d6ac412117a6d3cdd25085194cc00272f0c0ddff178606c965ea540197ebb9",
+    "tools/layout-studio/task-window.mjs": "06d4f72efeb48964b4d68f78f8c9e5ea79151e3b91c712b31cd8f6390a219f36",
+    "tools/layout-studio/tmux-task-window.mjs": "13defa1050a89aa5b98199d4cc6f966252d87dabc4c99967453592ee3dab0b5a",
+    "deployment/suite/release.mjs": "b682200807ad8fce583483d431a16dbbc86b9cfabe7bdf7358f2de96d245b82e",
+    "tools/layout-studio/scanner-recipe-draft.mjs": "1432be0b12ae745a8d0a97afc7f82c79428fb44b9e64757c2bcf0155d558061f",
+    "tools/layout-studio/scanner-recipe-files.mjs": "5007e2acb71bc81e6e54e399bc08aeea721d09ef5f82e6848125bec1cd879e94",
+    "packages/control-plane/src/confirmations.ts": "6b38a60448f8916f48a06ed660cb8c2c1b1c691606a416d0a4ae017394853e71",
+    "tools/layout-studio/legend-template.mjs": "763cf5cffbdb1f1aff84f9ae0ae2010cabbb480223ffc4fec00eb66d8d3e7b41",
+    "tools/layout-studio/legend-export.mjs": "fa81e07f3a6954b2de91298c285d48b4b4f807334ea5a6cdc018345656681db0",
+    "tools/layout-studio/scanner-recipe-save.mjs": "e37944b2e7afc836abb5aed1b42432ed2085db4048e0188aa612b193196cfcd5",
+    "tools/layout-studio/windows-scanner-recipe-files.mjs": "e848e40afdfd0ab2cc9a4fff466d009a5fa42bf2f6e79138035038888a9b1019",
+    "tools/layout-studio/suite-store.mjs": "976ccb9e34d28a2e61b7de5c862f3cfad5c6adb6ba90a9f69a255684502f5d3e",
+    "tools/layout-studio/codex-runtime-observation.mjs": "5d60231ef5ff2c17fc58605a62b4c7e010f83836e48ff5d537c0a8dd0210cae2",
+    "tools/layout-studio/suite.mjs": "d3c64fdc9326b5880e53ee146e10ec15496e38b0b4c0ad3bfd354c1598fb1802",
+    "tools/layout-studio/windows-native-focus.mjs": "72ac55cfb28e2b956294940283fa5ec1dd559015d3acf50c8102a690aa6d36b5",
+    "integrations/agent-sdk.mjs": "4283ff269f478dd6922147116b55e67c08151442787f0b9855d917f421673449",
+    "integrations/switchyard_agent.py": "00d6a985df82f8d8d6a4b923e1af69ada92423a6d63467ee94ba3211326a6896",
+    "tools/layout-studio/task-authority.mjs": "89821e1b72f86dddbbbe8e2ae1bb3861e250e437b7e0d59d3e1974fd8969320d",
+    "tools/layout-studio/shield-git-inputs.mjs": "01a56867b1ce199ab77832ab912265682de3b84015ea51f78bf75393b6e5e993",
+    "tools/layout-studio/repository-execution.mjs": "61dca0524b221a9939059cf55c27b16e919af5aed2b2a61d5a1b4ef9eba4477e",
+    "tools/layout-studio/repository-windows-execution.mjs": "0d6242a40eb9706bf7ebdf6bbc8337a0471df3c7b6da36329a1e3a2ec3185f22",
+    "tools/layout-studio/windows-reviewed-inputs.mjs": "09d283c0b9266a78e094add6189afda30e3ded4c89471030ca6e0baea7467efc",
+    "tools/layout-studio/windows-reviewed-runner.mjs": "e8eeb68afbb1922e0b97fbca037f87871f671064f6d0a6df104d79de989848d0",
+    "tools/layout-studio/windows-history-inputs.mjs": "c4c587745c4ab1feed187e4dfcd22374004dd81a9b40f6fc44cf3c1c41601531",
+    "apps/linux-companion/src/linux-repository-inputs.ts": "115376fc375dd91d6246d4c414c946e22c19a18e1fa62e312fcf98fef6f19988",
+    "tools/layout-studio/shield-scanner-engine.mjs": "cc4609ee36d5b6afb4bbbecbc49a434652f0a72cd3bd791c9ec9471e05ba6eca",
+    "tools/layout-studio/repository-shield.mjs": "486d8432f3a6afd8e9a8b16ca12bf502945775ee53747bda4880ca2ebb60c3ca",
+    "tools/layout-studio/workflow.mjs": "21305677d67b99e401050c705c40535f059cc15cb7ccf7de696b65ef4be9c7b4",
+    "tools/layout-studio/physical-intent-contract.mjs": "026034ae5c44963a6ffefc3c872f1c224aff8800897d58e1c41871602cc036df",
+    "tools/layout-studio/physical-intent.mjs": "87f3dbafc43d184ed3e9274d75c1545b42cc1d68ffd78f8fadecbdbcc314c0c0",
+    "tools/layout-studio/instance.mjs": "f20cc1ab9eda6ac3a33b61567ca2f6fb59d032a9f303691529b9f67d407f2288",
+    "tools/layout-studio/serve.mjs": "5b4904a91856806a98973ad3dc0c73c35e37091c9551017de4a0e33214eecc32",
+    "tools/layout-studio/workspace.mjs": "378e913d36fff330d3f2f63ffa1aa1f2228c124527d5c2a68f24c77d90b797ac"
+  },
+  "exactModuleDigests": 56,
+  "savedProfilesValidated": 4,
+  "savedWorkflowsValidated": 57,
+  "preparedBundleCleanup": {
+    "schema": "switchyard-prepared-bundle-cleanup/v1",
+    "sourceCommit": "eebfe054a91a7a95fe3228f87d16bfe245185919",
+    "release": "3760be8d85dfbacf69d6bc76012a3e941d7a6d12df5f8550be5ab460f0c10071",
+    "files": 554,
+    "bytes": 4830564,
+    "exactOwnedInventoryVerified": true,
+    "currentAndRollbackVerified": true,
+    "applicationRunsFromInstalledVersion": true,
+    "removed": true
+  },
+  "installedRuntimeObservationChecks": 2,
+  "verifierSourceFiles": {
+    "scripts/verify-agent-security-host.mjs": "0201370f3524dcac826470be2f2a78326a90fcc35112dfeb817eb791cf7f1bbe",
+    "scripts/verify-workflow-host.mjs": "ff85c4438caffb9aeab02ddad6de0ffabd40992cadcce71c055e8d24cbd7a487"
+  },
+  "hostFacingVerifiersRunSequentially": true,
+  "installedOriginalRoleGuardChecks": 2,
+  "installedSignedIntentChecks": 8,
+  "liveAccountsChanged": 0,
+  "nativeProviderTasksStarted": 0,
+  "nativeFocusEffects": 0,
+  "modelPrompts": 0,
+  "hardwareOperations": 0,
+  "scannerProcessesStarted": 0,
+  "frontendChanged": false,
+  "success": true,
+  "limitations": [
+    "Installed proof exercises metadata, in-memory runtime observation and original-role refusal/success, plus deliberately refused signed requests; it does not invoke a live role, provider, native focus or keyboard event.",
+    "The VS Code launcher remains inactive pending command activation and interactive acceptance. Updating the backend does not install or activate that command.",
+    "Recording consent and foreground generation corrections pass eight focused groups/123 tests with no skips. Full Linux 0c025df is still running and predates these corrections; complete-current-source and live native acceptance remain separate."
+  ]
+}

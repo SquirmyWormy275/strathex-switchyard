@@ -1,0 +1,46 @@
+{
+  "schema": "switchyard-native-windows-scanner-save-summary/v1",
+  "sourceCommit": "5ec16fe9725c5ba20dec7b4a7a55451989f670f9",
+  "mergeCommit": "6e02cbabf84363f2d6e0852f0f8d14b52121a16b",
+  "equalSourceAndMergeTree": "f2add979b0817a06ea9321665e67f5409a39064d",
+  "workflowRun": 42346369644,
+  "scannerSaveJob": 128325076132,
+  "helperBuildJob": 128324890619,
+  "scannerSaveJobPassed": true,
+  "overallWorkflowPassed": false,
+  "nativeCases": 4,
+  "groups": 1,
+  "passedTests": 15,
+  "skippedTests": 0,
+  "sourceFiles": {
+    "apps/desktop-hotkeys/ScannerRecipeFiles.cs": "b77c96291c1c5bb31db8a44b3b1972aa29e1fecfbacb037f18c53ecf8dbd7b37",
+    "apps/desktop-hotkeys/Program.cs": "e5a357ce9ef9259dabc7fd4c36ad7e3c6aa4c44c4d5300568ca171e15395b2cc",
+    "tools/layout-studio/windows-scanner-recipe-files.mjs": "e848e40afdfd0ab2cc9a4fff466d009a5fa42bf2f6e79138035038888a9b1019",
+    "tools/layout-studio/windows-scanner-recipe-files.test.mjs": "f08d360bebcca2502b1f3e2adbae07619b11732c62f5722db385ab22428cc799",
+    "tools/layout-studio/scanner-recipe-save.mjs": "e37944b2e7afc836abb5aed1b42432ed2085db4048e0188aa612b193196cfcd5",
+    ".github/workflows/switchyard-windows-filesystem.yml": "f5ccf1d56c13fa7398319b06c4dc334b04dc4ec6f32269a29ec274695368c105",
+    "scripts/verify-windows-storage-contracts.mjs": "990ce2524f1c5d0ed7982ab738a6d3bc07f0854b322a825399c52032b69a377b"
+  },
+  "manifestSha256": "0ef8f1dfbb40d28525aa64dc92c6d3b9679b244d4ac9b058bc673c0ff1ed57b9",
+  "receipt": "isolated-test-e564588b-33e6-4fe4-b553-f1695fa22f08.json",
+  "receiptSha256": "acb13ea571df6a700e35aa0041750767b1ebd236a0f52f406f20a9a6db4fb30f",
+  "artifact": {
+    "id": 13563294762,
+    "bytes": 994,
+    "sha256": "0973da6375e7fc7c11f7181611c86bb27c526f1632b4027f1f69a4e02ea0cdf0",
+    "archiveReadInMemoryOnly": true
+  },
+  "originalCommandsBoundsSkipsAndCleanupVerified": true,
+  "scope": [
+    "Actual NTFS generated control saving and source/index preservation.",
+    "Existing-directory refusal, junction substitution and hard-link refusal preserve uncertain output.",
+    "Native orchestration, request proof substitution, lost acknowledgement and original helper retirement."
+  ],
+  "limitations": [
+    "The separate restricted-storage exchange job failed; this receipt does not accept the full Windows workflow.",
+    "Mixed index/history support was implemented later and is outside this source.",
+    "Interactive Windows, real accounts, physical devices and frontend activation remain separate."
+  ],
+  "success": true,
+  "restrictedStorageJob": 128325074973
+}

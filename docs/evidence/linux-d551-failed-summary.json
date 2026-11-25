@@ -1,0 +1,48 @@
+{
+  "schema": "switchyard-complete-linux-failed/v1",
+  "sourceCommit": "d551ccffbde77a889ddf45ccd006ab3d756bf70f",
+  "verificationReceipt": "isolated-test-6abdbdf6-eb3d-437d-b5af-d41dbf9b9502.json",
+  "totals": {
+    "required": 278,
+    "passed": 277,
+    "failed": 1,
+    "tests": 1779,
+    "passedTests": 1767,
+    "failedTests": 1,
+    "skippedTests": 11,
+    "cancelledTests": 0,
+    "todoTests": 0
+  },
+  "failure": {
+    "file": "tools/layout-studio/codex-editor-recovery.test.mjs",
+    "case": "crash recovery preserves a substituted socket and does not upgrade uncertain retirement",
+    "error": "ENOENT at fixture unlink after host crash",
+    "accepted": false
+  },
+  "allChildAndTreeCleanupVerified": true,
+  "ownedCleanup": {
+    "schema": "switchyard-owned-full-linux-cleanup/v1",
+    "sourceCommit": "d551ccffbde77a889ddf45ccd006ab3d756bf70f",
+    "verificationReceipt": "isolated-test-6abdbdf6-eb3d-437d-b5af-d41dbf9b9502.json",
+    "generatedFiles": 782,
+    "generatedBytes": 11766655,
+    "generatedDirectories": [
+      "apps/linux-companion/dist",
+      "apps/provider-adapter-host/dist",
+      "apps/vscode-extension/dist",
+      "apps/windows-companion/dist",
+      "packages/protocol/dist"
+    ],
+    "dependencyAliasCount": 9,
+    "trackedTreeClean": true,
+    "testChildrenExited": true,
+    "testParentEmpty": true,
+    "rootIdentityVerified": true,
+    "testParentIdentityVerified": true,
+    "worktreeRemoved": true,
+    "rootRemoved": true,
+    "testParentRemoved": true,
+    "markerRemoved": true,
+    "otherWorktreesPreserved": true
+  }
+}

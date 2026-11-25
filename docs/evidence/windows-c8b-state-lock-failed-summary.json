@@ -1,0 +1,23 @@
+{
+  "schema": "switchyard-windows-state-lock-failed-summary/v1",
+  "sourceCommit": "c8b12160bb8dea7f535b22dde852299417b01d96",
+  "executionCommit": "70c50eaf6b33cef26012db13030b96e10eb64e9e",
+  "workflowRun": 42036945776,
+  "artifactId": 13418609248,
+  "archiveSha256": "c0a9c5ff37079557178e9ecc3f6a5d82e6701a400888b3653e627ffa444f0a72",
+  "digestVerified": true,
+  "success": false,
+  "privateReceipt": "windows-c8b-leases-failed.json",
+  "failedCase": "independent store instances serialize initialization and updates without replacing a compartment key or losing writes",
+  "failure": "Private state lock timed out at the original 15-second acquisition deadline",
+  "childTimedOut": false,
+  "totals": {
+    "tests": 5,
+    "passed": 3,
+    "failed": 1,
+    "declaredSkips": 1
+  },
+  "childCleanupVerified": true,
+  "sourceCorrection": "Queue initialization and mutations by normalized private root and compartment across store instances, retaining a separate kernel lease and every original deadline for each transaction.",
+  "nativeCorrectionAccepted": false
+}

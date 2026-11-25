@@ -1,0 +1,105 @@
+{
+  "schema": "switchyard-cargo-archive-identity-source/v1",
+  "at": "2026-11-07T00:22:11.065578+00:00",
+  "baseSource": "9a71cf1572d49fc934fc43a5abc8b48c3a8364a9",
+  "sourceFiles": {
+    "tools/layout-studio/shield-scanner-engine.mjs": "e6d1889ddcbd20bb9fea3a51c6d869890b23afad573a21b298106bf738db046a",
+    "tools/layout-studio/repository-shield.mjs": "3eaac8062d1e5f00cf1af157e495b0906f565067a3ed76d9a924da4f08ddf8ef",
+    "tools/layout-studio/cargo-archive.test.mjs": "8f76224b760354edf0c052f3cafb89475f0b80defc28cc234d763e0475925a3c",
+    "tools/layout-studio/repository-shield-cargo-archives.test.mjs": "5e9c6b8d683a65f46f6166e5545c356b8e5ddcb86d7fb2c0931866e8af93cab0",
+    "tools/layout-studio/repository-windows-shield-cargo-archives.test.mjs": "365f9046d35aa27934acf9c11e8db180f2b8287fca9b63ef8c6682150ed8561a",
+    "tools/layout-studio/test-support/cargo-archive-fixture.mjs": "67377439313c2af018103ef10d29d32979041e262daeb09e3adc10e90a3d53f5",
+    "tools/layout-studio/test-support/npm-archive-fixture.mjs": "dbc8aa1f1cec3d022e5489778c929c86a017af6c4575844c3da93372ee7c76f5",
+    "tools/layout-studio/test-support/shield-scanner-fixture.mjs": "e0a2d704ce0ba16531780a953906e2c0880d193f0586f291266e2434d29c6433",
+    "tools/layout-studio/test-support/assert-cargo-archive-shield.mjs": "2785709c8d1e16a288ea357e4ff9c8488e9b8d6b0a71c430663be062c872431a",
+    "tools/layout-studio/test-support/repository-shield-fixture.mjs": "e6be112389c80937b6f6bd4d04b41290326e63da9120f5b7dd5d3c30b2af6904",
+    "tools/layout-studio/test-support/windows-execution-fixture.mjs": "3e31919070bdd774a87d4993977c20d0c5a1b524026f03b8f2bddafab2d160d0",
+    "scripts/generate-cargo-archive-oracle.py": "0dde2c31c4bc4e952e3d7c1e305bafc6bd7b381a7ee5ae04b571e0ece3b46cfe",
+    "scripts/fixtures/cargo-archive-oracle.json": "6dbe0de08c7ae458f42e787ab06a1b6274c6858d322aa564a68f6bbc5d17a31b",
+    "scripts/run-isolated-tests.mjs": "2acfba028538783449a677ad56c5a7a686399ee5defe9dba5704f234c4df894e",
+    "scripts/run-isolated-tests.test.mjs": "e957fda947d20040b21cfcb02b595427458b70df842702d56eccc7f8c9a2b8e8",
+    "scripts/verify-cargo-inventory-host.mjs": "8d56fded8dfc15bef7e48f685e2a6a466ed36a85048a3c1d56ec049b056fc896",
+    "scripts/verify-python-inventory-host.mjs": "c60d7a24e5b3057a0ec0dd52b543d623f37b858b5db216cc57687ef802c8d07c"
+  },
+  "reference": {
+    "cases": 26,
+    "libraries": [
+      "Python tomllib",
+      "tarfile.USTAR_FORMAT",
+      "gzip"
+    ],
+    "cargoInvoked": false,
+    "packageBuildOrInstall": false,
+    "network": false
+  },
+  "focusedReceipts": [
+    {
+      "name": "isolated-test-1aeca448-c638-4b59-a527-1ca980b83e8e.json",
+      "sha256": "91f03cd0ed73c29a126ac5f9d0087e42548e1e865feb97549489e3fdde2eaba0",
+      "success": false,
+      "totals": {
+        "required": 12,
+        "passed": 11,
+        "failed": 1,
+        "tests": 126,
+        "passedTests": 125,
+        "failedTests": 1,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "name": "isolated-test-b1f2077b-4cd0-415e-b324-d70eee15826d.json",
+      "sha256": "355324e0bc1e20fd0e9a44907923162a4c94b61b8862cfd47048fa12960318d9",
+      "success": true,
+      "totals": {
+        "required": 1,
+        "passed": 1,
+        "failed": 0,
+        "tests": 5,
+        "passedTests": 5,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "name": "isolated-test-7722ed29-cea2-45c5-b05f-4061ad3d9bf3.json",
+      "sha256": "f53817abdee91b3b42b4ae4a3e489c847af4071fb893e16e35faa2fca4eef956",
+      "success": true,
+      "totals": {
+        "required": 3,
+        "passed": 3,
+        "failed": 0,
+        "tests": 33,
+        "passedTests": 33,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    }
+  ],
+  "acceptedDistinctGroups": 13,
+  "acceptedDistinctTests": 132,
+  "initialFailure": "New integration timeout inventory omitted two new files; registered their existing 120-second Linux/300-second Windows class without extending existing bounds.",
+  "initialUnitBeforeImplementation": {
+    "tests": 5,
+    "failed": 5,
+    "evidence": "Direct Node test output, not isolated acceptance"
+  },
+  "actualLinuxArchiveScans": 6,
+  "windowsGuestDoubleArchiveScans": 6,
+  "typecheck": true,
+  "originalFiveMiBPackageBudgetPassed": true,
+  "allChildAndTreeCleanupVerified": true,
+  "exactOwnedRootRemoved": true,
+  "archiveExtraction": false,
+  "artifactExecution": false,
+  "dependencyResolution": false,
+  "publisherVerification": false,
+  "nativeWindowsAcceptance": false,
+  "installedArchiveAcceptance": false
+}

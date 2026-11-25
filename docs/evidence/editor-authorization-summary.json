@@ -1,0 +1,41 @@
+{
+  "schema": "switchyard-editor-authorization-summary/v1",
+  "basis": "83d4139bfb0659d47f75829b5dc1b37a0783697b",
+  "sourceSha256": {
+    "tools/layout-studio/coding-editor-authorizations.mjs": "124e894250d56bd247f4e52c1a543ab0394bdfde735e93583330e3ff83e4bf85",
+    "tools/layout-studio/coding-editor-authorizations.test.mjs": "89f908a25be21e80760f46f12fa625a10b81987bfc4e35c951c4c0684407ef9d",
+    "tools/layout-studio/coding-task-owners.test.mjs": "fc9a1ce31419faf166410199641d604a2d404d450c053bf978d37f8ef0c1ad2b",
+    "tools/layout-studio/suite.mjs": "a7c48c1f5343106981638a8c6adb68f86b4c010de58b272e97dc7df6212322e6",
+    "packages/control-plane/src/confirmations.ts": "f8ef5458213de53ba839c2ba519134a97cff0cbfcd2d6968215740b70a073b87",
+    "scripts/run-isolated-tests.mjs": "b43b2c69eb58ede236b29111fffa8f8666b947e4d9b22c21881c0d5b8ccf5e2e"
+  },
+  "focusedTests": {
+    "receipt": "isolated-test-3f01650a-bb9a-4c7f-a2bd-8f5dc9cdb754.json",
+    "groups": 5,
+    "passedTests": 59,
+    "allChildAndTreeCleanupVerified": true,
+    "typecheck": true
+  },
+  "earlierAttempt": {
+    "receipt": "isolated-test-03042786-cceb-4139-864b-f539a8f58509.json",
+    "success": false,
+    "passedTests": 6,
+    "failedTests": 1,
+    "cause": "The policy-drift test treated the saved policy name as an object. The corrected fixture changes enrolled accounts and retains the scope-mismatch refusal assertion.",
+    "ownedCleanupVerified": true
+  },
+  "implemented": [
+    "Exact original acknowledged task, owner, load, endpoint, policy and editor-instance review.",
+    "One-use confirmation and protected 30-second hashed permit under the real per-task kernel lease.",
+    "At-most-once authorization delivery across concurrent service instances, with permanent no-replay records.",
+    "Refuse expiry, clock reversal, foreign IDs/permits, inactive workspace, account/endpoint/repository/policy drift and unrelated effect fields.",
+    "A lost or refused final consume reply leaves the permit spent; retries carry no launch authorization.",
+    "Authenticated HTTP routes, private snapshot omission and shutdown joins."
+  ],
+  "limits": [
+    "Provider metadata is controlled in software tests; actual HTTP, encrypted state and Linux kernel leases are exercised.",
+    "The backend authorizes a terminal launch only. It never launches a terminal or claims an IDE attachment, model turn or completion.",
+    "Signed extension authorization transport, command wiring, actual terminal creation and native attachment acknowledgement remain unfinished.",
+    "Installed source remains e768d18; no live task or account operation is performed by this acceptance."
+  ]
+}

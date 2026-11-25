@@ -1,0 +1,131 @@
+{
+  "schema": "switchyard-atomic-startup-source/v1",
+  "sourceFiles": {
+    "tools/layout-studio/suite-store.mjs": "04fa023ea41656bdbdba89846dc7f9d0ec68a4e0bc0965f9efce6621f0c2ac7c",
+    "tools/layout-studio/suite.mjs": "1f9afbf8b258435e337630b57115456c1204a988820cc9ba274a17fba015de46",
+    "tools/layout-studio/suite.test.mjs": "203ed4ec47d2ce6c196ab456ed2343085fc6a793466b443bfe13c3ba1f3228d9"
+  },
+  "runs": [
+    {
+      "receiptId": "06f3695d-720a-4b41-8182-1a3404897485",
+      "sha256": "5de07a748091fc3c76e3a58b2f2592752fadf94a78351a38b2bfc8e7d82d6212",
+      "success": true,
+      "totals": {
+        "required": 3,
+        "passed": 3,
+        "failed": 0,
+        "tests": 81,
+        "passedTests": 81,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "files": [
+        "tools/layout-studio/suite.test.mjs",
+        "tools/layout-studio/role-dispatch.test.mjs",
+        "tools/layout-studio/native-focus-ui.test.mjs"
+      ],
+      "originalCommandsBoundsSkipsAndCleanupVerified": true,
+      "failures": []
+    },
+    {
+      "receiptId": "6ce3835d-e512-4a96-9fd7-296b3b611ebf",
+      "sha256": "6d34e4da91fbd82db1868fcaf89f7096e1f01890a3d1755a4f7e209e81d82a88",
+      "success": false,
+      "totals": {
+        "required": 1,
+        "passed": 0,
+        "failed": 1,
+        "tests": 37,
+        "passedTests": 36,
+        "failedTests": 1,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "files": [
+        "tools/layout-studio/suite.test.mjs"
+      ],
+      "originalCommandsBoundsSkipsAndCleanupVerified": true,
+      "failures": [
+        {
+          "file": "tools/layout-studio/suite.test.mjs",
+          "diagnosticSha256": "f755961d6c763d25e473bff039c26b518dcd7b6836f3a18232684b50b4afc68c"
+        }
+      ]
+    },
+    {
+      "receiptId": "2c8cc5da-a02d-4f21-96ff-9ca566a0777d",
+      "sha256": "9ba354e7d99230127368202e13e3c1e93266f59447ceb130fcba5f823134523f",
+      "success": true,
+      "totals": {
+        "required": 1,
+        "passed": 1,
+        "failed": 0,
+        "tests": 37,
+        "passedTests": 37,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "files": [
+        "tools/layout-studio/suite.test.mjs"
+      ],
+      "originalCommandsBoundsSkipsAndCleanupVerified": true,
+      "failures": []
+    },
+    {
+      "receiptId": "5e618a51-454b-44ec-830d-fbfe94b6d351",
+      "sha256": "ae7c08823c8b2d65bde0e7bcf75636a1c3c4923b3bc2569151688d83972b0507",
+      "success": true,
+      "totals": {
+        "required": 10,
+        "passed": 10,
+        "failed": 0,
+        "tests": 148,
+        "passedTests": 147,
+        "failedTests": 0,
+        "skippedTests": 1,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "files": [
+        "deployment/suite/release.test.mjs",
+        "deployment/suite/application.test.mjs",
+        "tools/layout-studio/suite.test.mjs",
+        "tools/layout-studio/role-dispatch.test.mjs",
+        "tools/layout-studio/native-focus-ui.test.mjs",
+        "tools/layout-studio/execution-ui.test.mjs",
+        "tools/layout-studio/scanner-ui.test.mjs",
+        "tools/layout-studio/connection-ui.test.mjs",
+        "tools/layout-studio/windows-native-focus.test.mjs",
+        "tools/layout-studio/state-lock.test.mjs"
+      ],
+      "originalCommandsBoundsSkipsAndCleanupVerified": true,
+      "failures": []
+    }
+  ],
+  "typecheck": {
+    "command": [
+      "/home/kingoftheeast/.local/share/mise/installs/node/24.14.0/bin/node",
+      "node_modules/typescript/bin/tsc",
+      "--noEmit",
+      "-p",
+      "tsconfig.json"
+    ],
+    "exitCode": 0
+  },
+  "implementation": [
+    "Ordered startup recovery now reads, transforms and seals workspace state under one original kernel lease. Each recovery operation retains its policy, retention and audit rules. No cached-state or native-lock bypass is introduced.",
+    "A later recovery failure preserves existing sealed bytes. Independent store writers observe the completed recovery transaction. Existing-policy mismatches and malformed callbacks refuse before persistence.",
+    "Suite shutdown waits for original startup and selection promises after requesting component retirement. Closed-state checks prevent new recovery/discovery after shutdown; existing-policy checks are also tracked."
+  ],
+  "regression": "The original shutdown test completed close while the original startup lease was held; 36 cases passed and the new case failed. With lifecycle joining, all 37 pass.",
+  "limitations": [
+    "The final ten-group run passes 147 tests with the one original native-Windows lease-worker skip on Linux. Earlier receipts overlap and precede the final lifecycle change.",
+    "Windows a351626 client evidence predates this optimization. New native verification must pass the original bounds.",
+    "No actual HID, live provider/account/task, installed agent, microphone or UI acceptance is inferred."
+  ]
+}

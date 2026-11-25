@@ -1,0 +1,40 @@
+{
+  "schema": "switchyard-linux-complete-summary/v1",
+  "sourceCommit": "072e0669f78ec2780016fd7234124a557a9ec079",
+  "receipt": "isolated-test-7e37ff1e-0b56-477e-9fad-381aab19b81d.json",
+  "totals": {
+    "required": 252,
+    "passed": 252,
+    "failed": 0,
+    "tests": 1660,
+    "passedTests": 1649,
+    "failedTests": 0,
+    "skippedTests": 11,
+    "cancelledTests": 0,
+    "todoTests": 0
+  },
+  "allChildAndTreeCleanupVerified": true,
+  "ownedCleanupReceipt": "linux-072e066-cleanup-1793962408919.json",
+  "ownedCleanup": {
+    "schema": "switchyard-owned-linux-checkout-cleanup/v1",
+    "source": "072e0669f78ec2780016fd7234124a557a9ec079",
+    "runReceipt": "isolated-test-7e37ff1e-0b56-477e-9fad-381aab19b81d.json",
+    "runAccepted": true,
+    "allChildAndTreeCleanupVerified": true,
+    "exactRootIdentityVerified": true,
+    "dependencyAliasesVerifiedRemoved": true,
+    "ownedBuildsRemoved": true,
+    "emptyArtifactsDirectoryRemoved": true,
+    "checkoutRemoved": true,
+    "rootRemoved": true,
+    "markerRemoved": true,
+    "ownedTestParentRemoved": true
+  },
+  "scope": "Complete Linux manifest from immutable published source, including dedicated editor upstream registration, restricted relay and the real Linux synthetic ingress-to-provider demonstration.",
+  "limits": [
+    "Eleven declared Windows-only skips; no native Windows, guest or ordinary-user acceptance is inferred.",
+    "The terminal and provider are controlled doubles carried over real owned Linux processes/sockets. This is not native IDE/account/task attachment.",
+    "The later protected editor journal at 2ae7d9b is outside this complete source run and has separate 24-test evidence.",
+    "Installed source remains 5a2c324. Frozen frontend, F77 and work-account checks remain separate."
+  ]
+}

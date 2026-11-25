@@ -1,0 +1,40 @@
+{
+  "schema": "switchyard-linux-complete-summary/v1",
+  "sourceCommit": "d243d8166993de56d16dd597bcfcd48b9c2b772a",
+  "receipt": "isolated-test-321487f6-f936-4b97-a7c6-0787c2e4de97.json",
+  "totals": {
+    "required": 251,
+    "passed": 251,
+    "failed": 0,
+    "tests": 1644,
+    "passedTests": 1633,
+    "failedTests": 0,
+    "skippedTests": 11,
+    "cancelledTests": 0,
+    "todoTests": 0
+  },
+  "allChildAndTreeCleanupVerified": true,
+  "ownedCleanupReceipt": "linux-d243d81-cleanup-1793960773835.json",
+  "ownedCleanup": {
+    "schema": "switchyard-owned-linux-checkout-cleanup/v1",
+    "source": "d243d8166993de56d16dd597bcfcd48b9c2b772a",
+    "runReceipt": "isolated-test-321487f6-f936-4b97-a7c6-0787c2e4de97.json",
+    "runAccepted": true,
+    "allChildAndTreeCleanupVerified": true,
+    "exactRootIdentityVerified": true,
+    "dependencyAliasesVerifiedRemoved": true,
+    "ownedBuildsRemoved": true,
+    "emptyArtifactsDirectoryRemoved": true,
+    "checkoutRemoved": true,
+    "rootRemoved": true,
+    "markerRemoved": true,
+    "ownedTestParentRemoved": true
+  },
+  "scope": "Complete Linux manifest from immutable published source, including signal-safe editor ingress cleanup and the parent-owned ingress lifecycle.",
+  "limits": [
+    "Eleven declared Windows-only skips; no native Windows, guest or ordinary-user acceptance is inferred.",
+    "Provider/editor doubles and owned synthetic kernel processes do not establish live IDE/account/task attachment.",
+    "The later 702897d CI-only helper console comparison is not included in this complete run.",
+    "Installed source remains 5a2c324 with separate metadata/offline evidence. Frontend, F77 and work-account acceptance remain separate."
+  ]
+}

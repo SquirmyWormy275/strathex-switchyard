@@ -1,0 +1,54 @@
+{
+  "schema": "switchyard-full-linux-source-summary/v1",
+  "sourceCommit": "7e45654a5dca544815f86336b4bc2512c60648a9",
+  "sourceTree": "9dd69636801ad6c50397ccdae8d943ccb516bda6",
+  "verificationReceipt": "isolated-test-62a8d41b-24c7-4903-936b-bbb800c40ea7.json",
+  "verificationReceiptSha256": "a3bc90ec422f484a482125c4597343f4cf3af5357909636e469bdbe71905e146",
+  "success": false,
+  "totals": {
+    "required": 306,
+    "passed": 305,
+    "failed": 1,
+    "tests": 1799,
+    "passedTests": 1783,
+    "failedTests": 0,
+    "skippedTests": 16,
+    "cancelledTests": 0,
+    "todoTests": 0
+  },
+  "failedGroups": [
+    {
+      "file": "tools/layout-studio/repository-shield-artifacts.test.mjs",
+      "reason": "120000ms test-file timeout; no accepted final plan"
+    }
+  ],
+  "allChildAndTreeCleanupVerified": true,
+  "cleanupReceipt": "linux-7e45654-cleanup-1793993285895.json",
+  "cleanup": {
+    "schema": "switchyard-owned-full-linux-cleanup/v1",
+    "sourceCommit": "7e45654a5dca544815f86336b4bc2512c60648a9",
+    "verificationReceipt": "isolated-test-62a8d41b-24c7-4903-936b-bbb800c40ea7.json",
+    "generatedFiles": 782,
+    "generatedBytes": 11766655,
+    "generatedDirectories": [
+      "apps/linux-companion/dist",
+      "apps/provider-adapter-host/dist",
+      "apps/vscode-extension/dist",
+      "apps/windows-companion/dist",
+      "packages/protocol/dist"
+    ],
+    "dependencyAliasCount": 9,
+    "trackedTreeClean": true,
+    "testChildrenExited": true,
+    "testParentEmpty": true,
+    "rootIdentityVerified": true,
+    "testParentIdentityVerified": true,
+    "worktreeRemoved": true,
+    "rootRemoved": true,
+    "testParentRemoved": true,
+    "markerRemoved": true,
+    "otherWorktreesPreserved": true
+  },
+  "providersAndWindowsGuestsDoubledWhereDeclared": true,
+  "installedChanged": false
+}

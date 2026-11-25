@@ -1,0 +1,545 @@
+{
+  "schema": "switchyard-pypi-requirements-oracle/v1",
+  "pipVersion": "26.2.2",
+  "packagingVersion": "26.2",
+  "sources": [
+    {
+      "module": "pip._internal.req.req_file",
+      "sha256": "7661814b167d763d5e3aad8d5eff786e8af4bb59fc3f8f80be624bfaf63322c1"
+    },
+    {
+      "module": "pip._vendor.packaging.requirements",
+      "sha256": "43e05d107556e4aefce46057b7b45c3f8504b1d20a5a8585aa5ac78d1e16579d"
+    },
+    {
+      "module": "pip._vendor.packaging.utils",
+      "sha256": "33bf8930a89cdac3f562d57ff1a5bb795181fb1dc00ee282892aec55e09dd94a"
+    }
+  ],
+  "references": [
+    "https://pip.pypa.io/en/stable/reference/requirements-file-format/",
+    "https://packaging.python.org/en/latest/specifications/dependency-specifiers/",
+    "https://packaging.python.org/en/latest/specifications/name-normalization/"
+  ],
+  "cases": [
+    {
+      "input": "Example==1.2.3",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "example",
+          "version": "1.2.3",
+          "declaredSha256": []
+        }
+      ]
+    },
+    {
+      "input": "Example==01!02.0RC01.post02.dev03+LOCAL-001",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "example",
+          "version": "01!02.0RC01.post02.dev03+LOCAL-001",
+          "declaredSha256": []
+        }
+      ]
+    },
+    {
+      "input": "Example[]==1.2.3",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "example",
+          "version": "1.2.3",
+          "declaredSha256": []
+        }
+      ]
+    },
+    {
+      "input": "Example[]==01!02.0RC01.post02.dev03+LOCAL-001",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "example",
+          "version": "01!02.0RC01.post02.dev03+LOCAL-001",
+          "declaredSha256": []
+        }
+      ]
+    },
+    {
+      "input": "Example[TLS,secure_Mode]==1.2.3",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "example",
+          "version": "1.2.3",
+          "declaredSha256": [],
+          "extras": [
+            "secure-mode",
+            "tls"
+          ]
+        }
+      ]
+    },
+    {
+      "input": "Example[TLS,secure_Mode]==01!02.0RC01.post02.dev03+LOCAL-001",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "example",
+          "version": "01!02.0RC01.post02.dev03+LOCAL-001",
+          "declaredSha256": [],
+          "extras": [
+            "secure-mode",
+            "tls"
+          ]
+        }
+      ]
+    },
+    {
+      "input": "Example[foo.bar,foo__bar,Z]==1.2.3",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "example",
+          "version": "1.2.3",
+          "declaredSha256": [],
+          "extras": [
+            "foo-bar",
+            "z"
+          ]
+        }
+      ]
+    },
+    {
+      "input": "Example[foo.bar,foo__bar,Z]==01!02.0RC01.post02.dev03+LOCAL-001",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "example",
+          "version": "01!02.0RC01.post02.dev03+LOCAL-001",
+          "declaredSha256": [],
+          "extras": [
+            "foo-bar",
+            "z"
+          ]
+        }
+      ]
+    },
+    {
+      "input": "Example [a-b_c.d] ==1.2.3",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "example",
+          "version": "1.2.3",
+          "declaredSha256": [],
+          "extras": [
+            "a-b-c-d"
+          ]
+        }
+      ]
+    },
+    {
+      "input": "Example [a-b_c.d] ==01!02.0RC01.post02.dev03+LOCAL-001",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "example",
+          "version": "01!02.0RC01.post02.dev03+LOCAL-001",
+          "declaredSha256": [],
+          "extras": [
+            "a-b-c-d"
+          ]
+        }
+      ]
+    },
+    {
+      "input": "mixed_Name==1.2.3",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "mixed-name",
+          "version": "1.2.3",
+          "declaredSha256": []
+        }
+      ]
+    },
+    {
+      "input": "mixed_Name==01!02.0RC01.post02.dev03+LOCAL-001",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "mixed-name",
+          "version": "01!02.0RC01.post02.dev03+LOCAL-001",
+          "declaredSha256": []
+        }
+      ]
+    },
+    {
+      "input": "mixed_Name[]==1.2.3",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "mixed-name",
+          "version": "1.2.3",
+          "declaredSha256": []
+        }
+      ]
+    },
+    {
+      "input": "mixed_Name[]==01!02.0RC01.post02.dev03+LOCAL-001",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "mixed-name",
+          "version": "01!02.0RC01.post02.dev03+LOCAL-001",
+          "declaredSha256": []
+        }
+      ]
+    },
+    {
+      "input": "mixed_Name[TLS,secure_Mode]==1.2.3",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "mixed-name",
+          "version": "1.2.3",
+          "declaredSha256": [],
+          "extras": [
+            "secure-mode",
+            "tls"
+          ]
+        }
+      ]
+    },
+    {
+      "input": "mixed_Name[TLS,secure_Mode]==01!02.0RC01.post02.dev03+LOCAL-001",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "mixed-name",
+          "version": "01!02.0RC01.post02.dev03+LOCAL-001",
+          "declaredSha256": [],
+          "extras": [
+            "secure-mode",
+            "tls"
+          ]
+        }
+      ]
+    },
+    {
+      "input": "mixed_Name[foo.bar,foo__bar,Z]==1.2.3",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "mixed-name",
+          "version": "1.2.3",
+          "declaredSha256": [],
+          "extras": [
+            "foo-bar",
+            "z"
+          ]
+        }
+      ]
+    },
+    {
+      "input": "mixed_Name[foo.bar,foo__bar,Z]==01!02.0RC01.post02.dev03+LOCAL-001",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "mixed-name",
+          "version": "01!02.0RC01.post02.dev03+LOCAL-001",
+          "declaredSha256": [],
+          "extras": [
+            "foo-bar",
+            "z"
+          ]
+        }
+      ]
+    },
+    {
+      "input": "mixed_Name [a-b_c.d] ==1.2.3",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "mixed-name",
+          "version": "1.2.3",
+          "declaredSha256": [],
+          "extras": [
+            "a-b-c-d"
+          ]
+        }
+      ]
+    },
+    {
+      "input": "mixed_Name [a-b_c.d] ==01!02.0RC01.post02.dev03+LOCAL-001",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "mixed-name",
+          "version": "01!02.0RC01.post02.dev03+LOCAL-001",
+          "declaredSha256": [],
+          "extras": [
+            "a-b-c-d"
+          ]
+        }
+      ]
+    },
+    {
+      "input": "a.b--c==1.2.3",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "a-b-c",
+          "version": "1.2.3",
+          "declaredSha256": []
+        }
+      ]
+    },
+    {
+      "input": "a.b--c==01!02.0RC01.post02.dev03+LOCAL-001",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "a-b-c",
+          "version": "01!02.0RC01.post02.dev03+LOCAL-001",
+          "declaredSha256": []
+        }
+      ]
+    },
+    {
+      "input": "a.b--c[]==1.2.3",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "a-b-c",
+          "version": "1.2.3",
+          "declaredSha256": []
+        }
+      ]
+    },
+    {
+      "input": "a.b--c[]==01!02.0RC01.post02.dev03+LOCAL-001",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "a-b-c",
+          "version": "01!02.0RC01.post02.dev03+LOCAL-001",
+          "declaredSha256": []
+        }
+      ]
+    },
+    {
+      "input": "a.b--c[TLS,secure_Mode]==1.2.3",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "a-b-c",
+          "version": "1.2.3",
+          "declaredSha256": [],
+          "extras": [
+            "secure-mode",
+            "tls"
+          ]
+        }
+      ]
+    },
+    {
+      "input": "a.b--c[TLS,secure_Mode]==01!02.0RC01.post02.dev03+LOCAL-001",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "a-b-c",
+          "version": "01!02.0RC01.post02.dev03+LOCAL-001",
+          "declaredSha256": [],
+          "extras": [
+            "secure-mode",
+            "tls"
+          ]
+        }
+      ]
+    },
+    {
+      "input": "a.b--c[foo.bar,foo__bar,Z]==1.2.3",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "a-b-c",
+          "version": "1.2.3",
+          "declaredSha256": [],
+          "extras": [
+            "foo-bar",
+            "z"
+          ]
+        }
+      ]
+    },
+    {
+      "input": "a.b--c[foo.bar,foo__bar,Z]==01!02.0RC01.post02.dev03+LOCAL-001",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "a-b-c",
+          "version": "01!02.0RC01.post02.dev03+LOCAL-001",
+          "declaredSha256": [],
+          "extras": [
+            "foo-bar",
+            "z"
+          ]
+        }
+      ]
+    },
+    {
+      "input": "a.b--c [a-b_c.d] ==1.2.3",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "a-b-c",
+          "version": "1.2.3",
+          "declaredSha256": [],
+          "extras": [
+            "a-b-c-d"
+          ]
+        }
+      ]
+    },
+    {
+      "input": "a.b--c [a-b_c.d] ==01!02.0RC01.post02.dev03+LOCAL-001",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "a-b-c",
+          "version": "01!02.0RC01.post02.dev03+LOCAL-001",
+          "declaredSha256": [],
+          "extras": [
+            "a-b-c-d"
+          ]
+        }
+      ]
+    },
+    {
+      "input": "one==1.0 # comment \\\ntwo==2.0\nthree==3.0",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "one",
+          "version": "1.0",
+          "declaredSha256": []
+        },
+        {
+          "ecosystem": "PyPI",
+          "name": "three",
+          "version": "3.0",
+          "declaredSha256": []
+        }
+      ]
+    },
+    {
+      "input": "one==1.\\\n0",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "one",
+          "version": "1.0",
+          "declaredSha256": []
+        }
+      ]
+    },
+    {
+      "input": "on\\\ne[tls,\\\n socks]==1.0",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "one",
+          "version": "1.0",
+          "declaredSha256": [],
+          "extras": [
+            "socks",
+            "tls"
+          ]
+        }
+      ]
+    },
+    {
+      "input": "one==1.0 \\\n# comment\\\ntwo==2.0",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "one",
+          "version": "1.0",
+          "declaredSha256": []
+        },
+        {
+          "ecosystem": "PyPI",
+          "name": "two",
+          "version": "2.0",
+          "declaredSha256": []
+        }
+      ]
+    },
+    {
+      "input": "# comment\\\none==1.0",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "one",
+          "version": "1.0",
+          "declaredSha256": []
+        }
+      ]
+    },
+    {
+      "input": "one==1.0 # comment\nsecond==2.0",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "one",
+          "version": "1.0",
+          "declaredSha256": []
+        },
+        {
+          "ecosystem": "PyPI",
+          "name": "second",
+          "version": "2.0",
+          "declaredSha256": []
+        }
+      ]
+    },
+    {
+      "input": "\n#justtext\n",
+      "components": []
+    },
+    {
+      "input": "one==1.0 \\\n\nsecond==2.0",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "one",
+          "version": "1.0",
+          "declaredSha256": []
+        },
+        {
+          "ecosystem": "PyPI",
+          "name": "second",
+          "version": "2.0",
+          "declaredSha256": []
+        }
+      ]
+    },
+    {
+      "input": "\tFoo [ TLS ] == 01!02.0RC01 # metadata\r\n",
+      "components": [
+        {
+          "ecosystem": "PyPI",
+          "name": "foo",
+          "version": "01!02.0RC01",
+          "declaredSha256": [],
+          "extras": [
+            "tls"
+          ]
+        }
+      ]
+    }
+  ]
+}

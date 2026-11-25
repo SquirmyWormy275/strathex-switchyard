@@ -1,0 +1,80 @@
+{
+  "schema": "switchyard-client-native-verification/v1",
+  "sourceCommit": "99784a78c62a0f625eb77122abf17ea34352ce4f",
+  "mergeCommit": "de4e74ef85e9522418dd59206e85774574458c50",
+  "sourceTree": "fedc701b33287918a91d6ea25e202697dc79c9b3",
+  "workflowRunId": 42586125624,
+  "jobId": 129057118505,
+  "jobConclusion": "success",
+  "originalJobBoundMinutes": 15,
+  "receiptId": "678ada16-6cfb-46df-a58a-6291b8f6f925",
+  "receiptSha256": "6f1ce2132f69a3b9c8e39fea0afa8a94096e7c89c4b2fdd2d6fa5fbc867c94cf",
+  "artifactId": 13659707768,
+  "artifactSha256": "c99c8b26c1ac5c62bb17a76d95a7dc04a69ae304161e5006859552b1fab96149",
+  "totals": {
+    "required": 31,
+    "passed": 31,
+    "failed": 0,
+    "tests": 356,
+    "passedTests": 356,
+    "failedTests": 0,
+    "skippedTests": 0,
+    "cancelledTests": 0,
+    "todoTests": 0
+  },
+  "files": [
+    "scripts/vscode-windows-runtime.test.mjs",
+    "deployment/suite/release.test.mjs",
+    "tools/layout-studio/suite.test.mjs",
+    "tools/layout-studio/integrations.test.mjs",
+    "tools/layout-studio/role-dispatch.test.mjs",
+    "tools/layout-studio/guided-role-choices.test.mjs",
+    "tools/layout-studio/role-ui.test.mjs",
+    "tools/layout-studio/native-focus-ui.test.mjs",
+    "tools/layout-studio/connection-ui.test.mjs",
+    "tools/layout-studio/client-launch.test.mjs",
+    "tools/layout-studio/physical-intent.test.mjs",
+    "tools/layout-studio/native-focus-gateway.test.mjs",
+    "tools/layout-studio/windows-native-focus.test.mjs",
+    "tools/layout-studio/windows-terminal-process.test.mjs",
+    "tools/layout-studio/windows-editor-endpoint.test.mjs",
+    "tools/layout-studio/windows-terminal-peer.test.mjs",
+    "tools/layout-studio/editor-websocket-frames.test.mjs",
+    "tools/layout-studio/windows-editor-ingress.test.mjs",
+    "tools/layout-studio/windows-codex-editor-connection.test.mjs",
+    "tools/layout-studio/windows-owned-stdio.test.mjs",
+    "tools/layout-studio/codex-windows-tasks.test.mjs",
+    "tools/layout-studio/codex-retained-editor-client.test.mjs",
+    "tools/layout-studio/windows-editor-journal.test.mjs",
+    "tools/layout-studio/windows-editor-recovery.test.mjs",
+    "tools/layout-studio/windows-coding-editor-connections.test.mjs",
+    "apps/windows-companion/test/repository-runtime.test.ts",
+    "apps/vscode-extension/test/codex-windows-terminal.test.ts",
+    "apps/vscode-extension/test/studio-windows-task-client.test.ts",
+    "apps/vscode-extension/test/studio-windows-native.test.ts",
+    "apps/vscode-extension/test/studio-windows-editor-launch.test.ts",
+    "apps/vscode-extension/test/studio-windows-editor-files.test.ts"
+  ],
+  "originalCommandsBoundsSkipsAndCleanupVerified": true,
+  "serialScheduleVerified": true,
+  "sourceManifestForWindowsVerified": true,
+  "localNativeBinaryDownloaded": false,
+  "durations": [
+    {
+      "file": "tools/layout-studio/role-dispatch.test.mjs",
+      "durationMs": 38705,
+      "effectiveTimeoutMs": 45000
+    },
+    {
+      "file": "tools/layout-studio/native-focus-ui.test.mjs",
+      "durationMs": 26628,
+      "effectiveTimeoutMs": 45000
+    }
+  ],
+  "limitations": [
+    "Exact source passes the original 31-group Windows client lane. This does not accept the complete Windows source or package suites.",
+    "The prior 21e8394 and 96ac214 timeout failures remain retained. Atomic startup and joined shutdown now pass the exact client lane; role dispatch finishes at 38,705 ms under the original 45,000 ms bound. This single run is not a controlled performance benchmark.",
+    "Only the bounded 4,174-byte ZIP was read and hashed in memory; its JSON receipt is retained. No native helper archive was downloaded.",
+    "No Windows app/window, keyboard, account or visual acceptance is inferred. No manual CI operation or deadline change occurred."
+  ]
+}

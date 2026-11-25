@@ -1,0 +1,51 @@
+{
+  "schema": "switchyard-native-complete-windows-summary/v1",
+  "at": "2026-11-07T01:01:34.584834+00:00",
+  "sourceCommit": "dc75590162f6aef5ecbd6ce442e4c7c012452658",
+  "mergeCommit": "8ac33d8c9687a06bc1df3a36fd1a9d6c57ebc7ba",
+  "sourceAndMergeTree": "8f2acae3f35412a7d033dbd01b614d139dbe41c1",
+  "sourceAndMergeTreesEqual": true,
+  "workflowRun": 42309282833,
+  "completeJob": 128214335511,
+  "completeVerificationStepPassed": true,
+  "workflowConclusion": "success",
+  "allSixJobsSucceeded": true,
+  "artifact": {
+    "id": 13552254959,
+    "bytes": 48682,
+    "sha256": "02c3b3ebb17ff92e4b6c5e00f0561ab12c9586f0d97fe1b7764c94fc7df935b7"
+  },
+  "privateReceipt": "windows-complete-dc755901-13552254959-0.json",
+  "receiptSha256": "9c81bb2238df99fb604523edbe0d84938940c25c71f625998f27df77b1f91a26",
+  "success": true,
+  "totals": {
+    "required": 417,
+    "passed": 417,
+    "failed": 0,
+    "tests": 2685,
+    "passedTests": 2478,
+    "failedTests": 0,
+    "skippedTests": 207,
+    "cancelledTests": 0,
+    "todoTests": 0
+  },
+  "originalSourceGroupInventoryAndBoundsVerified": true,
+  "sourceInventoryModuleSha256": "8d3942ffaec13b777f886fb0e20621b04cf444b48f598b888b7d002cd2c0aa8b",
+  "metadataOnlyPlatformProjection": true,
+  "projectionStartedNoTestProcesses": true,
+  "temporaryProjectionSourceRemoved": true,
+  "allChildAndTreeCleanupVerified": true,
+  "nonTapBuildGroups": 9,
+  "initialLocalProjectionIssue": "The receipt verifier initially expected TAP counters on non-TAP build children. It stopped without accepting a result. The corrected projection verifies all nine build exits and every TAP counter separately. No native test was rerun or changed.",
+  "installedWindowsAccepted": false,
+  "ordinaryUserUacAndGuestAcceptance": false,
+  "tokenQueryMaskWidened": false,
+  "artifactZipRetained": false,
+  "laterChangesExcluded": [
+    "Python wheel identity and RECORD",
+    "five-job Windows scheduling",
+    "Cargo archive identity",
+    "workflow and profile identity corrections",
+    "reviewed observation design context"
+  ]
+}

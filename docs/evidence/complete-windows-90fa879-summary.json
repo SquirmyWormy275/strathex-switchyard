@@ -1,0 +1,913 @@
+{
+  "schema": "switchyard-complete-windows-source-followup/v1",
+  "sourceCommit": "90fa879d776c0b7756f66d37180fb8c3049b3fc4",
+  "mergeCommit": "1ef2f3659805b45d7f6959cac669c5d0036fd1c9",
+  "sourceTree": "8ff16a293e3de4e702d69d361d43b1a38378f089",
+  "runId": 42397684980,
+  "scope": {
+    "platform": "win32",
+    "sourceCommit": "1ef2f3659805b45d7f6959cac669c5d0036fd1c9",
+    "sourceTree": "8ff16a293e3de4e702d69d361d43b1a38378f089",
+    "nodeVersion": "24.14.0",
+    "nodeExecutable": "C:\\hostedtoolcache\\windows\\node\\24.14.0\\x64\\node.exe",
+    "nodeSha256": "63c259c81e5d472b5f11c8d506070130cb04a1ecf84b80377a34ed6ec9048088",
+    "pythonVersion": "3.13.3",
+    "pythonExecutable": "C:\\hostedtoolcache\\windows\\Python\\3.13.3\\x64\\python.exe",
+    "pythonSha256": "d87063e5597f257004c731b66c59c56c91038861c6877b1a3dca6b8c4e919125",
+    "helperSha256": "24240ee69a3b3f2e310b8e505a8915a4fe47b81a3dccf27f7df04c21ba85383a",
+    "dotnetManifestSha256": "9387431f821c8af70705752e6d8a9d16ec88e374167bd415c742db3a319c0387"
+  },
+  "completeOriginalReceiptSetVerified": true,
+  "pinnedSourceManifestReconstruction": {
+    "unchangedRunnerSchedulerCostsAndToolchainVerified": true,
+    "unchangedScenarioManifestVerified": true,
+    "npmCliFromPinnedWindowsNodeDirectory": true
+  },
+  "workflowCollectorAcceptance": "passed",
+  "manifestSha256": "cc4cd1d1eb5cea40b54b93bb53580141dfecb77be2536fdb9ae2ea92bc3d50da",
+  "totals": {
+    "required": 462,
+    "passed": 462,
+    "failed": 0,
+    "tests": 3148,
+    "passedTests": 2902,
+    "failedTests": 0,
+    "skippedTests": 246,
+    "cancelledTests": 0,
+    "todoTests": 0
+  },
+  "cohorts": [
+    {
+      "shard": "1",
+      "receiptId": "80866bba-9365-45e8-82d2-7e26f6f5a931",
+      "receiptSha256": "644fb6012f6856512aaf7b74db2dca4758b1a5a0f382d52943654fc2bd714c42",
+      "totals": {
+        "required": 21,
+        "passed": 21,
+        "failed": 0,
+        "tests": 143,
+        "passedTests": 126,
+        "failedTests": 0,
+        "skippedTests": 17,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "shard": "2",
+      "receiptId": "e9656a7b-03a6-49f0-99f3-2ae99cec7739",
+      "receiptSha256": "516ed2f3cfda1af1ccbeeebdebc28adc807d5dacd951691608548ac6ef5ed050",
+      "totals": {
+        "required": 21,
+        "passed": 21,
+        "failed": 0,
+        "tests": 154,
+        "passedTests": 98,
+        "failedTests": 0,
+        "skippedTests": 56,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "shard": "3",
+      "receiptId": "68de9bd2-c38a-45ba-9a32-15907912a058",
+      "receiptSha256": "ff06f97e4b91cd2389d5fa115e9686920b17929d2b1d03671c2ab9259aec0f7f",
+      "totals": {
+        "required": 23,
+        "passed": 23,
+        "failed": 0,
+        "tests": 163,
+        "passedTests": 139,
+        "failedTests": 0,
+        "skippedTests": 24,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "shard": "4",
+      "receiptId": "fd6eafba-7798-425b-b7fa-77b8674a96e6",
+      "receiptSha256": "65fc8adc4ec9b650757d315e0bd51baa9e1be4531f9573811c79b4b00a9763ad",
+      "totals": {
+        "required": 22,
+        "passed": 22,
+        "failed": 0,
+        "tests": 147,
+        "passedTests": 133,
+        "failedTests": 0,
+        "skippedTests": 14,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "shard": "5",
+      "receiptId": "294e1c0b-ae1b-4f3c-b2c8-924553eb330c",
+      "receiptSha256": "67674cae3dd41da986fae29a0c615f785b8b015d1a65f8415426b8eac70c32b7",
+      "totals": {
+        "required": 22,
+        "passed": 22,
+        "failed": 0,
+        "tests": 117,
+        "passedTests": 112,
+        "failedTests": 0,
+        "skippedTests": 5,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "shard": "6",
+      "receiptId": "da905b00-b747-4c78-99cc-ab030fa0bf18",
+      "receiptSha256": "125ae6e5ba723dd9d1a7d6afc5e382fb83d53c0d09f14c43bda32b03162d4c90",
+      "totals": {
+        "required": 19,
+        "passed": 19,
+        "failed": 0,
+        "tests": 152,
+        "passedTests": 142,
+        "failedTests": 0,
+        "skippedTests": 10,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "shard": "7",
+      "receiptId": "4e5e3363-8a0d-476f-bdf9-92b4ccbb33fe",
+      "receiptSha256": "2c1a51938c61412c779ad38af554fd167997bff4b551eea2f1204a0cb9b7acc9",
+      "totals": {
+        "required": 22,
+        "passed": 22,
+        "failed": 0,
+        "tests": 122,
+        "passedTests": 117,
+        "failedTests": 0,
+        "skippedTests": 5,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "shard": "8",
+      "receiptId": "3c402745-06f2-4701-a007-63eb4cb945f1",
+      "receiptSha256": "9e76feeb149bc0cbc269fd1326c6099b744f1919bc6c54f8746184de89f0d273",
+      "totals": {
+        "required": 22,
+        "passed": 22,
+        "failed": 0,
+        "tests": 149,
+        "passedTests": 136,
+        "failedTests": 0,
+        "skippedTests": 13,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "shard": "9",
+      "receiptId": "edcbf89c-c2fe-4cdf-a438-99e5f363a6a6",
+      "receiptSha256": "abc8c570dc77af4f6b8ad702d1e0065729c21e3b555b8dca1c06ccb9b3a269d9",
+      "totals": {
+        "required": 22,
+        "passed": 22,
+        "failed": 0,
+        "tests": 138,
+        "passedTests": 131,
+        "failedTests": 0,
+        "skippedTests": 7,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "shard": "10",
+      "receiptId": "9d1a5419-1a14-411d-baf1-16ff18bff7c1",
+      "receiptSha256": "729f96aef53075c7615706dc7de6429afc44373e849a0143c46767c3eab20ba7",
+      "totals": {
+        "required": 23,
+        "passed": 23,
+        "failed": 0,
+        "tests": 183,
+        "passedTests": 181,
+        "failedTests": 0,
+        "skippedTests": 2,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "shard": "11",
+      "receiptId": "e7d74dc9-3532-4ec9-92a3-231a7d1eb11f",
+      "receiptSha256": "e995d30d3175eb2549a7d8782c6ec768a3c0bde4fb3122e8bac2eda93cc51938",
+      "totals": {
+        "required": 21,
+        "passed": 21,
+        "failed": 0,
+        "tests": 159,
+        "passedTests": 154,
+        "failedTests": 0,
+        "skippedTests": 5,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "shard": "12",
+      "receiptId": "e01156d2-27e8-4723-927f-ee42d70a0159",
+      "receiptSha256": "6378dd946cd11e0f705fb102627d2a7b4e0ab951f9e7fcb351880102b520771c",
+      "totals": {
+        "required": 23,
+        "passed": 23,
+        "failed": 0,
+        "tests": 141,
+        "passedTests": 120,
+        "failedTests": 0,
+        "skippedTests": 21,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "shard": "13",
+      "receiptId": "5a4988d7-3f60-472e-9ac5-f13d43e115a3",
+      "receiptSha256": "beef8538e052b236aab80cd3cff5a69af7a59bdf4549b91300e16270a38eb6c4",
+      "totals": {
+        "required": 23,
+        "passed": 23,
+        "failed": 0,
+        "tests": 135,
+        "passedTests": 132,
+        "failedTests": 0,
+        "skippedTests": 3,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "shard": "14",
+      "receiptId": "c6cd5bd7-b937-4b20-a6fd-c53c3dd8fd1d",
+      "receiptSha256": "32ac81f0cef246ca832efccc88643a89902b917e68449e8454586fed4ee5dadc",
+      "totals": {
+        "required": 23,
+        "passed": 23,
+        "failed": 0,
+        "tests": 173,
+        "passedTests": 150,
+        "failedTests": 0,
+        "skippedTests": 23,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "shard": "15",
+      "receiptId": "552d8bae-1124-4f65-98cc-2a273d842e7a",
+      "receiptSha256": "6a4c741e0d8fc5b88e2f5c03c357e027066057e87eb923226a2757e3a7fa2269",
+      "totals": {
+        "required": 25,
+        "passed": 25,
+        "failed": 0,
+        "tests": 185,
+        "passedTests": 183,
+        "failedTests": 0,
+        "skippedTests": 2,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "shard": "16",
+      "receiptId": "fdcfd7da-c5f5-479c-999f-14b5f6f0eae3",
+      "receiptSha256": "0947175fb4c300b0543a70185fb7d0984a4921aa9ff6ad6b09056cdf2cf95201",
+      "totals": {
+        "required": 25,
+        "passed": 25,
+        "failed": 0,
+        "tests": 149,
+        "passedTests": 144,
+        "failedTests": 0,
+        "skippedTests": 5,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "shard": "17",
+      "receiptId": "28182897-bee2-42a8-8482-385e2d7bfe46",
+      "receiptSha256": "4894d41252d73d1bdfc6298010e1fe74ea1dd3d371b509a0f5a9c5146d8e2658",
+      "totals": {
+        "required": 23,
+        "passed": 23,
+        "failed": 0,
+        "tests": 193,
+        "passedTests": 183,
+        "failedTests": 0,
+        "skippedTests": 10,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "shard": "18",
+      "receiptId": "7be987d9-168b-4040-945d-2ee0a94b0714",
+      "receiptSha256": "a691b15d4892e2b283a9bcc2023f930db5fa945e1be60fe54bd9429623664075",
+      "totals": {
+        "required": 24,
+        "passed": 24,
+        "failed": 0,
+        "tests": 120,
+        "passedTests": 115,
+        "failedTests": 0,
+        "skippedTests": 5,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "shard": "19",
+      "receiptId": "ff84900b-b57b-41b1-b9cd-705665ce64c2",
+      "receiptSha256": "4fefe8ec00732653cd022cc50cb1b253f74011449098cc0dbcf5ff4f2785e2a8",
+      "totals": {
+        "required": 21,
+        "passed": 21,
+        "failed": 0,
+        "tests": 96,
+        "passedTests": 94,
+        "failedTests": 0,
+        "skippedTests": 2,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "shard": "20",
+      "receiptId": "24cc6377-194a-40be-b407-2eebafb02b6f",
+      "receiptSha256": "61ab6d8aa48d03c12f77d632ad10abec0d80f0c026894c2c88d5e30de063d981",
+      "totals": {
+        "required": 24,
+        "passed": 24,
+        "failed": 0,
+        "tests": 317,
+        "passedTests": 300,
+        "failedTests": 0,
+        "skippedTests": 17,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "shard": "assembly",
+      "receiptId": "00526e0c-76ca-4fdc-9edf-e8380d746201",
+      "receiptSha256": "643cc865e72304f74da188e154ca752f3446b1a51ef11bf66fc58330fbf031e0",
+      "totals": {
+        "required": 13,
+        "passed": 13,
+        "failed": 0,
+        "tests": 12,
+        "passedTests": 12,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    }
+  ],
+  "artifacts": [
+    {
+      "artifactId": 13583869444,
+      "shard": "4",
+      "zipBytes": 4123,
+      "zipSha256": "1610a392f4eb597ffa57507c9a0df3877814313b1c5444d46eda1a758b06af51",
+      "envelopeSha256": "1ced2ea43828b1545ed0a99ec2461a418c56425673dd021155ba25db9d2b992a",
+      "receiptSha256": "65fc8adc4ec9b650757d315e0bd51baa9e1be4531f9573811c79b4b00a9763ad"
+    },
+    {
+      "artifactId": 13585135292,
+      "shard": "10",
+      "zipBytes": 4270,
+      "zipSha256": "a36f60e0c61ba5bf3e3640f94b209f87ab8f023ecd950bbf0593f18eec6f54dc",
+      "envelopeSha256": "4a55d28236a9feb8d63a55becf3ab884cc6f9a80dfc9504a697d1c689f43ddd8",
+      "receiptSha256": "729f96aef53075c7615706dc7de6429afc44373e849a0143c46767c3eab20ba7"
+    },
+    {
+      "artifactId": 13585111152,
+      "shard": "7",
+      "zipBytes": 4112,
+      "zipSha256": "272fe7a6107bd94ff3f045ab74d397e05de3a8bb9bb1a31ff7296eea20adfd3c",
+      "envelopeSha256": "3358d0123d53493572297e8f2a2a0a394060a0914aefdfddeb1e57497f613df1",
+      "receiptSha256": "2c1a51938c61412c779ad38af554fd167997bff4b551eea2f1204a0cb9b7acc9"
+    },
+    {
+      "artifactId": 13584992015,
+      "shard": "assembly",
+      "zipBytes": 3239,
+      "zipSha256": "7d271e32b995e09e718fae9df1722ca67657e7e0ac1806e6178f56a632b4c8fc",
+      "envelopeSha256": "3cc5c432ba46a50060f588a5fc29aaf90f7fadabeeb702400158929e87bd4528",
+      "receiptSha256": "643cc865e72304f74da188e154ca752f3446b1a51ef11bf66fc58330fbf031e0"
+    },
+    {
+      "artifactId": 13584975854,
+      "shard": "12",
+      "zipBytes": 4348,
+      "zipSha256": "39097e8fbc34b6227b2338dedfd673e38f21dd7d31cbf138133e9756115f4c58",
+      "envelopeSha256": "f94a6bbd12a8b6a0e6b30102b705b7c7e3399842a4f2f47ff1cc1e4a65971fa6",
+      "receiptSha256": "6378dd946cd11e0f705fb102627d2a7b4e0ab951f9e7fcb351880102b520771c"
+    },
+    {
+      "artifactId": 13584870868,
+      "shard": "20",
+      "zipBytes": 4555,
+      "zipSha256": "fc504de93694eeb045d3507986c358207d6b19079f09fbe222797cd835d200ad",
+      "envelopeSha256": "4e42455def7bc1e541b3fec48a51a342342b2f8c263c73583948dd7b489f29c2",
+      "receiptSha256": "61ab6d8aa48d03c12f77d632ad10abec0d80f0c026894c2c88d5e30de063d981"
+    },
+    {
+      "artifactId": 13584626051,
+      "shard": "15",
+      "zipBytes": 4444,
+      "zipSha256": "3ef2e18d61e0752bdcc1dfbac91d757c42aa6b7b68d938f1546e54a4bd5585ab",
+      "envelopeSha256": "f7b75648252713a66319de203d819692224bd1ca529750917671ef8c1c88bb99",
+      "receiptSha256": "6a4c741e0d8fc5b88e2f5c03c357e027066057e87eb923226a2757e3a7fa2269"
+    },
+    {
+      "artifactId": 13584601175,
+      "shard": "8",
+      "zipBytes": 4212,
+      "zipSha256": "a64cf5644ae4160d155c0e699c76052c26ceafc7441016c621fd46f8f09c3ed4",
+      "envelopeSha256": "805a11e08fecca84e819d00e66cc1fb87a68d876bec85baa62c85d0323b123e4",
+      "receiptSha256": "9e76feeb149bc0cbc269fd1326c6099b744f1919bc6c54f8746184de89f0d273"
+    },
+    {
+      "artifactId": 13584551695,
+      "shard": "5",
+      "zipBytes": 4073,
+      "zipSha256": "6a0c17ac1403d6e9c4e214c40e1fef892ae2c9eb24bd366ec2bec24406fefa19",
+      "envelopeSha256": "f29d7a640aac2ad924bc6222461e9711aa7efba018f4a8be1202bfe0d49c5139",
+      "receiptSha256": "67674cae3dd41da986fae29a0c615f785b8b015d1a65f8415426b8eac70c32b7"
+    },
+    {
+      "artifactId": 13584507474,
+      "shard": "3",
+      "zipBytes": 4282,
+      "zipSha256": "b74e6cd4cbba779158546d2a719f4635221ecfca357327f64470ffdd60144241",
+      "envelopeSha256": "b03f31bd73790a05cbd0388c9a2aae9ecc31c644683da069279e4dedcce6cfb6",
+      "receiptSha256": "ff06f97e4b91cd2389d5fa115e9686920b17929d2b1d03671c2ab9259aec0f7f"
+    },
+    {
+      "artifactId": 13584496479,
+      "shard": "13",
+      "zipBytes": 4314,
+      "zipSha256": "fbab93470a5ca2a5ec8ce5197691c1aa5950dce63ed9993ecc5a3765e0f50580",
+      "envelopeSha256": "11b50f7fbc6b80b5ed8f95f16065848e8b4f600db36b08b3f1b5f04a69c50e4a",
+      "receiptSha256": "beef8538e052b236aab80cd3cff5a69af7a59bdf4549b91300e16270a38eb6c4"
+    },
+    {
+      "artifactId": 13584428242,
+      "shard": "6",
+      "zipBytes": 3622,
+      "zipSha256": "bce8144a24ed46b334a0fcdf821de2a6c88c7afc1d1be6f7ce3fa4926234f08f",
+      "envelopeSha256": "8a49ba7139711d5d37806aa15b4be47d0ec1cab529134b801746d09e2c73ddbd",
+      "receiptSha256": "125ae6e5ba723dd9d1a7d6afc5e382fb83d53c0d09f14c43bda32b03162d4c90"
+    },
+    {
+      "artifactId": 13584393916,
+      "shard": "18",
+      "zipBytes": 4360,
+      "zipSha256": "90e100757e9326534c0f9a60869bba6657082654e19dad560a13d059a3ef7a22",
+      "envelopeSha256": "67fd64a925694f37a4f0768c88b2f325f241103d2f590f25545a68c70b181165",
+      "receiptSha256": "a691b15d4892e2b283a9bcc2023f930db5fa945e1be60fe54bd9429623664075"
+    },
+    {
+      "artifactId": 13584309373,
+      "shard": "9",
+      "zipBytes": 4012,
+      "zipSha256": "9e8b4a893ecfb62f30cca67587d9e8bba6f7fc9df84ad246ff99583b65c132f7",
+      "envelopeSha256": "b3ae2ed468903e8ced09e6320af1d3620f0fddcfc29740852a9922cef5ee0ddf",
+      "receiptSha256": "abc8c570dc77af4f6b8ad702d1e0065729c21e3b555b8dca1c06ccb9b3a269d9"
+    },
+    {
+      "artifactId": 13584269366,
+      "shard": "17",
+      "zipBytes": 4248,
+      "zipSha256": "07569c69089f66a3ac2a9b5c6a06f5cbb1929a2aceb58754f84ad2830cba3064",
+      "envelopeSha256": "391fba15188384243f79f17fc56f58fe46400566a205776b06e26971c451f423",
+      "receiptSha256": "4894d41252d73d1bdfc6298010e1fe74ea1dd3d371b509a0f5a9c5146d8e2658"
+    },
+    {
+      "artifactId": 13584192640,
+      "shard": "14",
+      "zipBytes": 4264,
+      "zipSha256": "c79f6f14c91a8238e9d2eed537c8d6d3c3e699ec53a6567576e22f59445c84bc",
+      "envelopeSha256": "0428631702d2fa3686ebaeb31f9eec0182f760c2b9ccb849a9fb05c7c63bf2d2",
+      "receiptSha256": "32ac81f0cef246ca832efccc88643a89902b917e68449e8454586fed4ee5dadc"
+    },
+    {
+      "artifactId": 13584052826,
+      "shard": "2",
+      "zipBytes": 3971,
+      "zipSha256": "eb34e3469500a4f472c6d87b02343b909c31ec9960acf44a0f7002cc04b303f4",
+      "envelopeSha256": "fb10d19496bc9abbff53b12de2968c7bf50ad2b8cc4c462e4fe9b395a757df52",
+      "receiptSha256": "516ed2f3cfda1af1ccbeeebdebc28adc807d5dacd951691608548ac6ef5ed050"
+    },
+    {
+      "artifactId": 13583964232,
+      "shard": "11",
+      "zipBytes": 3979,
+      "zipSha256": "8b8d727b4251ea60c286a2cc62889875633ed1107ab82cae30281715e0436951",
+      "envelopeSha256": "2f957bfdc2d288760e5337761cd6325a609b4b4f50c1c07eeb2901187bfc1097",
+      "receiptSha256": "e995d30d3175eb2549a7d8782c6ec768a3c0bde4fb3122e8bac2eda93cc51938"
+    },
+    {
+      "artifactId": 13583894958,
+      "shard": "1",
+      "zipBytes": 3931,
+      "zipSha256": "ba7a46fea0c127c68d3eb7f762a7277b4eff504e4427606be9cc8f49c5f85d48",
+      "envelopeSha256": "411011e13d56da3c462bb2be9287336af5285e84b36940679e04e9609c1c39e6",
+      "receiptSha256": "644fb6012f6856512aaf7b74db2dca4758b1a5a0f382d52943654fc2bd714c42"
+    },
+    {
+      "artifactId": 13583799468,
+      "shard": "16",
+      "zipBytes": 4519,
+      "zipSha256": "fcf13caa13155c9e94782a39d6b6a647183f2adace60f111ce39d603ecc42a7e",
+      "envelopeSha256": "e79e22650354c5bfbf8d6131958b688a7a46a91e4e931ae2d2fcba2300c4f31a",
+      "receiptSha256": "0947175fb4c300b0543a70185fb7d0984a4921aa9ff6ad6b09056cdf2cf95201"
+    },
+    {
+      "artifactId": 13583579666,
+      "shard": "19",
+      "zipBytes": 4117,
+      "zipSha256": "4402ee50ba89855309c43122704a88343fa563930a0d2d58c9ba5ea5c729cce7",
+      "envelopeSha256": "0b78abb34340d45b2e6c7dafc30e52c46d3eae006954a82ffffb3c48bee20695",
+      "receiptSha256": "4fefe8ec00732653cd022cc50cb1b253f74011449098cc0dbcf5ff4f2785e2a8"
+    }
+  ],
+  "declaredSkips": [
+    {
+      "file": "tools/layout-studio/repository-shield-osv-source.test.mjs",
+      "pattern": null,
+      "count": 8
+    },
+    {
+      "file": "tools/layout-studio/repository-shield-pypi.test.mjs",
+      "pattern": null,
+      "count": 6
+    },
+    {
+      "file": "tools/layout-studio/repository-shield-exceptions.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/linux-namespace-budget.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/repository-pipeline.test.mjs",
+      "pattern": null,
+      "count": 5
+    },
+    {
+      "file": "tools/layout-studio/repository-shield-history.test.mjs",
+      "pattern": null,
+      "count": 3
+    },
+    {
+      "file": "tools/layout-studio/scanner-history-review.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/coding-editor-connections.test.mjs",
+      "pattern": null,
+      "count": 10
+    },
+    {
+      "file": "tools/layout-studio/codex-unix-transport.test.mjs",
+      "pattern": null,
+      "count": 6
+    },
+    {
+      "file": "apps/linux-companion/test/linux-isolation.test.ts",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/repository-shield-cargo.test.mjs",
+      "pattern": null,
+      "count": 4
+    },
+    {
+      "file": "tools/layout-studio/scanner-review.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/scanner-mixed-review.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/codex-editor-recovery.test.mjs",
+      "pattern": null,
+      "count": 3
+    },
+    {
+      "file": "apps/windows-companion/test/authenticated-pipe.test.ts",
+      "pattern": null,
+      "count": 2
+    },
+    {
+      "file": "apps/vscode-extension/test/controller.test.ts",
+      "pattern": null,
+      "count": 3
+    },
+    {
+      "file": "apps/linux-companion/test/linux-process-supervisor.test.ts",
+      "pattern": null,
+      "count": 3
+    },
+    {
+      "file": "tools/layout-studio/scanner-recipe-draft.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/runtime.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/repository-shield-index.test.mjs",
+      "pattern": null,
+      "count": 3
+    },
+    {
+      "file": "tools/layout-studio/repository-shield-pypi-artifacts.test.mjs",
+      "pattern": null,
+      "count": 2
+    },
+    {
+      "file": "tools/layout-studio/codex-unix-tasks.test.mjs",
+      "pattern": null,
+      "count": 6
+    },
+    {
+      "file": "apps/linux-companion/test/linux-user-presence.test.ts",
+      "pattern": null,
+      "count": 2
+    },
+    {
+      "file": "tools/layout-studio/repository-shield-python-records.test.mjs",
+      "pattern": null,
+      "count": 2
+    },
+    {
+      "file": "tools/layout-studio/repository-shield-python-wheels.test.mjs",
+      "pattern": null,
+      "count": 2
+    },
+    {
+      "file": "tools/layout-studio/task-history-inputs.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/scanner-recipe-save.test.mjs",
+      "pattern": null,
+      "count": 22
+    },
+    {
+      "file": "tools/layout-studio/coding-task-owners.test.mjs",
+      "pattern": "protected task registry composes the actual owned Unix listener and bridge while the provider is a controlled double",
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/owned-process.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/repository-execution.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "apps/vscode-extension/test/studio-editor-session.test.ts",
+      "pattern": null,
+      "count": 2
+    },
+    {
+      "file": "tools/layout-studio/task-index-inputs.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/repository-shield-artifacts.test.mjs",
+      "pattern": null,
+      "count": 2
+    },
+    {
+      "file": "apps/vscode-extension/test/named-pipe-transport.test.ts",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "apps/linux-companion/test/linux-repository-runtime.test.ts",
+      "pattern": null,
+      "count": 6
+    },
+    {
+      "file": "tools/layout-studio/repository-receipt-authority.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/repository-shield-licenses.test.mjs",
+      "pattern": null,
+      "count": 2
+    },
+    {
+      "file": "tools/layout-studio/repository-ignored-scanner-inputs.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/coding-task-owners.test.mjs",
+      "pattern": "the editor client authenticates the real Studio route and reads original protected target metadata without another native effect",
+      "count": 1
+    },
+    {
+      "file": "scripts/codex-daemon-status.test.mjs",
+      "pattern": null,
+      "count": 2
+    },
+    {
+      "file": "apps/vscode-extension/test/studio-terminal-process.test.ts",
+      "pattern": null,
+      "count": 5
+    },
+    {
+      "file": "tools/layout-studio/codex-editor-ingress-owner.test.mjs",
+      "pattern": null,
+      "count": 9
+    },
+    {
+      "file": "packages/control-plane/test/git-inspector.test.ts",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/repository-execution-supervisor.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/repository-validation-policy.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/scanner-index-review.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/repository-pipeline-fixtures.test.mjs",
+      "pattern": null,
+      "count": 2
+    },
+    {
+      "file": "tools/layout-studio/runtime-command-suspended.test.mjs",
+      "pattern": null,
+      "count": 5
+    },
+    {
+      "file": "apps/vscode-extension/test/studio-task-client.test.ts",
+      "pattern": null,
+      "count": 12
+    },
+    {
+      "file": "apps/provider-adapter-host/test/linux-path-security.test.ts",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/repository-effects.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/repository-commits.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/repository-temporary-build.test.mjs",
+      "pattern": null,
+      "count": 2
+    },
+    {
+      "file": "tools/layout-studio/repository-shield-cargo-archives.test.mjs",
+      "pattern": null,
+      "count": 2
+    },
+    {
+      "file": "tools/layout-studio/runtime-command.test.mjs",
+      "pattern": null,
+      "count": 15
+    },
+    {
+      "file": "tools/layout-studio/codex-owned-listener.test.mjs",
+      "pattern": null,
+      "count": 13
+    },
+    {
+      "file": "apps/vscode-extension/test/studio-editor-launch.test.ts",
+      "pattern": null,
+      "count": 22
+    },
+    {
+      "file": "tools/layout-studio/repository-recovery.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/repository-shield-cargo-artifacts.test.mjs",
+      "pattern": null,
+      "count": 2
+    },
+    {
+      "file": "apps/linux-companion/test/linux-lifecycle.test.ts",
+      "pattern": null,
+      "count": 2
+    },
+    {
+      "file": "tools/layout-studio/configuration.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/linux-temporary-workspace.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/repository-shield-npm-archives.test.mjs",
+      "pattern": null,
+      "count": 2
+    },
+    {
+      "file": "tools/layout-studio/codex-editor-ingress.test.mjs",
+      "pattern": null,
+      "count": 13
+    },
+    {
+      "file": "scripts/install-workflow-shortcut.test.mjs",
+      "pattern": null,
+      "count": 2
+    },
+    {
+      "file": "tools/layout-studio/repository-shield-workspaces.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/repository-shield.test.mjs",
+      "pattern": null,
+      "count": 2
+    },
+    {
+      "file": "tools/layout-studio/repository-shield-ignored-trees.test.mjs",
+      "pattern": null,
+      "count": 1
+    },
+    {
+      "file": "tools/layout-studio/state-lock.test.mjs",
+      "pattern": null,
+      "count": 1
+    }
+  ],
+  "originalManifestCommandsBoundsSkipsAndCleanupVerified": true,
+  "packageAcceptance": false,
+  "limitations": [
+    "This accepts the complete distributed source at 90fa879 including project discovery and settlement-fixture diagnostics. It predates Claude 2.1.319 admission at 1bee5a5; package acceptance remains separate.",
+    "The earlier native focus, restricted-storage retirement and host-action settlement failures remain unresolved despite scoped passing follow-ups.",
+    "No interactive Windows account, desktop, guest, microphone or hardware acceptance is claimed."
+  ],
+  "workflowJobs": {
+    "success": 23,
+    "failed": 0
+  },
+  "nativeCollector": {
+    "artifactId": 13584933078,
+    "jobId": 128484849308,
+    "zipBytes": 2607,
+    "zipSha256": "0dfc46a2f73c1d2de76a2d0d968d08a7efd380ed9aa2d8ac8401da505a1f4b07",
+    "summarySha256": "cfcdf2f8fb04e7206669dcc57525924749e371c9337d009c278f43488e55aa71",
+    "matchesIndependentAudit": true
+  }
+}

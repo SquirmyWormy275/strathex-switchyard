@@ -1,0 +1,365 @@
+name: Switchyard Windows filesystem boundaries
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  build-state-helper:
+    uses: ./.github/workflows/switchyard-windows-state-helper.yml
+
+  verify-native-filesystem:
+    needs: build-state-helper
+    concurrency:
+      group: switchyard-windows-native-${{ github.ref }}-${{ matrix.lane }}
+      cancel-in-progress: false
+    strategy:
+      fail-fast: false
+      matrix:
+        lane: [filesystem, native-setup, restricted-exchange]
+    runs-on: windows-2022
+    timeout-minutes: 20
+    env:
+      DOTNET_NOLOGO: "1"
+      DOTNET_CLI_TELEMETRY_OPTOUT: "1"
+      NUGET_XMLDOC_MODE: skip
+      npm_config_audit: "false"
+      npm_config_fund: "false"
+      npm_config_update_notifier: "false"
+    steps:
+      - name: Check out the exact source revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+
+      - name: Install pinned Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24.14.0
+          cache: npm
+
+      - name: Install locked source dependencies
+        shell: pwsh
+        run: npm.cmd ci --ignore-scripts
+
+      - name: Install the exact-source native state helper
+        uses: ./.github/actions/install-state-helper
+
+      - name: Provision the reviewed repository-local offline .NET toolchain
+        shell: pwsh
+        run: .\deployment\windows\Provision-B122DotnetToolchain.ps1
+
+      - name: Build the exact helper and provision its pinned Node prerequisite
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $project = '.\apps\desktop-hotkeys\Switchyard.Hotkeys.csproj'
+          $output = Join-Path $env:RUNNER_TEMP 'switchyard-windows-hotkeys'
+          & .\.tools\dotnet\dotnet.exe restore $project -r win-x64 --source .\.tools\nuget-feed --packages .\.tools\nuget-packages --configfile .\.tools\NuGet.Config -p:RuntimeFrameworkVersion=8.0.30
+          if ($LASTEXITCODE -ne 0) { throw 'Native helper offline restore failed.' }
+          & .\.tools\dotnet\dotnet.exe publish $project --no-restore -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:RuntimeFrameworkVersion=8.0.30 -o $output
+          if ($LASTEXITCODE -ne 0) { throw 'Native helper build failed.' }
+          $archive = Join-Path $env:RUNNER_TEMP 'switchyard-filesystem-node.zip'
+          Invoke-WebRequest -UseBasicParsing -Uri 'https://nodejs.org/dist/v24.14.0/node-v24.14.0-win-x64.zip' -OutFile $archive
+          if ((Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash.ToLowerInvariant() -cne '313fa40c0d7b18575821de8cb17483031fe07d95de5994f6f435f3b345f85c66') { throw 'The official Node archive digest changed.' }
+          $nodeRoot = Join-Path $env:RUNNER_TEMP 'switchyard-filesystem-node'
+          New-Item -ItemType Directory -Path $nodeRoot | Out-Null
+          $zip = [System.IO.Compression.ZipFile]::OpenRead($archive)
+          try {
+            $entry = $zip.GetEntry('node-v24.14.0-win-x64/node.exe')
+            if ($null -eq $entry) { throw 'The verified official Node image is missing.' }
+            [System.IO.Compression.ZipFileExtensions]::ExtractToFile($entry, (Join-Path $nodeRoot 'node.exe'), $false)
+          } finally { $zip.Dispose() }
+          Remove-Item -LiteralPath $archive -Force
+
+      - name: Build and verify the closed native setup preflight without elevation
+        shell: pwsh
+        timeout-minutes: 4
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $output = Join-Path $env:RUNNER_TEMP 'switchyard-windows-hotkeys'
+          & .\deployment\windows\Build-SwitchyardSetup.ps1 -OutputDirectory $output
+          if ($LASTEXITCODE -ne 0) { throw 'Native setup compiler or linker failed.' }
+          & node scripts/verify-windows-native-setup.mjs --synthetic "--helper=$(Join-Path $output 'Switchyard.Hotkeys.exe')" "--setup=$(Join-Path $output 'Switchyard.Setup.exe')"
+          if ($LASTEXITCODE -ne 0) { throw 'Native setup preflight failed; no elevation was attempted.' }
+
+      - name: Verify the copied helper has no adjacent runtime dependency
+        shell: pwsh
+        timeout-minutes: 3
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $helper = Join-Path $env:RUNNER_TEMP 'switchyard-windows-hotkeys\Switchyard.Hotkeys.exe'
+          & node scripts/verify-windows-standalone-helper.mjs --synthetic "--helper=$helper"
+          if ($LASTEXITCODE -ne 0) { throw 'The copied Windows helper requires an unshipped runtime or has unknown exit.' }
+
+      - name: Verify suspended-worker acknowledgement on the actual Windows helper
+        if: matrix.lane == 'filesystem'
+        shell: pwsh
+        timeout-minutes: 3
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $env:SWITCHYARD_TEST_RUNTIME_HELPER = Join-Path $env:RUNNER_TEMP 'switchyard-windows-hotkeys\Switchyard.Hotkeys.exe'
+          $test = '.\tools\layout-studio\runtime-command-suspended.test.mjs'
+          $output = & node --test --test-reporter=tap $test
+          $code = $LASTEXITCODE
+          $output | Write-Output
+          $tap = $output -join "`n"
+          if ($code -ne 0 -or $tap -notmatch '(?m)^1\.\.8\r?\n# tests 8\r?\n# suites 0\r?\n# pass 8\r?\n# fail 0\r?\n# cancelled 0\r?\n# skipped 0\r?\n# todo 0\r?\n# duration_ms [^\r\n]+\s*$') { throw 'The exact native suspended-worker checks did not all pass.' }
+          @{ schema = 'switchyard-windows-suspended-worker-native/v1'; sourceCommit = (& git rev-parse HEAD); passedTests = 8; skippedTests = 0; failedTests = 0; helperSha256 = ((Get-FileHash $env:SWITCHYARD_TEST_RUNTIME_HELPER -Algorithm SHA256).Hash.ToLowerInvariant()); testSourceSha256 = ((Get-FileHash $test -Algorithm SHA256).Hash.ToLowerInvariant()); success = $true } | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $env:RUNNER_TEMP 'switchyard-suspended-worker-verification.json') -Encoding utf8
+          Remove-Item Env:SWITCHYARD_TEST_RUNTIME_HELPER
+
+      - name: Retain only the suspended-worker native proof
+        if: matrix.lane == 'filesystem'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: switchyard-suspended-worker-${{ github.sha }}
+          path: ${{ runner.temp }}/switchyard-suspended-worker-verification.json
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Verify broker metadata and protected files with a restricted token
+        if: ${{ !cancelled() }}
+        shell: pwsh
+        timeout-minutes: 3
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $project = '.\deployment\windows\test-support\storage-broker-protocol\StorageBrokerProtocol.Proof.csproj'
+          & .\.tools\dotnet\dotnet.exe restore $project --source .\.tools\nuget-feed --packages .\.tools\nuget-packages --configfile .\.tools\NuGet.Config -p:RuntimeFrameworkVersion=8.0.30
+          if ($LASTEXITCODE -ne 0) { throw 'Broker protocol proof offline restore failed.' }
+          & .\.tools\dotnet\dotnet.exe build $project --no-restore -c Release -p:RuntimeFrameworkVersion=8.0.30
+          if ($LASTEXITCODE -ne 0) { throw 'Broker protocol proof build failed.' }
+          $assembly = '.\deployment\windows\test-support\storage-broker-protocol\bin\Release\net8.0\StorageBrokerProtocol.Proof.dll'
+          $result = & .\.tools\dotnet\dotnet.exe $assembly --native-files
+          $code = $LASTEXITCODE
+          $result | Write-Output
+          $proof = $result | ConvertFrom-Json
+          if ($code -ne 0) {
+            $proof | Add-Member -NotePropertyName sourceCommit -NotePropertyValue (& git rev-parse HEAD)
+            $proof | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $env:RUNNER_TEMP 'switchyard-storage-broker-protocol-verification.json') -Encoding utf8
+            throw 'An authenticated broker metadata boundary failed.'
+          }
+          if ($proof.success -ne $true -or $proof.checks -ne 16 -or $proof.pipeTextProtocolChecks -ne 10 -or $proof.serviceHeaderChecks -ne 1541 -or $proof.restrictedChildEventChecks -ne 12 -or $proof.exchangeProtocolChecks -ne 30 -or $proof.exchangeJournalChecks -ne 43 -or $proof.exchangeFactsChecks -ne 23 -or $proof.indexInputChecks -ne 49 -or $proof.historyInputChecks -ne 62 -or $proof.protectedFilesChecks -ne 16 -or $proof.privatePipeChecks -ne 36 -or $proof.serviceInstalled -ne $false -or $proof.volumeOpened -ne $false -or $proof.guestLaunched -ne $false) { throw 'The exact broker proof result did not verify.' }
+          $proof | Add-Member -NotePropertyName sourceCommit -NotePropertyValue (& git rev-parse HEAD)
+          $proof | Add-Member -NotePropertyName protocolSourceSha256 -NotePropertyValue ((Get-FileHash '.\apps\desktop-hotkeys\WindowsStorageBrokerProtocol.cs' -Algorithm SHA256).Hash.ToLowerInvariant())
+          $proof | Add-Member -NotePropertyName assemblySha256 -NotePropertyValue ((Get-FileHash $assembly -Algorithm SHA256).Hash.ToLowerInvariant())
+          $proof | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $env:RUNNER_TEMP 'switchyard-storage-broker-protocol-verification.json') -Encoding utf8
+
+      - name: Verify actual NTFS private index bytes and parser refusals
+        if: matrix.lane == 'filesystem'
+        shell: pwsh
+        timeout-minutes: 4
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $helper = Join-Path $env:RUNNER_TEMP 'switchyard-windows-hotkeys/Switchyard.Hotkeys.exe'
+          & node --experimental-transform-types scripts/verify-windows-index-native.mjs --synthetic "--helper=$helper"
+          if ($LASTEXITCODE -ne 0) { throw 'Actual native index packet staging failed; preserve its scoped receipt.' }
+
+      - name: Verify actual NTFS private history bytes and parser refusals
+        if: matrix.lane == 'filesystem'
+        shell: pwsh
+        timeout-minutes: 4
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $helper = Join-Path $env:RUNNER_TEMP 'switchyard-windows-hotkeys/Switchyard.Hotkeys.exe'
+          & node --experimental-transform-types scripts/verify-windows-history-native.mjs --synthetic "--helper=$helper"
+          if ($LASTEXITCODE -ne 0) { throw 'Actual native history packet staging failed; preserve its scoped receipt.' }
+
+      - name: Verify the exact metadata broker service lifecycle
+        if: matrix.lane == 'filesystem'
+        shell: pwsh
+        timeout-minutes: 6
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $helper = Join-Path $env:RUNNER_TEMP 'switchyard-windows-hotkeys\Switchyard.Hotkeys.exe'
+          $dotnet = Join-Path $env:GITHUB_WORKSPACE '.tools\dotnet\dotnet.exe'
+          $proof = Join-Path $env:GITHUB_WORKSPACE 'deployment\windows\test-support\storage-broker-protocol\bin\Release\net8.0\StorageBrokerProtocol.Proof.dll'
+          & node scripts/verify-windows-storage-broker.mjs --synthetic "--helper=$helper" "--dotnet=$dotnet" "--proof=$proof"
+          if ($LASTEXITCODE -ne 0) { throw 'The exact protected metadata service did not complete; preserve its ownership evidence.' }
+
+      - name: Verify native protected staging and scoped broker removal
+        if: matrix.lane == 'native-setup'
+        shell: pwsh
+        timeout-minutes: 6
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $output = Join-Path $env:RUNNER_TEMP 'switchyard-windows-hotkeys'
+          $dotnet = Join-Path $env:GITHUB_WORKSPACE '.tools\dotnet\dotnet.exe'
+          $proof = Join-Path $env:GITHUB_WORKSPACE 'deployment\windows\test-support\storage-broker-protocol\bin\Release\net8.0\StorageBrokerProtocol.Proof.dll'
+          & node scripts/verify-windows-storage-broker.mjs --synthetic "--helper=$(Join-Path $output 'Switchyard.Hotkeys.exe')" "--dotnet=$dotnet" "--proof=$proof" "--setup=$(Join-Path $output 'Switchyard.Setup.exe')"
+          if ($LASTEXITCODE -ne 0) { throw 'The exact native setup did not settle; preserve its protected staging and original service evidence.' }
+
+      - name: Build the fixed cold random probe with the existing C++ toolchain
+        if: matrix.lane == 'restricted-exchange'
+        shell: pwsh
+        timeout-minutes: 2
+        run: |
+          .\deployment\windows\test-support\storage-broker-protocol\Build-ColdRandom.ps1 -OutputDirectory (Join-Path $env:RUNNER_TEMP 'switchyard-windows-hotkeys')
+
+      - name: Retain fixed imports of the exact Node image
+        if: always() && matrix.lane == 'restricted-exchange'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: switchyard-node-rng-imports-${{ github.sha }}
+          path: ${{ runner.temp }}/switchyard-windows-hotkeys/Switchyard.NodeRngImports.json
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Verify bounded storage through a client without volume privilege
+        if: matrix.lane == 'restricted-exchange'
+        shell: pwsh
+        timeout-minutes: 6
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $helper = Join-Path $env:RUNNER_TEMP 'switchyard-windows-hotkeys\Switchyard.Hotkeys.exe'
+          $dotnet = Join-Path $env:GITHUB_WORKSPACE '.tools\dotnet\dotnet.exe'
+          $proof = Join-Path $env:GITHUB_WORKSPACE 'deployment\windows\test-support\storage-broker-protocol\bin\Release\net8.0\StorageBrokerProtocol.Proof.dll'
+          & node scripts/verify-windows-storage-broker.mjs --synthetic "--helper=$helper" "--dotnet=$dotnet" "--proof=$proof" --exchange
+          if ($LASTEXITCODE -ne 0) { throw 'The original bounded exchange remains unconfirmed; preserve its protected journal and image.' }
+
+      - name: Verify actual native filesystems and guardians without opening a guest
+        if: matrix.lane == 'filesystem'
+        shell: pwsh
+        timeout-minutes: 5
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $helper = Join-Path $env:RUNNER_TEMP 'switchyard-windows-hotkeys\Switchyard.Hotkeys.exe'
+          $node = Join-Path $env:RUNNER_TEMP 'switchyard-filesystem-node\node.exe'
+          & node scripts/verify-windows-reviewed-inputs.mjs --synthetic "--helper=$helper" "--node=$node"
+          if ($LASTEXITCODE -ne 0) { throw 'A native filesystem, identity, image-header, sharing or owned-exit check failed.' }
+          Remove-Item -LiteralPath (Split-Path -Parent $node) -Recurse -Force
+
+      - name: Retain the bounded native acceptance receipt
+        if: always() && matrix.lane == 'filesystem'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: switchyard-windows-filesystem-${{ github.sha }}
+          path: ${{ runner.temp }}/switchyard-windows-inputs-verification.json
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Retain only the broker protocol proof
+        if: always() && matrix.lane == 'filesystem'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: switchyard-storage-broker-protocol-${{ github.sha }}
+          path: ${{ runner.temp }}/switchyard-storage-broker-protocol-verification.json
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Retain only the standalone helper proof
+        if: always() && matrix.lane == 'filesystem'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: switchyard-windows-standalone-helper-${{ github.sha }}
+          path: ${{ runner.temp }}/switchyard-standalone-helper-verification.json
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Retain only the restricted-client bounded exchange receipt
+        if: always() && matrix.lane == 'restricted-exchange'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: switchyard-storage-broker-exchange-${{ github.sha }}
+          path: ${{ runner.temp }}/switchyard-storage-broker-exchange-verification.json
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Retain only the native index packet receipt
+        if: always() && matrix.lane == 'filesystem'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: switchyard-windows-index-native-${{ github.sha }}
+          path: ${{ runner.temp }}/switchyard-windows-index-native.json
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Retain only the native history packet receipt
+        if: always() && matrix.lane == 'filesystem'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: switchyard-windows-history-native-${{ github.sha }}
+          path: ${{ runner.temp }}/switchyard-windows-history-native.json
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Retain only the scoped broker lifecycle receipt
+        if: always() && matrix.lane == 'filesystem'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: switchyard-storage-broker-bootstrap-${{ github.sha }}
+          path: ${{ runner.temp }}/switchyard-storage-broker-bootstrap-verification.json
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Retain only the native setup preflight receipt
+        if: always() && matrix.lane == 'native-setup'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: switchyard-native-setup-${{ github.sha }}
+          path: ${{ runner.temp }}/switchyard-native-setup-verification.json
+          if-no-files-found: error
+          retention-days: 7
+
+      - name: Retain only the native setup lifecycle receipt
+        if: always() && matrix.lane == 'native-setup'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: switchyard-native-setup-lifecycle-${{ github.sha }}
+          path: ${{ runner.temp }}/switchyard-native-setup-lifecycle-verification.json
+          if-no-files-found: error
+          retention-days: 7
+
+  verify-storage-contracts:
+    needs: build-state-helper
+    concurrency:
+      group: switchyard-windows-storage-contract-${{ github.ref }}-${{ matrix.suite }}
+      cancel-in-progress: false
+    runs-on: windows-2022
+    timeout-minutes: 8
+    strategy:
+      fail-fast: false
+      matrix:
+        suite: [inspect-cli, suite-application, suite-installation, task-owners, role-choices, agent-consent, scanner-save, mixed-scanner, history-windows-scanner, history-bytes, history-staging, history-scanner, history-inputs, history-authority, index-inputs, index-bytes, index-staging, index-scanner, index-authority, osv-source, osv-scanner, pypi-scanner, pypi-artifact-scanner, cargo-scanner, cargo-artifact-scanner, artifact-scanner, archive-scanner, license-scanner, copilot-account, copilot-lifecycle, copilot-requests, ignored-tree-policy, ignored-tree-authority, ignored-tree-scanner, receipt-authority, receipt-authority-state, shield-exceptions, shield-exception-execution, shield-exception-ledger, ignored-authority, ignored-scanner, fixture-invalidation, validation-policy, shield-evidence, shield-change, shield-codebase, shield-supply-chain, shield-release, shield-clean, shield-recovery, pipeline-recovery, pipeline-policy, pipeline-evidence, fixture-removal, backend-contract, fixture-registry, fixture-maintenance, harness, devices, storage-native, leases, legacy-images, broker-owner, sandbox-native, sandbox-sessions, reviewed-run, run-owner]
+    env:
+      npm_config_audit: "false"
+      npm_config_fund: "false"
+      npm_config_update_notifier: "false"
+    steps:
+      - name: Check out the exact source revision
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+        with:
+          persist-credentials: false
+
+      - name: Install pinned Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: 24.14.0
+          cache: npm
+
+      - name: Install locked source dependencies
+        shell: pwsh
+        run: npm.cmd ci --ignore-scripts
+
+      - name: Install the exact-source native state helper
+        uses: ./.github/actions/install-state-helper
+
+      - name: Verify the complete owned contract file under its original isolated bound
+        shell: pwsh
+        timeout-minutes: 6
+        run: |
+          $ErrorActionPreference = 'Stop'
+          & node --experimental-transform-types scripts/verify-windows-storage-contracts.mjs --synthetic "--suite=${{ matrix.suite }}"
+          if ($LASTEXITCODE -ne 0) { throw 'A protected storage ownership or harness contract failed.' }
+
+      - name: Retain only the bounded contract receipt
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: switchyard-storage-contract-${{ matrix.suite }}-${{ github.sha }}
+          path: ${{ runner.temp }}/switchyard-storage-contracts/${{ matrix.suite }}/isolated-test-*.json
+          if-no-files-found: error
+          retention-days: 7

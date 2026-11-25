@@ -1,0 +1,23 @@
+{
+  "schema": "switchyard-linux-35a-complete-summary/v1",
+  "sourceCommit": "35a64a982f63105f55ad55671d89b26ca0972c9c",
+  "receipt": "isolated-test-88ae253d-4c7d-4676-95c7-d0ac531dc3c6.json",
+  "success": true,
+  "totals": {
+    "required": 237,
+    "passed": 237,
+    "failed": 0,
+    "tests": 1474,
+    "passedTests": 1464,
+    "failedTests": 0,
+    "skippedTests": 10,
+    "cancelledTests": 0,
+    "todoTests": 0
+  },
+  "allChildCleanup": true,
+  "allProcessTreeTerminationComplete": true,
+  "ownedWorktreeFixturesAliasesRemoved": true,
+  "newSdkInstalled": false,
+  "newCvssContextChangesIncluded": false,
+  "priorFailureRetained": "isolated-test-2c20a702-0a2a-438c-b52c-a53beb6605f2.json"
+}

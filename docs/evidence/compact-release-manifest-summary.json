@@ -1,0 +1,39 @@
+{
+  "schema": "switchyard-compact-release-manifest-source/v1",
+  "baseCommit": "6dceac0a6e0cff8c489ff6a3a912ffd810ff0026",
+  "sourceFiles": {
+    "deployment/suite/release.mjs": "7a660c4957a35383cfbe1320746dc8a1d28c1a229d3162a2731e7be9ec71455c",
+    "deployment/suite/release.test.mjs": "2082ec4ecfbd41352af080f535a2e061d4cccd4175b9dd504c83c657c9669b8f"
+  },
+  "verificationReceipt": "isolated-test-8c92da3e-91b5-4dbe-b9c6-efca656b6fca.json",
+  "verificationReceiptSha256": "864d8892b21b14be0700475d81d246d5572606baf8457746be545f322a664ae5",
+  "totals": {
+    "required": 18,
+    "passed": 18,
+    "failed": 0,
+    "tests": 26,
+    "passedTests": 26,
+    "failedTests": 0,
+    "skippedTests": 0,
+    "cancelledTests": 0,
+    "todoTests": 0
+  },
+  "allChildAndTreeCleanupVerified": true,
+  "ownedTemporaryRootRemoved": true,
+  "fullLinuxBundleBudgetBytes": 5242880,
+  "earlierPreparation": {
+    "sourceCommit": "6dceac0a6e0cff8c489ff6a3a912ffd810ff0026",
+    "release": "58873ed872fbfbcd6dff08d61f993cde75add8617ebd43cd66dc34b982fb4f47",
+    "files": 535,
+    "bytes": 5246207,
+    "exceededBy": 3327,
+    "installed": false,
+    "exactVerifiedStagingRemoved": true
+  },
+  "change": "Remove JSON formatting whitespace only; assert the full payload plus integrity manifest stays below the original 5 MiB limit.",
+  "payloadFilesRemoved": false,
+  "integrityValidationChanged": false,
+  "installedChanged": false,
+  "nativeWindowsAcceptance": false,
+  "success": true
+}

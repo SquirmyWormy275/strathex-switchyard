@@ -1,0 +1,26 @@
+{
+  "schema": "switchyard-complete-linux-summary/v1",
+  "source": "83d4139bfb0659d47f75829b5dc1b37a0783697b",
+  "privateReceipt": "isolated-test-78c7ffa3-348e-4db2-aa7d-a92fb1cf2992.json",
+  "privateCleanupReceipt": "linux-83d4139-cleanup-1793947066903.json",
+  "totals": {
+    "required": 244,
+    "passed": 244,
+    "failed": 0,
+    "tests": 1567,
+    "passedTests": 1556,
+    "failedTests": 0,
+    "skippedTests": 11,
+    "cancelledTests": 0,
+    "todoTests": 0
+  },
+  "success": true,
+  "allChildAndTreeCleanupVerified": true,
+  "ownedCheckoutAndTestParentRemoved": true,
+  "dependencyAliasesAndBuildsRemoved": true,
+  "markerRemoved": true,
+  "limits": [
+    "The later reviewed editor authorization source has separate focused evidence.",
+    "Native Windows, installed source, hardware/account and frozen frontend acceptance remain distinct."
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "schema": "switchyard-setup-worker-native/v1",
+  "sourceCommit": "20dc0668bdc55fb0c1a82b3cdfc8bff155bf6312",
+  "executionCommit": "3a8a68f1b37dc1f91e09aa502d2433587543d7a3",
+  "sourceAndExecutionTree": "a687be9f352869cf7986025fd03d8d7ff7452d73",
+  "runId": 42266882372,
+  "jobId": 128061622442,
+  "artifactId": 13528455903,
+  "archiveBytes": 4631,
+  "archiveSha256": "6424cd2a1a48268db010db1976f352d29a9adb1ee7c5897d21546030cd101120",
+  "zipSavedLocally": false,
+  "privateReceipt": "windows-setup-worker-20dc-native.json",
+  "success": false,
+  "workerExitCode": 3221225794,
+  "workerStdoutBytes": 0,
+  "originalOwnerAcceptedChecks": 0,
+  "failedPhase": "probe-identity-return-structured-result-code3221225794-bytes0",
+  "specificFailingDllEstablished": false,
+  "installedChanged": false
+}

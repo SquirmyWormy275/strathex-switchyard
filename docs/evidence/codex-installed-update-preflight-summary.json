@@ -1,0 +1,26 @@
+{
+  "schema": "switchyard-codex-installed-update-preflight/v1",
+  "receipt": "123156ab-046c-43c7-be70-fac25a36a097",
+  "receiptSha256": "ee79804a3765e7868aba5c2bcad36e9184a55e4825cadf234bca241f67088c03",
+  "totals": {
+    "required": 18,
+    "passed": 18,
+    "failed": 0,
+    "tests": 27,
+    "passedTests": 27,
+    "failedTests": 0,
+    "skippedTests": 0,
+    "cancelledTests": 0,
+    "todoTests": 0
+  },
+  "pureSourceMetadataChecks": [
+    "installed-codex-admits-only-exact-reviewed-versions-and-client-identity",
+    "installed-codex-all-forty-two-restrictions-applied-and-read-back",
+    "installed-codex-restrictions-preserve-first-party-and-disabled-mcp-boundaries"
+  ],
+  "verifierSha256": "13ad2502d01981d332bd427a059c79ffdba82694daf9050d4bfba696699eef4e",
+  "installedApplicationChanged": false,
+  "originalChildCleanupVerified": true,
+  "previousVerifierSha256": "db341f59695dcb14ff4fbeef3008dac3ff043c0a0dc0a23fa9fea294ec380b21",
+  "subsequentCorrection": "Installed module comparison rejected two stale suite/release receipt references; updated to their existing Windows lifecycle/endpoint source receipts. No production module or installed package changed."
+}

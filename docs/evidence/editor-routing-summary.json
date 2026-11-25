@@ -1,0 +1,51 @@
+{
+  "schema": "switchyard-editor-signed-connections/v1",
+  "basis": "f90c7fd1050bb88262e32f8c132ff2d69a022900",
+  "sourceSha256": {
+    "tools/layout-studio/instance.mjs": "de9364d904b1bb1cbb9ad3f233b519e6d48a57317f1428626de2294269dc9180",
+    "tools/layout-studio/serve.mjs": "96aa8a614bbcd0be342255d72d68e865a30e81c239623ce94a006ae6f7fb03d7",
+    "tools/layout-studio/suite.mjs": "96cd270bdb66de608ae881fb91112ac35d0de0cba23bbb9b1c00a31777aaa4ae",
+    "tools/layout-studio/coding-editor-journal.mjs": "3a066c2265b30fdff57db0ac2bacd41880dccba5e4a1913c8464cdf6253a7580",
+    "apps/vscode-extension/src/studio-task-client.ts": "051b84a74bbec240390dba9af376622e06010c8b6d902a8f9d0a726032682b1b",
+    "tools/layout-studio/coding-editor-connections.test.mjs": "35ed36c57b5a07a6097773aa6bea17e906b497c7d2cd74dfb5568971d755f697"
+  },
+  "receipt": "isolated-test-f6e1dfbf-9003-493a-a384-1012bd7e2dfe.json",
+  "groups": 7,
+  "passed": 96,
+  "allChildAndTreeCleanupVerified": true,
+  "typecheckPassed": true,
+  "compiledExtensionPassed": true,
+  "commonjsClientMethodsChecked": 5,
+  "generatedExtensionBuildRemoved": {
+    "files": 34,
+    "bytes": 989345
+  },
+  "implemented": [
+    "Signed open, exact peer pin, observe, stop and recover operations bind the application instance/build, nonce, original owner/load and reviewed editor selection. Closed request fields reject browser origins, prompts, commands and unrelated authorization fields.",
+    "The typed editor client validates closed response shapes, exact selections, peer/socket fields and the distinction between historical cleanup and live protocol acknowledgement. It exposes no API bearer and retries no effect after loss or replacement.",
+    "Suite lazily creates the Linux lifecycle using an existing private runtime root. No new runtime directory is created on construction. Workspace, keyboard-only and shutdown transitions join editor cleanup before original-owner retirement.",
+    "Uncertain cleanup preserves workspace selection, leaves keyboard-only saved with a refusal, and still attempts owner shutdown. Same-host already-stopped recovery is idempotent and grants no new handle."
+  ],
+  "demonstration": {
+    "signedHttpToRealProtectedLifecycle": true,
+    "realLinuxIngressAndDedicatedUpstream": true,
+    "syntheticProviderAndTerminal": true,
+    "exactResumeAcknowledged": true,
+    "duplicateEndpointPrevented": true,
+    "signedRetirementVerified": true,
+    "liveNativeTaskOrAccountEffects": false
+  },
+  "earlierPassingReceipt": "isolated-test-ce446505-9706-44e2-9bb0-da16467ed7ad.json",
+  "retainedFailure": {
+    "receipt": "isolated-test-04aea7e8-6622-4d16-8d6e-4e4eaf5835c5.json",
+    "passed": 95,
+    "failed": 1,
+    "cause": "The new routed test sampled acknowledgement immediately after socket delivery, before the relay completed its final current-state recheck. The test now uses the existing bounded wait for the actual acknowledgement; production ordering and acceptance conditions are unchanged.",
+    "allChildAndTreeCleanupVerified": true
+  },
+  "limits": [
+    "Retained Terminal launcher composition and command activation are unfinished. The new signed routes are implemented but not automatically invoked by an editor command.",
+    "Native TUI and installed Codex 0.167.0 compatibility remain unaccepted; version admission stays at 0.166.0.",
+    "The latest complete Linux 072e066 run predates the journal, recovery and routing changes. Windows native restricted helper startup remains failed software validation."
+  ]
+}

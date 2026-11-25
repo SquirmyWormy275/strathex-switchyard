@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { chmod, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { isAbsolute, join } from "node:path";
 import test from "node:test";
@@ -62,6 +62,9 @@ test("provisioned VS Code transport rejects a broadly readable Linux endpoint re
   context.after(async () => { await rm(directory, { recursive: true, force: true }); });
   const configurationPath = join(directory, "authenticated-pipe.json");
   await writeFile(configurationPath, JSON.stringify({ version: 1, pipePath: join(directory, "companion.sock"), sealedToken: "opaque" }), { encoding: "utf8", mode: 0o644 });
+  // Establish the deliberately unsafe fixture even under a private runner umask.
+  await chmod(configurationPath, 0o644);
+  assert.equal((await stat(configurationPath)).mode & 0o777, 0o644);
   const transport = new ProvisionedNamedPipeJsonLineTransport(configurationPath, new FakeSecretReader());
   await assert.rejects(() => transport.request(JSON.stringify({ version: 1, id: "public-state", method: "ping" })), /not provisioned|unsafe|private/i);
 });

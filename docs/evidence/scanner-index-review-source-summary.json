@@ -1,0 +1,151 @@
+{
+  "schema": "switchyard-scanner-index-review-source-summary/v1",
+  "at": "2026-11-07T04:38:34.829Z",
+  "baseCommit": "d0c492b1758cd9ea024d146faac89731b26ab774",
+  "sourceFiles": {
+    "deployment/suite/installation.test.mjs": "9d9f10b0591817d1c23abaf87efacf79b695d14934a5b4e09537a1a4aa36779f",
+    "deployment/suite/release.test.mjs": "a3b3cf50a9f2f12cd92f609202f58bffdd3c21f63606cbdeabd2ee12a8d9a7de",
+    "scripts/run-isolated-tests.mjs": "847158fa206cc7ac0f714bd4d999999efb13da39c2c2955059de60d3dc9b7425",
+    "scripts/run-isolated-tests.test.mjs": "752fb0d8483cf490455f2d2b1b57838877dfccb6bfffe78c84531a726e4c62dd",
+    "scripts/verify-agent-security-host.mjs": "9ccccbae3a1de526acb8232aaf93f38518857e5b3b610ec79e113227f9e63ebd",
+    "scripts/windows-backend-shards.test.mjs": "2025ce872294426df0bab0c3b5fa367c9d2a18471568a3a4043109f55eae6234",
+    "scripts/windows-scenario-groups.test.mjs": "513550b7b199fb410c9ce3cffdb94b84dfa041cf3a4e7962162eb0e5a1ca3d9f",
+    "tools/layout-studio/git-index-inputs.mjs": "fb21e68483be3ad1ed18777e7c8204886aa8b5a5e4f846ef665884e580e8f333",
+    "tools/layout-studio/git-index-inputs.test.mjs": "ec63dd4c159a5647cc54d5daa1c93a774f2628c49711ee37030373388ae775c1",
+    "tools/layout-studio/receipt-authority-state.test.mjs": "b2c9eca01c33611e16038a27e9e2809940c277d4825b965fde8bf33910d66bf1",
+    "tools/layout-studio/repository-inspection.mjs": "0fc2e391767ddb01ae9d4dc85b92810d9ca1dc25c6bd32539084def98d9b5a34",
+    "tools/layout-studio/repository-shield-index.test.mjs": "d43167615663fabf068d04828045fb748a5936eb72b7da54f9d84d3221e7205f",
+    "tools/layout-studio/repository-shield.mjs": "486d8432f3a6afd8e9a8b16ca12bf502945775ee53747bda4880ca2ebb60c3ca",
+    "tools/layout-studio/repository-windows-shield-index.test.mjs": "25dd71030b19f5875c441b2699f2253732106e91f4c0cd9347d5086259ccad57",
+    "tools/layout-studio/scanner-index-review.test.mjs": "83c0acc618d0aca5b9027f15c2a984d44834336731784fc99809254e6a5b9782",
+    "tools/layout-studio/scanner-review.test.mjs": "4e38267c6568dd6d9f57f96cb8b8fbb622dd1dd59828e09d8080e5a093bfc1af",
+    "tools/layout-studio/shield-index-inputs.mjs": "d04d6f2f6964d01a74eeb2b619427e216a13e5398e0fc219f19eb88e59f0b8b0",
+    "tools/layout-studio/shield-input-inventory.test.mjs": "9b0466a618f8730bdc9361ab0c88752dea125a32c887cb56c6a3563834f595d7",
+    "tools/layout-studio/task-authority-ignored-inputs.test.mjs": "698731e6edfb5a404fd0b785f0428f517e93ff7f0fabdc59ec542dfc22ad80cf",
+    "tools/layout-studio/task-authority-ignored-trees.test.mjs": "33da04d08c6af41e0ac9a994cc30a1272dbb1f051b57cb8369fc8932b3477cba",
+    "tools/layout-studio/task-authority.mjs": "795f6507eef74c543f108be42e510751d319897cf1b0a3866d34856386ba16ca",
+    "tools/layout-studio/task-authority.test.mjs": "97ac82bba826d37c3913ef3c4653c762577e241ff5620848602706d7697ff3ae",
+    "tools/layout-studio/task-index-inputs.test.mjs": "5ccd5eb51daa98c6abe5b9394470a2a9061f37974c6589c4600660d1ba7acd4b",
+    "tools/layout-studio/test-support/repository-shield-fixture.mjs": "e6be112389c80937b6f6bd4d04b41290326e63da9120f5b7dd5d3c30b2af6904",
+    "tools/layout-studio/test-support/task-authority-fixture.mjs": "6e951c3aa0da586268f4f3086dff752e15d1b7b9961f560f02cad0f2c0e35d23",
+    "tools/layout-studio/test-support/windows-execution-fixture.mjs": "3e31919070bdd774a87d4993977c20d0c5a1b524026f03b8f2bddafab2d160d0",
+    "tools/layout-studio/windows-index-inputs.mjs": "b52a0092d7f23a4295c08f7d8099d79a9f12c2807bc69dca281df38ce6ed7ec8",
+    "tools/layout-studio/windows-index-inputs.test.mjs": "48e457862926f840193c316c5319613a6d7212597690e0c25f75177b6aefc413",
+    "tools/layout-studio/windows-index-staging.test.mjs": "d36d426d4b32b11309e273acb7ae5fa2952b42a79ece0bd596306a43a32de4a2"
+  },
+  "missingFeatureRed": {
+    "name": "isolated-test-73056960-705b-42f7-bb8f-387b378185d8.json",
+    "sha256": "cc34fc51544b61ceb9be00128562ed4481ef27ee2ff0d40c37fb96bf2a116dd7",
+    "success": false,
+    "totals": {
+      "required": 1,
+      "passed": 0,
+      "failed": 1,
+      "tests": 5,
+      "passedTests": 0,
+      "failedTests": 5,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    }
+  },
+  "referenceCommandFixtureFailure": {
+    "name": "isolated-test-774fc908-c150-4d0d-80ed-8c94c0df1464.json",
+    "sha256": "c3733121fdd9c26184ae8ca9b6b17050158c176c847e7c32a46fd88e5f0a6dca",
+    "success": false,
+    "totals": {
+      "required": 2,
+      "passed": 1,
+      "failed": 1,
+      "tests": 17,
+      "passedTests": 16,
+      "failedTests": 1,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    }
+  },
+  "focused": {
+    "name": "isolated-test-a60d678e-a686-4c84-bfa9-1fe4cce03fd5.json",
+    "sha256": "c3aa554ad2b88ff53ac6e3238e4a671da0b0af53d464a38a6a864bad005c78cf",
+    "success": true,
+    "totals": {
+      "required": 4,
+      "passed": 4,
+      "failed": 0,
+      "tests": 45,
+      "passedTests": 45,
+      "failedTests": 0,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    }
+  },
+  "surrounding": {
+    "name": "isolated-test-c81e2431-bde6-465b-bdd1-4eb3f8e0b0e1.json",
+    "sha256": "5efc9be2ec0bee505a34328efd5261132455939d5ce723b2795caae4b1c8a103",
+    "success": true,
+    "totals": {
+      "required": 29,
+      "passed": 29,
+      "failed": 0,
+      "tests": 84,
+      "passedTests": 84,
+      "failedTests": 0,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    }
+  },
+  "finalDistinctGroups": 33,
+  "finalDistinctTests": 129,
+  "originalCommandsBoundsSkipsAndCleanupVerified": true,
+  "typecheck": {
+    "command": "npm run typecheck",
+    "node": "24.14.0",
+    "passed": true
+  },
+  "scope": {
+    "authenticatedHttp": true,
+    "completeIndexTreeBoundToSnapshot": true,
+    "independentRealGitObjectFormats": [
+      "sha1",
+      "sha256"
+    ],
+    "defaultCurrentFilesPreserved": true,
+    "noSourceBytesReturned": true,
+    "changedIndexHeadWorktreeAccountSelectionRefused": true,
+    "realLinuxStagedOnlySecretScan": true,
+    "windowsGuestDoubleStagedOnlySecretScan": true,
+    "separateAuthorityAndExecutionReviews": true,
+    "unchangedOriginalGitAndWorktreeVerified": true,
+    "originalPackageBudgetPassed": true
+  },
+  "bounds": {
+    "indexFiles": 64,
+    "perIndexFileBytes": 262144,
+    "indexTotalBytes": 458752,
+    "windowsIndexTotalBytes": 327680,
+    "currentAndIndexFiles": 256
+  },
+  "limitations": [
+    "Automatic scanner recipe/feed assembly remains unfinished.",
+    "Frontend remains frozen; staged preparation controls are not activated.",
+    "Windows native host/guest acceptance of this change remains separate.",
+    "History, unsupported syntax and broader complete security coverage remain unverified."
+  ],
+  "effects": {
+    "modelPrompts": 0,
+    "installedNativeTasks": 0,
+    "accountChanges": 0,
+    "hidOpened": false,
+    "frontendChanged": false,
+    "liveInstalledScanner": false,
+    "newRuntimeDownloads": false
+  },
+  "cleanup": {
+    "emptyOwnedParentVerified": true,
+    "removed": true
+  },
+  "success": true
+}

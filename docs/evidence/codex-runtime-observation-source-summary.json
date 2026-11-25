@@ -1,0 +1,132 @@
+{
+  "schema": "switchyard-codex-runtime-observation-source-summary/v1",
+  "baseCommit": "85fd223fdc4cc699beff1d5eaedd7993ee243b95",
+  "sourceFiles": {
+    "tools/layout-studio/codex-runtime-observation.mjs": "e307fa2fcddf91c0654033fb4e57cb676f12006a3face1f2d93727582c2267e4",
+    "tools/layout-studio/codex-turn.mjs": "871a6f75f2c40e8ad7270fb53b4d77d036340efd566c5d357bd3cde0bb6d9b8b",
+    "tools/layout-studio/agent-observation.mjs": "79052bbf1dfe8d35d811e1f5cd43061db171035ca64a66a864204cfaac4161c6",
+    "tools/layout-studio/agents.mjs": "a200bc6c0bba609e74767e356faa4e27f5e40923b1ca511f452c1ce7c093d0d1",
+    "tools/layout-studio/reviewed-task-text.mjs": "2c9d710b0f54be05056e8d2bdf9784e765fe4ec851c9efb15ae25281cc7ac6d2",
+    "tools/layout-studio/design-observations.mjs": "0b6789628cfde72059eac00771101675b0ec83fef872c3baf3c90056652bde60",
+    "tools/layout-studio/codex-turn.test.mjs": "54576d3681aa9df4a7216efe068008094009f5f3a6907749ab6805dd156abafd",
+    "tools/layout-studio/agent-observation.test.mjs": "c3d718ed34e1c0bcaac1c154f27602a60dbe0a14721fab93b2ef1de75876040d",
+    "tools/layout-studio/conversation-role-boundaries.test.mjs": "f99cb4e93a8bba19944e2d2895bb4fed59fd9be40e7b54b0c9ec80f73ba4019a",
+    "tools/layout-studio/codex-submissions.test.mjs": "43ff028867a76ad446256656fc2877dc977b052beacc62ca5801ce1e2d8c4631",
+    "tools/layout-studio/design-observations.test.mjs": "2b12c494874e6353c3b36d10df5d18aa3f440ca1ebb9f3ce2f4ae632f2b543e2"
+  },
+  "receipts": [
+    {
+      "id": "d9af8ebb-0787-4380-89c5-b25c493b2208",
+      "kind": "unit",
+      "sha256": "1ffb72bfdde505b31fe250ac48ce5339de33f33b9ce22eb88f6df34ac433095b",
+      "totals": {
+        "required": 2,
+        "passed": 2,
+        "failed": 0,
+        "tests": 31,
+        "passedTests": 31,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "originalManifestCommandsBoundsAndCleanupVerified": true
+    },
+    {
+      "id": "0ff6bb00-a228-4371-baef-7875aaa083a3",
+      "kind": "fixture-correction",
+      "sha256": "e5b26bae7808060c1d74e5a9e46ddf209fa4e275b03f8091d1b95f4863a2db01",
+      "totals": {
+        "required": 9,
+        "passed": 7,
+        "failed": 2,
+        "tests": 156,
+        "passedTests": 153,
+        "failedTests": 3,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "originalManifestCommandsBoundsAndCleanupVerified": true
+    },
+    {
+      "id": "e0c58f96-ff36-4c00-9491-d9789284ac30",
+      "kind": "fixture-correction",
+      "sha256": "22363ab6f55492bd035e7a3dcc977c958fab3c1c4479f396495beab0c9e91baf",
+      "totals": {
+        "required": 9,
+        "passed": 8,
+        "failed": 1,
+        "tests": 156,
+        "passedTests": 154,
+        "failedTests": 2,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "originalManifestCommandsBoundsAndCleanupVerified": true
+    },
+    {
+      "id": "ed3b18f9-f823-47b8-9372-a1c1df965fbe",
+      "kind": "focused",
+      "sha256": "4c4c3fc6a528bbf7e3e24fe6536751e8a72f48b1fd360f01dd8eda4e929d2a02",
+      "totals": {
+        "required": 9,
+        "passed": 9,
+        "failed": 0,
+        "tests": 156,
+        "passedTests": 156,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "originalManifestCommandsBoundsAndCleanupVerified": true
+    },
+    {
+      "id": "b79e3ef0-13f8-4a08-90fd-e73c24acd59d",
+      "kind": "accepted",
+      "sha256": "1eb2ce43e33618871920c82e0aeed8486bffc9973fa08e98833e7627bcd4d873",
+      "totals": {
+        "required": 27,
+        "passed": 27,
+        "failed": 0,
+        "tests": 191,
+        "passedTests": 191,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "originalManifestCommandsBoundsAndCleanupVerified": true
+    }
+  ],
+  "accepted": {
+    "groups": 27,
+    "passedTests": 191,
+    "skippedTests": 0
+  },
+  "typechecks": {
+    "root": true,
+    "vscode": true
+  },
+  "scope": [
+    "Fixed thread/status/changed metadata from the existing owned design/reviewed-text turn; no extra subscription, process, thread resume or provider request.",
+    "Exact thread, original account/generation/role or task binding and observation consent/interval rechecked before encrypted persistence; event identities remain digests.",
+    "Duplicate status collapsed; up to 64 status transitions per original bounded turn; callback failure/overflow retains uncertainty with original owned cleanup and no retry.",
+    "Queued writes cannot continue after cancellation, timeout or account boundary; successful reply waits for accepted metadata writes.",
+    "Existing separate aggregate observation review recognizes runtime provenance without sending raw events/content."
+  ],
+  "fixtureCorrections": [
+    "The first integration attempt omitted updatedAt, so existing retention removed synthetic recording sessions.",
+    "The next design fixture started recording before Suite initialization; existing startup recovery correctly stopped that stale recording. Tests now initialize before recording.",
+    "An initial broad-run selector assumed one group per file; original installation scenarios are separate groups. Preflight refused before tests; the corrected selection preserves every original pattern and bound."
+  ],
+  "reference": "https://learn.chatgpt.com/docs/app-server#track-thread-status-changes",
+  "limitations": [
+    "Provider traffic is synthetic. Encrypted local state and original test-process lifecycle are real; no account, model, microphone, keyboard, desktop or installed application effect was used.",
+    "Only the existing authorized owned turn is observed. Read-only inventory does not subscribe; there is no continuous external-session observer.",
+    "Only the documented idle/notLoaded/systemError and active empty/waitingOnApproval shapes are accepted. Unsupported status metadata is ignored; complete provider-stream coverage is not claimed.",
+    "This change postdates the complete Linux 0c7d918 checkpoint and installed 08fa7ea release; native Windows and live provider acceptance remain separate."
+  ]
+}

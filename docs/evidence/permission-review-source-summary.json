@@ -1,0 +1,150 @@
+{
+  "schema": "switchyard-permission-review-source/v1",
+  "sourceFiles": {
+    "tools/layout-studio/authority-ui.mjs": "187e0e9ae7a1b7784fc7930e852cbf3bd46b9a02a3046185a7bda2dac38c4d7b",
+    "tools/layout-studio/authority-ui.test.mjs": "d6ef97aba4429ae7fb47abc3e2c86c5c66391c05a3612ec940b068df82fba257",
+    "tools/layout-studio/index.html": "556aff7e8476cc0611a8fdbb26db45822f716ad8db4115bf826d48526f3e6a5a"
+  },
+  "runs": [
+    {
+      "receiptId": "9611e7bf-f952-40fe-a8f8-ff1843416f77",
+      "sha256": "9a6e3c13a1f14fab91613c90b2d4366fbdfa7bd5ed822d8917eb05d5c7ec0429",
+      "success": false,
+      "totals": {
+        "required": 1,
+        "passed": 0,
+        "failed": 1,
+        "tests": 9,
+        "passedTests": 0,
+        "failedTests": 9,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "files": [
+        "tools/layout-studio/authority-ui.test.mjs"
+      ],
+      "originalCommandsBoundsSkipsAndCleanupVerified": true,
+      "failures": [
+        {
+          "file": "tools/layout-studio/authority-ui.test.mjs",
+          "diagnosticSha256": "777e9036b01f19c6d719f3d048d2d74f81847173fd4ba8300c6d1c3d74f911b6"
+        }
+      ]
+    },
+    {
+      "receiptId": "d82d8a8c-5923-4b63-aa55-53730d646c9a",
+      "sha256": "5bf2f2b6cec5881002ed0e4a7b85a12a67d8827032a2d66b8587e410e4344693",
+      "success": false,
+      "totals": {
+        "required": 1,
+        "passed": 0,
+        "failed": 1,
+        "tests": 9,
+        "passedTests": 8,
+        "failedTests": 1,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "files": [
+        "tools/layout-studio/authority-ui.test.mjs"
+      ],
+      "originalCommandsBoundsSkipsAndCleanupVerified": true,
+      "failures": [
+        {
+          "file": "tools/layout-studio/authority-ui.test.mjs",
+          "diagnosticSha256": "44c108b51028d8ec2fe176930f499e9e018a4f75df89e94dbdfd726fc54f8c43"
+        }
+      ]
+    },
+    {
+      "receiptId": "ceaad89a-feb7-4e2a-a916-fff6b5c01e24",
+      "sha256": "4b71c9a5de0aaafbce1d85059d60f479623b19a3aad7b5a47568404750db1b91",
+      "success": false,
+      "totals": {
+        "required": 1,
+        "passed": 0,
+        "failed": 1,
+        "tests": 1,
+        "passedTests": 0,
+        "failedTests": 1,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "files": [
+        "tools/layout-studio/authority-ui.test.mjs"
+      ],
+      "originalCommandsBoundsSkipsAndCleanupVerified": true,
+      "failures": [
+        {
+          "file": "tools/layout-studio/authority-ui.test.mjs",
+          "diagnosticSha256": "c082cd8bdb4b7a1ec8cc55c2567c069d954d96b0a2c88a7cf526e0db7b6b1d46"
+        }
+      ]
+    },
+    {
+      "receiptId": "46519d0b-6c3f-482a-bf07-f2410d87c1bf",
+      "sha256": "a20452e6f0af07c9948aebc61fd65b747b11d3ce0c860a42f4cee80a5987afb4",
+      "success": true,
+      "totals": {
+        "required": 1,
+        "passed": 1,
+        "failed": 0,
+        "tests": 9,
+        "passedTests": 9,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "files": [
+        "tools/layout-studio/authority-ui.test.mjs"
+      ],
+      "originalCommandsBoundsSkipsAndCleanupVerified": true,
+      "failures": []
+    },
+    {
+      "receiptId": "cffb26c2-c394-4ef1-b996-1608d299f848",
+      "sha256": "28de26d59251a6d673f356d36595b9f80634d497914aeda4e3f500efddffff7b",
+      "success": true,
+      "totals": {
+        "required": 6,
+        "passed": 6,
+        "failed": 0,
+        "tests": 63,
+        "passedTests": 63,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "files": [
+        "deployment/suite/release.test.mjs",
+        "tools/layout-studio/configuration.test.mjs",
+        "tools/layout-studio/execution-ui.test.mjs",
+        "tools/layout-studio/authority-ui.test.mjs",
+        "tools/layout-studio/scanner-ui.test.mjs",
+        "tools/layout-studio/connection-ui.test.mjs"
+      ],
+      "originalCommandsBoundsSkipsAndCleanupVerified": true,
+      "failures": []
+    }
+  ],
+  "originalNativeFailure": "native-96ac214-failures-summary.json",
+  "implementation": [
+    "The main permission review shows literal project/file paths, tool/task/session, plan, permitted actions and lifetime in readable text. Nonempty included/excluded classifications stay visible.",
+    "The full unchanged scope and file fingerprints remain in a collapsed, labelled details section. Revocation shows the exact existing grant. Workspace changes and dialog closure clear both surfaces.",
+    "All original review/issue/revoke authority, one-use confirmations and separate execution behavior are unchanged."
+  ],
+  "regressions": [
+    "Native Windows original assertion found the literal root absent because the UI showed JSON-escaped Windows separators. The original assertion remains unchanged.",
+    "The new literal-Windows-path and classification case initially lacked its browser fixture (nine failures); the corrected fixture yields eight passes and one expected missing-formatter failure. An intermediate literal-newline edit error is retained before the final green runs.",
+    "Final nine interaction/format cases and six integration groups/63 tests pass with zero skips; totals overlap."
+  ],
+  "limitations": [
+    "This source is not yet installed or browser-accepted. Native Windows UI follow-up remains pending.",
+    "No hardware, real provider/account/task or microphone operation occurred."
+  ]
+}

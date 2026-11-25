@@ -1,0 +1,85 @@
+{
+  "sourceCommit": "1fc9d7fa891c941e432aae67d3e4cdea041464c3",
+  "executionCommit": "2f675ed7cb59a165b427595b9937531af134e734",
+  "sourceAndExecutionTree": "fc468fa7f5570627b9837118863abf0f2273a45f",
+  "artifactId": 13505830332,
+  "archiveBytes": 44289,
+  "runId": 42218424502,
+  "archiveSha256": "bbcfe81440b6c3583fe41672bd0620bd3b4044306d61e2d314a8cc2e4d9053ef",
+  "zipSavedLocally": false,
+  "schema": "switchyard-windows-release-failure/v1",
+  "jobId": 127894621884,
+  "privateReceipt": "windows-release-1fc-native.json",
+  "totals": {
+    "required": 366,
+    "passed": 362,
+    "failed": 4,
+    "tests": 2487,
+    "passedTests": 2296,
+    "failedTests": 8,
+    "skippedTests": 183,
+    "cancelledTests": 0,
+    "todoTests": 0
+  },
+  "allChildAndTreeCleanupVerified": true,
+  "buildOutputCleanupVerified": false,
+  "failures": [
+    {
+      "file": "deployment/suite/application.test.mjs",
+      "timeout": false,
+      "counts": {
+        "total": 5,
+        "passed": 1,
+        "failed": 4,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "childCleanupVerified": true
+    },
+    {
+      "file": "deployment/suite/installation.test.mjs",
+      "timeout": false,
+      "counts": {
+        "total": 16,
+        "passed": 14,
+        "failed": 2,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "childCleanupVerified": true
+    },
+    {
+      "file": "tools/layout-studio/devices.test.mjs",
+      "timeout": false,
+      "counts": {
+        "total": 18,
+        "passed": 17,
+        "failed": 1,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "childCleanupVerified": true
+    },
+    {
+      "file": "apps/windows-companion/test/scanner-fixtures.test.ts",
+      "timeout": false,
+      "counts": {
+        "total": 20,
+        "passed": 19,
+        "failed": 1,
+        "cancelled": 0,
+        "skipped": 0,
+        "todo": 0
+      },
+      "childCleanupVerified": true
+    }
+  ],
+  "findings": [
+    "Two discovery/native-path fixture checks fail with python.exe ENOENT: the isolated release PATH omits the existing documentation Python.",
+    "Application/recovery fixtures bundle nonexecutable text as their native helper; actual Windows launch/recovery now uses a native lease worker. Source staging alone did not replace that fixture payload.",
+    "The earlier source also predates later canonical-path and inherited-pipe fixes. The full failed result is retained; no newer complete Windows acceptance is inferred."
+  ]
+}

@@ -1,0 +1,36 @@
+{
+  "schema": "switchyard-windows-verifier-inventory-correction/v1",
+  "failedSource": "702897d16d3bf8226d12dd9f7d99965d54abe194",
+  "executionCommit": "797c1575e04cf4159fc5dd78cbb3d758c5883f80",
+  "sourceAndExecutionTree": "6190b0151e685ceee61098cd7e50bbf5154b660d",
+  "runId": 42201753904,
+  "restrictedJobId": 127838823542,
+  "artifact": {
+    "id": 13494019083,
+    "bytes": 1497,
+    "sha256": "5fd542f27829e5092200084c1ea764d62a8ad0645587b059ca6f3592e24ad24b",
+    "privateReceipt": "windows-lease-console-702-native.json",
+    "zipSavedLocally": false
+  },
+  "result": {
+    "success": false,
+    "completedBootstrapChecks": 3,
+    "newConsoleComparisonObserved": false,
+    "originalNodeOwnerObserved": false,
+    "failedInstallationPreserved": true
+  },
+  "correction": {
+    "file": "scripts/verify-windows-storage-broker.mjs",
+    "field": "restrictedChildStderrChecks",
+    "oldExpected": 40,
+    "actualPortableInventory": 50,
+    "newExpected": 50,
+    "sha256": "bdd307b8e562aa278eae8fe2a543970727bb533b9c7ba54137f148d1f0c42924",
+    "basisReceipt": "managed-source-build-1793960254533.json"
+  },
+  "limits": [
+    "The added ten entry-marker parser cases changed the complete inventory; the bootstrap verifier still required forty and refused the successful compiled proof before restricted-client acceptance.",
+    "The count is corrected to the actual fifty checks. No check is skipped and no native success is inferred.",
+    "The console comparison still needs a native run; the earlier 71614e0 state-lock startup failure remains unresolved."
+  ]
+}

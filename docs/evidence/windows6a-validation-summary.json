@@ -1,0 +1,286 @@
+{
+  "schema": "switchyard-native-windows-checkpoint-summary/v1",
+  "sourceCommit": "6a45643764ec7b04ce2569d3e6f3d05dff2cb613",
+  "filesystemRun": 41982439432,
+  "policyRun": 41982439549,
+  "completeWorkflowAccepted": false,
+  "guestExecutionDoubled": true,
+  "interactiveAccountVerified": false,
+  "artifacts": [
+    {
+      "suite": "storage-broker-exchange",
+      "artifactId": 13395815192,
+      "archiveDigest": "sha256:9f9cfa4a8c20902f7480cddc3c2b3ee93f093390fe10c5760b4f8c53ba4b05d2",
+      "digestVerified": true,
+      "retainedReceipt": "windows6a-storage-broker-exchange.json",
+      "success": false,
+      "totals": null,
+      "children": []
+    },
+    {
+      "suite": "storage-contract-shield-policy",
+      "artifactId": 13395202664,
+      "archiveDigest": "sha256:27193b6883d4799ba661ff595c16f30a2fcfb0565d86987819896b232329c406",
+      "digestVerified": true,
+      "retainedReceipt": "windows6a-storage-contract-shield-policy.json",
+      "success": false,
+      "totals": {
+        "required": 1,
+        "passed": 0,
+        "failed": 1,
+        "tests": 0,
+        "passedTests": 0,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "children": [
+        {
+          "file": "tools/layout-studio/repository-windows-shield.test.mjs",
+          "timeout": true,
+          "cleanupCompleted": true
+        }
+      ]
+    },
+    {
+      "suite": "storage-contract-receipt-authority",
+      "artifactId": 13395786238,
+      "archiveDigest": "sha256:08b9b04c4be41b7c6277497b522aff3ac49c1005c1ab82413886ffa58a67aba2",
+      "digestVerified": true,
+      "retainedReceipt": "windows6a-storage-contract-receipt-authority.json",
+      "success": true,
+      "totals": {
+        "required": 1,
+        "passed": 1,
+        "failed": 0,
+        "tests": 2,
+        "passedTests": 1,
+        "failedTests": 0,
+        "skippedTests": 1,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "children": [
+        {
+          "file": "tools/layout-studio/repository-receipt-authority.test.mjs",
+          "timeout": false,
+          "cleanupCompleted": true
+        }
+      ]
+    },
+    {
+      "suite": "storage-contract-receipt-authority-state",
+      "artifactId": 13395766386,
+      "archiveDigest": "sha256:4473616ee8b759853216272bf72041244344fe20b736a0d25ade752809a2da4a",
+      "digestVerified": true,
+      "retainedReceipt": "windows6a-storage-contract-receipt-authority-state.json",
+      "success": true,
+      "totals": {
+        "required": 1,
+        "passed": 1,
+        "failed": 0,
+        "tests": 1,
+        "passedTests": 1,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "children": [
+        {
+          "file": "tools/layout-studio/receipt-authority-state.test.mjs",
+          "timeout": false,
+          "cleanupCompleted": true
+        }
+      ]
+    },
+    {
+      "suite": "storage-contract-ignored-scanner",
+      "artifactId": 13395456062,
+      "archiveDigest": "sha256:51df2224520f6693ffc27a9a5c856ab8f8dcc9594a76694681e78c4c1967f14b",
+      "digestVerified": true,
+      "retainedReceipt": "windows6a-storage-contract-ignored-scanner.json",
+      "success": true,
+      "totals": {
+        "required": 1,
+        "passed": 1,
+        "failed": 0,
+        "tests": 2,
+        "passedTests": 1,
+        "failedTests": 0,
+        "skippedTests": 1,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "children": [
+        {
+          "file": "tools/layout-studio/repository-ignored-scanner-inputs.test.mjs",
+          "timeout": false,
+          "cleanupCompleted": true
+        }
+      ]
+    },
+    {
+      "suite": "storage-contract-shield-exception-execution",
+      "artifactId": 13395766827,
+      "archiveDigest": "sha256:ed0b724c6c7a716a3d6f912fc0625a3125508a1d1a079d2fe070fd91d6356701",
+      "digestVerified": true,
+      "retainedReceipt": "windows6a-storage-contract-shield-exception-execution.json",
+      "success": true,
+      "totals": {
+        "required": 1,
+        "passed": 1,
+        "failed": 0,
+        "tests": 1,
+        "passedTests": 1,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "children": [
+        {
+          "file": "tools/layout-studio/repository-windows-shield-exceptions.test.mjs",
+          "timeout": false,
+          "cleanupCompleted": true
+        }
+      ]
+    },
+    {
+      "suite": "storage-contract-shield-exceptions",
+      "artifactId": 13394429869,
+      "archiveDigest": "sha256:b024a53f35c67730326d85f22aab204ff13a0552b73b205e606cddf13f5da5cc",
+      "digestVerified": true,
+      "retainedReceipt": "windows6a-storage-contract-shield-exceptions.json",
+      "success": true,
+      "totals": {
+        "required": 1,
+        "passed": 1,
+        "failed": 0,
+        "tests": 7,
+        "passedTests": 7,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "children": [
+        {
+          "file": "tools/layout-studio/shield-exceptions.test.mjs",
+          "timeout": false,
+          "cleanupCompleted": true
+        }
+      ]
+    },
+    {
+      "suite": "storage-contract-shield-exception-ledger",
+      "artifactId": 13395191187,
+      "archiveDigest": "sha256:655af8213f6502d94d9abbd12b77fdbcb790005a8d9afaf17c41af2a2965f7a1",
+      "digestVerified": true,
+      "retainedReceipt": "windows6a-storage-contract-shield-exception-ledger.json",
+      "success": true,
+      "totals": {
+        "required": 1,
+        "passed": 1,
+        "failed": 0,
+        "tests": 6,
+        "passedTests": 6,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "children": [
+        {
+          "file": "tools/layout-studio/shield-exception-ledger.test.mjs",
+          "timeout": false,
+          "cleanupCompleted": true
+        }
+      ]
+    },
+    {
+      "suite": "storage-contract-validation-policy",
+      "artifactId": 13395088145,
+      "archiveDigest": "sha256:d43d7a3f6751891c580bba5d64867d79de1db9f342324889d6897b1b17acacfd",
+      "digestVerified": true,
+      "retainedReceipt": "windows6a-storage-contract-validation-policy.json",
+      "success": true,
+      "totals": {
+        "required": 1,
+        "passed": 1,
+        "failed": 0,
+        "tests": 2,
+        "passedTests": 1,
+        "failedTests": 0,
+        "skippedTests": 1,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "children": [
+        {
+          "file": "tools/layout-studio/repository-validation-policy.test.mjs",
+          "timeout": false,
+          "cleanupCompleted": true
+        }
+      ]
+    },
+    {
+      "suite": "storage-contract-fixture-invalidation",
+      "artifactId": 13394544646,
+      "archiveDigest": "sha256:2e84da26bd04549c440008b8df77346cca12ecd06f3f0aa70baf1ce298d9da5b",
+      "digestVerified": true,
+      "retainedReceipt": "windows6a-storage-contract-fixture-invalidation.json",
+      "success": true,
+      "totals": {
+        "required": 1,
+        "passed": 1,
+        "failed": 0,
+        "tests": 5,
+        "passedTests": 5,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "children": [
+        {
+          "file": "tools/layout-studio/scanner-fixture-invalidation.test.mjs",
+          "timeout": false,
+          "cleanupCompleted": true
+        }
+      ]
+    },
+    {
+      "suite": "policy-stop",
+      "artifactId": 13394594368,
+      "archiveDigest": "sha256:bfabbcd0572ef99a2b3490fe36d31b3aa7aa8457b5c17a0302ab005f370a8f25",
+      "digestVerified": true,
+      "retainedReceipt": "windows6a-policy-stop.json",
+      "success": false,
+      "totals": {
+        "required": 2,
+        "passed": 1,
+        "failed": 1,
+        "tests": 17,
+        "passedTests": 17,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "children": [
+        {
+          "file": "scripts/run-isolated-tests.test.mjs",
+          "timeout": false,
+          "cleanupCompleted": true
+        },
+        {
+          "file": "tools/layout-studio/repository-windows-execution-stop.test.mjs",
+          "timeout": true,
+          "cleanupCompleted": true
+        }
+      ]
+    }
+  ]
+}

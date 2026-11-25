@@ -1,0 +1,41 @@
+{
+  "schema": "switchyard-legacy-provider-lookup-source/v1",
+  "basis": "8c8ecaa6413b5571ed275c5c39f07ea0a19f30bb",
+  "sourceSha256": {
+    "deployment/windows/test-support/storage-broker-protocol/ColdRandom.cpp": "7230732525d0325e50e1af14ed04f37b96f290a39347492eb4437ce8a9c676db",
+    "deployment/windows/test-support/storage-broker-protocol/ColdRandomProcess.cs": "946e46868b4c5791ebc34f98365a289c33f3c287a07b07bc81767b7f4c0cd4d9",
+    "deployment/windows/test-support/storage-broker-protocol/ColdRandomReport.cs": "5e72f3a76d9cb25f135487ab16d301a1ce7e47ff175ce4af5c1190afad1d6c57",
+    "scripts/verify-windows-storage-broker.mjs": "736934242c8e866a790ac3f30dc6e05e2b7d602a630d2964e67139e2e0e7eb00",
+    "scripts/windows-restricted-owner-report.mjs": "94b4f0ee9b1d66e2f7ef9bc31a62ffcc32e5eedbeac6e28703f9c65ceffa4cda",
+    "scripts/windows-restricted-owner-report.test.mjs": "bbb51b60d7a2e8321555c0e9df4a52ac8abba078ba9c3bb63a6c1bb826407c11"
+  },
+  "purpose": "Keep default legacy CryptAcquireContextW as the first crypto call, then observe read-only user/machine default-provider lookups and one fixed Microsoft Enhanced provider acquisition/generation/release. CNG observations follow.",
+  "managedBuild": {
+    "receipt": "managed-source-build-1793951118863.json",
+    "targets": 2,
+    "portableChecksPassed": 1912,
+    "coldParserChecks": 56,
+    "warnings": 0,
+    "errors": 0,
+    "existingSdkReused": true,
+    "ownedScratchRemoved": true
+  },
+  "focused": {
+    "receipt": "isolated-test-cbbbf361-4253-4a7d-b63f-9c2f6796f1b5.json",
+    "groups": 2,
+    "passedTests": 19,
+    "allChildAndTreeCleanupVerified": true
+  },
+  "nativeAcceptance": "pending",
+  "limits": [
+    "Fixed 128-byte V3 packet retains status codes, booleans and four known provider classifications only. Raw provider names and random bytes are cleared and never exported.",
+    "No CryptSetProvider, registry write, persistent key container, account, token/privilege change or entropy fallback.",
+    "The initial cold default-provider failure remains separate from subsequent warmed lookup/explicit-provider observations.",
+    "Original restricted Node acceptance, private desktop, inherited pipes, environment, process Job and deadlines are unchanged.",
+    "Native C++ compilation and observations await CI; managed/parser checks cannot establish the cause of the provider denial."
+  ],
+  "references": [
+    "https://learn.microsoft.com/en-us/windows/win32/api/wincrypt/nf-wincrypt-cryptgetdefaultproviderw",
+    "https://learn.microsoft.com/en-us/windows/win32/seccrypto/microsoft-enhanced-cryptographic-provider"
+  ]
+}

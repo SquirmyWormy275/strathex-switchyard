@@ -1,0 +1,129 @@
+{
+  "schema": "switchyard-windows-editor-endpoint-source-summary/v1",
+  "at": "2026-11-07T09:55:37.579Z",
+  "baseCommit": "485b7c68993e67605ca064684d96843522c6b84d",
+  "sourceFiles": {
+    ".github/workflows/client-platform.yml": "90c00c3e5d76b69c5f31531261d616078ee9f9b015ecc830f7217728c027c9ca",
+    "apps/desktop-hotkeys/Program.cs": "02f0ce1a605bbbe1dda6aaac6059923b99e4636d270e2adb46471aad0175e6b3",
+    "apps/desktop-hotkeys/Switchyard.Hotkeys.csproj": "7380b849b093742efb9e65c5f569c0b5d7e0fbec8112cb51ccfd0c500149d12a",
+    "apps/windows-companion/provider-desktop-helper/EditorEndpoint.cs": "f6b51441e725d23e6288fb97eca739ab66469937be9cbb66be6d4a5054961f50",
+    "apps/windows-companion/provider-desktop-helper/Program.cs": "1e28d77baed4fabb2f260554f5ec5221523d8f1f90fdab5a378fb81af098c8d1",
+    "deployment/suite/release.mjs": "b682200807ad8fce583483d431a16dbbc86b9cfabe7bdf7358f2de96d245b82e",
+    "deployment/suite/release.test.mjs": "0d89e2e4011fa5fbbd71615e15ef4b4a85138a800b690e6165b05eb2902caf57",
+    "deployment/suite/test-support/fixture.mjs": "6c876d46303ccf9ebbf493e54134bdd3859520e3a03d34e73d2d3f2c9387aaa8",
+    "scripts/run-isolated-tests.mjs": "866b6c905865599aefa46410aefdf3c48be982d5e5baeab3716b6aaaf8236876",
+    "scripts/run-isolated-tests.test.mjs": "55b7e4d01e370c34949f19730bca2ff0574b4c9840f90e8437e042363e09e358",
+    "scripts/verify-client-platform.mjs": "61e8e84fa60706c8ed5b2d7ffba236d4921246b7e873b19298164abf77bd5a01",
+    "tools/layout-studio/owned-native-command.mjs": "111ae7ad96adf1a461e3aaa8d73c0c7c698de95e9348ea6b0abc596c1d77261a",
+    "tools/layout-studio/owned-process.mjs": "ae9a3ee17fdfecf948c42fbc66445d597614d10e33b85d661440684745a9f10f",
+    "tools/layout-studio/runtime-command.mjs": "d4dd534b5ae23651554fac74e98d6847054b65c6fc7454fb4d7c47a47e3b4745",
+    "tools/layout-studio/runtime-command.test.mjs": "284608a2595cb4b823a44afce2d45a244023a1f62ad36f3f4e85e3dfadea01d1",
+    "tools/layout-studio/windows-editor-endpoint.mjs": "3f42e59907d2730bf0550ed28de82e3478c10a41f2de60a977aedfa0390ded92",
+    "tools/layout-studio/windows-editor-endpoint.test.mjs": "c92c3e60a561e20199881ca0bde7c574167dd2679d9e8dac6ece0ab4423aadfb",
+    "tools/layout-studio/windows-terminal-peer.test.mjs": "e83f37af27b9a47094fdb23ff81fd9d65c0c48ad02c7fafb8fab6fa16b72b9a2",
+    "tools/layout-studio/windows-terminal-process.mjs": "226f92defc9f0ddc39e2f6f666d1189393190adf24ac461f47e15dd892d97380",
+    "tools/layout-studio/windows-terminal-process.test.mjs": "bc9e7fc89888f2b81d2c3806a726ae2af9dc59c61607ecd2f6cc2b6aa4cd68b9"
+  },
+  "receipts": [
+    {
+      "name": "isolated-test-9c4d3bf3-8c1c-4e1f-95e5-422410e05902.json",
+      "sha256": "7f34b9f4bbef4e90474622da004cfd9df5d2fab2cf0924d8ed180c1ec2094569",
+      "totals": {
+        "required": 6,
+        "passed": 6,
+        "failed": 0,
+        "tests": 69,
+        "passedTests": 66,
+        "failedTests": 0,
+        "skippedTests": 3,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    },
+    {
+      "name": "isolated-test-1975e2bf-8d96-479f-b2b4-c3404e59743c.json",
+      "sha256": "91d623f19203716f2bcf04f0e7a3204d3ff1ae18be95144c50bc79d9662aa641",
+      "totals": {
+        "required": 6,
+        "passed": 6,
+        "failed": 0,
+        "tests": 71,
+        "passedTests": 68,
+        "failedTests": 0,
+        "skippedTests": 3,
+        "cancelledTests": 0,
+        "todoTests": 0
+      }
+    }
+  ],
+  "groups": 6,
+  "passedTests": 68,
+  "skippedTests": 3,
+  "originalCommandsBoundsSkipsAndCleanupVerified": true,
+  "firstFailure": {
+    "receipt": "isolated-test-43248f11-16f2-47bc-b1a3-ca5733e7c8fe.json",
+    "sha256": "5826c06f2183d66232fb6ddd85a7bb1882edabc671490434182f9fd3fb389d0d",
+    "totals": {
+      "required": 6,
+      "passed": 4,
+      "failed": 2,
+      "tests": 69,
+      "passedTests": 63,
+      "failedTests": 3,
+      "skippedTests": 3,
+      "cancelledTests": 0,
+      "todoTests": 0
+    },
+    "reason": "New group missing from the timeout audit inventory; linked native source missing from the release test fixture inventory.",
+    "correctedWithoutChangingExistingBoundsOrExpectedSkips": true,
+    "ownedCleanupVerified": true
+  },
+  "typecheck": {
+    "command": "npm run typecheck",
+    "node": "24.14.0",
+    "passed": true
+  },
+  "compile": {
+    "receipt": "windows-editor-endpoint-offline-compile.json",
+    "sha256": "28e2bd989e5ca7f27477b0327376ec43d8a018e94b51ea69575b8a4a53aa4160",
+    "sources": 36,
+    "sdk": "existing .tools/dotnet-8.0.424",
+    "warnings": 0,
+    "errors": 0,
+    "nativeExecution": false
+  },
+  "scope": {
+    "nativeHeldFileAndParentOwnerAclVerification": true,
+    "tokenAccessMask": 8,
+    "reparseAndHardLinkRefusal": true,
+    "boundedStrictUtf8Read": true,
+    "unchangedSecurityAndIdentityBeforeReply": true,
+    "originalJobAndObserverRetirementRequired": true,
+    "cancellationDuringRetirementRefusesBytes": true,
+    "unknownSpawnRemainsUncertain": true,
+    "releaseIncludesLinkedNativeSource": true
+  },
+  "nativeClientEvidence": "windows-editor-client-native-summary.json",
+  "effects": {
+    "liveModelPrompts": 0,
+    "liveProviderTasks": 0,
+    "accountChanges": 0,
+    "hardwareOpened": false,
+    "frontendChanged": false,
+    "installedApplicationChanged": false,
+    "newDependencies": false,
+    "nativeWindowsExecution": false
+  },
+  "limitations": [
+    "The actual Windows endpoint ACL/path fixture awaits CI; local native compilation is not Windows execution.",
+    "VS Code packaging/composition, exact terminal observation and launcher integration remain unfinished.",
+    "The restricted-storage guardian failure remains unresolved; the later passing workflow still requires its own detailed audit."
+  ],
+  "cleanup": {
+    "compilerFilesRemoved": 5,
+    "compilerBytesRemoved": 621355,
+    "originalChildAndTreeRetirementVerified": true,
+    "fixtureRootsRemoved": true
+  },
+  "success": true
+}

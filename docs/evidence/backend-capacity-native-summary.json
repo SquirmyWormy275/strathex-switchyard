@@ -1,0 +1,72 @@
+{
+  "schema": "switchyard-backend-capacity-native-summary/v1",
+  "date": "2026-11-24",
+  "sourceCommit": "8dd849e9eb3ac7f15ff556c52e98298cc367c786",
+  "mergeCommit": "023e0ea7d828f3541a44cd7896fb4e775b519364",
+  "allSixWorkflowsPassed": true,
+  "workflows": [
+    {
+      "id": 45463930579,
+      "name": "Switchyard client platform checks",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/SquirmyWormy275/strathex-switchyard/actions/runs/45463930579"
+    },
+    {
+      "id": 45463930566,
+      "name": "Switchyard Windows policy admission",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/SquirmyWormy275/strathex-switchyard/actions/runs/45463930566"
+    },
+    {
+      "id": 45463930569,
+      "name": "Switchyard Windows filesystem boundaries",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/SquirmyWormy275/strathex-switchyard/actions/runs/45463930569"
+    },
+    {
+      "id": 45463930762,
+      "name": "Switchyard complete Windows source verification",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/SquirmyWormy275/strathex-switchyard/actions/runs/45463930762"
+    },
+    {
+      "id": 45463930817,
+      "name": "B122 Linux release verification",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/SquirmyWormy275/strathex-switchyard/actions/runs/45463930817"
+    },
+    {
+      "id": 45463930564,
+      "name": "B122 Windows release verification",
+      "status": "completed",
+      "conclusion": "success",
+      "url": "https://github.com/SquirmyWormy275/strathex-switchyard/actions/runs/45463930564"
+    }
+  ],
+  "completeWindows": {
+    "groups": 499,
+    "passedTests": 3182,
+    "declaredSkips": 246,
+    "collectorArtifact": 14955571646,
+    "collectorReceiptSha256": "9010c07bb0d06335c377922c61da05805df37c26fedfe547234d03e3cb3635da"
+  },
+  "windowsRelease": {
+    "groups": 499,
+    "passedTests": 3182,
+    "declaredSkips": 246,
+    "artifact": 14958012431,
+    "receiptSha256": "6497c05976027853ab0b7a042c2f425e1b15d3ed04ee53f3500244f4d9fd9f1b"
+  },
+  "localFocused": {
+    "groups": 4,
+    "passedTests": 46,
+    "skippedTests": 0
+  },
+  "limitsPreserved": true,
+  "acceptance": "Automated source and private packaging verification; no interactive desktop, device, account or tenant acceptance."
+}

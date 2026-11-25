@@ -1,5 +1,11 @@
 # Windows Release and Installation
 
+## Plain keyboard use
+
+The commissioned B122 must enumerate and type as a standard USB keyboard when plugged into any supported Windows computer. Ordinary typing requires **no Switchyard installer, sign-in, per-computer mapping, service, or provider setup**. The 22 advanced controls have no agent effect when the optional companion is absent. This is a physical acceptance requirement; the current logical 22-control firmware overlay does not yet include or prove the full B122 typing map. Do not flash that overlay as a replacement for the manufacturer's complete keymap. See [the host capability matrix](platform-capability-matrix.md).
+
+Install the per-user Windows bundle only when the operator wants advanced agent functions on that machine. The installation must preserve normal typing and cannot inherit Linux credentials, personal provider accounts, or protected state. Each effectful integration still requires its own exact authorization; an unconfigured route reports unavailable.
+
 The Windows deliverable is a per-user bundle containing the compiled companion, fixed Windows Sandbox guest helper, fixed repository-runtime Job-Object helper, fixed native Raw-HID helper, fixed native provider-desktop helper, fixed native voice helper, VS Code VSIX, a portable QMK/Vial source overlay, the runtime/sandbox/voice provisioning tools and templates, the complete repository documentation set, an exact-commit source archive, an official Node runtime with its license, the pinned self-contained .NET runtime license and third-party notices, checksums, a portable-startup receipt, a compiler-bound firmware verification receipt, and an SPDX 2.3 SBOM. The build never downloads a Node runtime implicitly: supply an official Node Windows x64 ZIP and its reviewed SHA-256 to `Build-B122Release.ps1` so its `node.exe` and `LICENSE` are captured together. Any supplied prebuilt native helper requires its reviewed SHA-256 value.
 
 On a clean checkout, provision the repository-local .NET SDK and offline package feed before building. `Provision-B122DotnetToolchain.ps1` downloads only the exact Microsoft SDK archive and NuGet packages recorded in `dotnet-toolchain.json`, verifies their reviewed digests, and prepares the cache used by the test harness. `-VerifyExisting` performs the same identity checks without network access.
@@ -13,6 +19,7 @@ On a clean checkout, provision the repository-local .NET SDK and offline package
   -NodeRuntimeZip C:\reviewed\node-v24-win-x64.zip `
   -NodeRuntimeSha256 <reviewed-64-character-sha256> `
   -NodeRuntimeSourceUri https://nodejs.org/dist/v24.14.0/node-v24.14.0-win-x64.zip `
+  -TestPythonPath C:\reviewed\Python313\python.exe `
   -SandboxHelperPath C:\reviewed\b122-sandbox-worker.exe `
   -SandboxHelperSha256 <reviewed-64-character-sha256> `
   -RawHidHelperPath C:\reviewed\strathex-b122-hid-helper.exe `
@@ -22,6 +29,20 @@ On a clean checkout, provision the repository-local .NET SDK and offline package
   -VoiceHelperPath C:\reviewed\sxsy-b122-voice-helper.exe `
   -VoiceHelperSha256 <reviewed-64-character-sha256>
 ```
+
+Verified builds also require an existing Python **3.13.3** executable supplied
+through `-TestPythonPath`. CI reuses the documentation Python it already installs.
+The builder checks the concrete path, version and image hash, adds only its exact
+directory to the isolated test path, and checks its bytes again after tests.
+Its version/hash appear in build provenance; this test prerequisite is not copied
+into the product and adds no implicit download. Test subprocesses continue to
+receive the strict environment without ambient Python injection variables.
+
+Native Windows application and recovery fixtures now bundle the same-source
+compiled lease helper. The inert fixture remains for Linux packaging simulations
+and the unexecuted setup image. Independent `suite-application` and
+`suite-installation` CI lanes retain the original assertions and deadlines;
+complete release verification remains separate.
 
 The builder pins one exact `HEAD` commit at entry and rejects every staged, unstaged, or untracked worktree change. It creates an immutable Git archive for that commit, expands it into isolated staging, installs the lockfile-pinned dependencies there, and builds and copies only from that snapshot. It checks both `HEAD` and the complete worktree status again before and after final artifact validation, so a concurrent edit or commit aborts the build rather than mixing source identities.
 
@@ -173,3 +194,8 @@ unforgeable boundary against another process already running as the same
 Windows user; same-user hostile-process acceptance remains outside this
 software-only release until an OS-separated service or hardware/NCrypt-backed
 authority is independently accepted.
+
+The earlier `1fc9d7f` complete release remains a failed checkpoint. The prerequisite
+and native-fixture corrections pass Linux source checks; their native lanes and
+complete Windows release are pending. [Failure](evidence/windows-release-1fc-failure-summary.json),
+[source checks](evidence/windows-release-prerequisite-summary.json).

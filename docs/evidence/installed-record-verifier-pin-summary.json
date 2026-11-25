@@ -1,0 +1,19 @@
+{
+  "schema": "switchyard-installed-verifier-evidence-pin/v1",
+  "installedSource": "7dbb0b87293977ba58acc5636a83a9b7ef695b29",
+  "failedBeforeChecks": true,
+  "module": "deployment/suite/release.mjs",
+  "oldEvidence": "scanner-review-source-summary.json",
+  "oldExpectedSha256": "1f971189932f55826af403fc06e247d4292287484513ab8bfb9fb57e979917b8",
+  "newEvidence": "pypi-wheel-record-source-summary.json",
+  "testedInstalledSha256": "53ec632c47bb051b6601edecfc7bb72ec6ba7bc994f06fd85f6010c314428ed3",
+  "verifierSha256": "0f410ed52d07c5dfbf85481b17b8721e8d8f1691d315059baabf5916cbf46ffa",
+  "guardReceipt": "isolated-test-fb7db18a-e9fb-4029-91a3-65366482f1cb.json",
+  "guardReceiptSha256": "5b92a56aff3ebfb90e6ce149b6aac007c0a58db0289b8359736e1ffe454e95c0",
+  "guardPassedTests": 4,
+  "correctedInstalledPassedChecks": 14,
+  "correctedInstalledReceipt": "installed-agent-security-metadata-1794009110979.json",
+  "verificationBypass": false,
+  "allChildAndTreeCleanupVerified": true,
+  "exactOwnedRootRemoved": true
+}

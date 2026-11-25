@@ -1,0 +1,45 @@
+{
+  "sourceCommit": "55515d1a673066b75c01d7d595f418825fa20897",
+  "executedCommit": "0f9d263ad7fc724b785cda0438c5af909639d359",
+  "sourceTree": "d054c4902ee4534d29381075172608527fb64454",
+  "equalSourceAndMergeTree": true,
+  "workflowRun": 42279024919,
+  "artifact": {
+    "id": 13534717207,
+    "name": "switchyard-storage-contract-suite-installation-0f9d263ad7fc724b785cda0438c5af909639d359",
+    "size_in_bytes": 3551,
+    "digest": "sha256:6210bb9e94d218c4bfb88ca03ac37ceed14a44919a6d62a1d2723448e5aaec36"
+  },
+  "schema": "switchyard-native-boundary-summary/v1",
+  "jobId": 128103237005,
+  "privateReceipt": "windows-boundary-55515d1-13534717207.json",
+  "success": false,
+  "totals": {
+    "required": 16,
+    "passed": 15,
+    "failed": 1,
+    "tests": 16,
+    "passedTests": 15,
+    "failedTests": 1,
+    "skippedTests": 0,
+    "cancelledTests": 0,
+    "todoTests": 0
+  },
+  "allChildAndTreeCleanupVerified": true,
+  "guestLaunched": false,
+  "accountOpened": false,
+  "keyboardOpened": false,
+  "installedChanged": false,
+  "group": "deployment/suite/installation.test.mjs",
+  "failedScenario": "installation keeps current and one rollback version, records dated backups, preserves data and removes only owned entries",
+  "failure": "Native shortcut creation timed out.",
+  "originalShortcutDeadlineMs": 10000,
+  "rootCauseEstablished": false,
+  "partialPlanAccepted": false,
+  "unchangedSourceRetry": {
+    "jobId": 128110089870,
+    "conclusion": "cancelled",
+    "nativeResultAccepted": false,
+    "logAvailable": false
+  }
+}

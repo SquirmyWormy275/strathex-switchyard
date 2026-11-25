@@ -1,0 +1,58 @@
+{
+  "schema": "switchyard-foreground-retirement-source-summary/v1",
+  "baseCommit": "eebfe054a91a7a95fe3228f87d16bfe245185919",
+  "sourceFiles": {
+    "tools/layout-studio/suite.mjs": "5545606dea20e79305a0df4c61f0083d62a4d7abdcc5c966dadf33b37b2dc5a7",
+    "tools/layout-studio/foreground.test.mjs": "6bd8231397443223ee47a8fdfacb2e892d2e669b576d16637aaf61afad0d4bc5"
+  },
+  "receipts": [
+    {
+      "id": "57321e02-6490-4574-b978-eb373adb6ce1",
+      "kind": "original-regression",
+      "sha256": "16bb3c6117e86928290af8604fa7b834cf8e7cb2cf3539cf088d8c993d7f1da9",
+      "totals": {
+        "required": 1,
+        "passed": 0,
+        "failed": 1,
+        "tests": 15,
+        "passedTests": 14,
+        "failedTests": 1,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "originalManifestCommandsBoundsSkipsAndCleanupVerified": true
+    },
+    {
+      "id": "b4841fe3-186a-4480-b635-ddf25ff08097",
+      "kind": "accepted",
+      "sha256": "60e3f345656231c405f8caf562297f9cb1803bbe4a712642b923c5316e80fae7",
+      "totals": {
+        "required": 8,
+        "passed": 8,
+        "failed": 0,
+        "tests": 124,
+        "passedTests": 124,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "originalManifestCommandsBoundsSkipsAndCleanupVerified": true
+    }
+  ],
+  "accepted": {
+    "groups": 8,
+    "passedTests": 124,
+    "skippedTests": 0
+  },
+  "scope": [
+    "Failed sampler retirement captures and stops its original source before an awaited error-state write can permit a local replacement.",
+    "A delayed old failure cannot shut down the newly resumed category source. The regression uses an actual encrypted Suite flow and explicit synthetic source identities.",
+    "Existing persisted consent checks, native retirement contracts, bounded retries and no automatic restart remain unchanged."
+  ],
+  "limitations": [
+    "Fixtures use two independent stores sharing encrypted files and controlled foreground replies; they do not read the user's actual foreground window, register hotkeys or open hardware.",
+    "Installed eebfe05 and the running complete Linux 0c025df predate this correction. Native platform, live account and frozen frontend acceptance remain separate."
+  ]
+}

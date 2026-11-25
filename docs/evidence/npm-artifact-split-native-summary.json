@@ -1,0 +1,37 @@
+{
+  "sourceCommit": "55515d1a673066b75c01d7d595f418825fa20897",
+  "executedCommit": "0f9d263ad7fc724b785cda0438c5af909639d359",
+  "sourceTree": "d054c4902ee4534d29381075172608527fb64454",
+  "equalSourceAndMergeTree": true,
+  "workflowRun": 42279024919,
+  "artifact": {
+    "id": 13535067405,
+    "name": "switchyard-storage-contract-artifact-scanner-0f9d263ad7fc724b785cda0438c5af909639d359",
+    "size_in_bytes": 1000,
+    "digest": "sha256:b1c9b9eb796cece3260df52246a36377dd4cd5d24a59d5b014e83acee604db6f"
+  },
+  "schema": "switchyard-native-boundary-summary/v1",
+  "jobId": 128103239088,
+  "privateReceipt": "windows-boundary-55515d1-13535067405.json",
+  "success": true,
+  "totals": {
+    "required": 1,
+    "passed": 1,
+    "failed": 0,
+    "tests": 10,
+    "passedTests": 8,
+    "failedTests": 0,
+    "skippedTests": 2,
+    "cancelledTests": 0,
+    "todoTests": 0
+  },
+  "allChildAndTreeCleanupVerified": true,
+  "guestLaunched": false,
+  "accountOpened": false,
+  "keyboardOpened": false,
+  "installedChanged": false,
+  "group": "tools/layout-studio/repository-shield-artifacts.test.mjs",
+  "originalTimeoutMs": 300000,
+  "guestExecutionDoubled": true,
+  "linuxOnlySkips": 2
+}

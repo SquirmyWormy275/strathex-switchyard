@@ -1,0 +1,21 @@
+{
+  "schema": "switchyard-windows-restricted-owner-failed-summary/v1",
+  "sourceCommit": "c8b12160bb8dea7f535b22dde852299417b01d96",
+  "executionCommit": "70c50eaf6b33cef26012db13030b96e10eb64e9e",
+  "workflowRun": 42036945776,
+  "jobId": 127278838286,
+  "artifactId": 13419237206,
+  "archiveSha256": "01827c5bdeff9bfc5914dfb44fbdfa97186dab32dcdc149bca0a4ad2fbfbdc48",
+  "digestVerified": true,
+  "privateReceipt": "windows-c8b-restricted-failed.json",
+  "success": false,
+  "errorCategory": "InvalidOperationException",
+  "nativeCode": null,
+  "managedHResult": -2146233079,
+  "failurePhase": "restricted-primary-token/restriction-flags",
+  "childCreated": false,
+  "protectedServiceAndContextPreserved": true,
+  "nativeCorrection": "Set all four restricting SIDs in the first filter and preserve them through the second privilege-deletion filter; retain exact SID/flag/primary-token/medium-integrity/privilege checks, creation-time Job and original deadlines.",
+  "originalFailureCauseConfirmed": false,
+  "nextNativeValidationPending": true
+}

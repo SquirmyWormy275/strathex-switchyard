@@ -1,0 +1,82 @@
+{
+  "schema": "switchyard-background-ui-source-evidence/v1",
+  "scope": "Reviewed empty Claude background creation, exact owned stop and local review of existing interactive-window focus; stopped tasks enter the existing exact text review",
+  "runs": [
+    {
+      "receiptId": "d893b3f0-a84f-4523-ae78-876b547d3daa",
+      "sha256": "9c2b88ff66df2647cd2e3a068c323e1180701b10b132fd45c293ada72c378a8b",
+      "success": true,
+      "totals": {
+        "required": 8,
+        "passed": 8,
+        "failed": 0,
+        "tests": 113,
+        "passedTests": 113,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "files": [
+        "scripts/windows-backend-shards.test.mjs",
+        "scripts/run-isolated-tests.test.mjs",
+        "tools/layout-studio/conversation-ui.test.mjs",
+        "tools/layout-studio/task-ui.test.mjs",
+        "tools/layout-studio/copilot-ui.test.mjs",
+        "tools/layout-studio/claude-submissions.test.mjs",
+        "tools/layout-studio/claude-coding.test.mjs",
+        "tools/layout-studio/task-window.test.mjs"
+      ],
+      "originalBoundsPreserved": true,
+      "ownedCleanupComplete": true
+    }
+  ],
+  "interactionCases": {
+    "existing": 11,
+    "added": 8,
+    "total": 19
+  },
+  "sourceFiles": {
+    "tools/layout-studio/task-ui.mjs": "9831e15bc422302cd1fba9da29d5b642a494126da954d6a5377ca07e5365a176",
+    "tools/layout-studio/task-ui.test.mjs": "3664924c4636cb7972c66bd4e6bad668e7fae3eeb81e8c6d90fce5176121dc8f",
+    "tools/layout-studio/index.html": "0a361a7f5d4e1765691a109e139e34c432138138b8f31eaedefa55c833cd63ba",
+    "tools/layout-studio/suite-ui.mjs": "f145e350f53b3b71640ed58a01e674234cb6bc0067e8b3de776be7c3f5c9e50d",
+    "tools/layout-studio/serve.mjs": "2ef1817c076ddaaf4ed843e31c1b00a3f48d0cf29da6dd195200f86eb33902c8",
+    "deployment/suite/release.mjs": "3c0f52e5571d34cf549f7ecb5fd6483683a87eb3acaf0b8abc6c65c157036f61",
+    "scripts/demo-switchyard-ui.mjs": "ab8dc6bbe98caa546c38c2a16d9f108f5995cc8f255eeda976a9cb5a21200637"
+  },
+  "livePreview": {
+    "checks": [
+      "exact served task-ui.mjs",
+      "exact served copilot-ui.mjs",
+      "exact served suite-ui.mjs",
+      "exact served index.html",
+      "keyboard-only saved reserved/background/interactive synthetic task metadata",
+      "background ownership and external interactive connection stay distinct",
+      "demo refuses coding/claude/create",
+      "demo refuses coding/claude/stop/review",
+      "demo refuses coding/claude/stop",
+      "demo refuses coding/claude/focus",
+      "demo refuses coding/claude/turns/submit",
+      "Personal selection and keyboard-only mode unchanged"
+    ],
+    "synthetic": true,
+    "modelRequests": 0,
+    "hardwareOpened": false
+  },
+  "limitations": [
+    "UI native account/command/window transports are explicit doubles. HTTP, encrypted state, directory identity and one-use backend stop/review lifecycle are real. Production Claude coding/submission/window groups are included separately.",
+    "An empty stopped native background task may have no resumable transcript; no replacement is created when native history is unavailable.",
+    "A saved interactive session can request exact existing-window focus. Native interactive attachment/restart remains unfinished and is never inferred from focus.",
+    "No real account, native task, model, terminal, hardware or microphone operation occurred.",
+    "Browser visual acceptance, normal installation and newest full Linux/Windows acceptance remain separate."
+  ],
+  "frontend": {
+    "sourceCommit": "e4561ad58dd49e65fcaf39bae9e02d9828ea93cc",
+    "digest": "2159625c985e59a2291da1e3db4c98d80daa8a072b8c11d991fede5b5cbc2e51",
+    "assets": 35,
+    "allSourceAndBundleBytesVerified": true,
+    "previousPointerBackup": "background-20261109T040236Z",
+    "installed": false
+  }
+}

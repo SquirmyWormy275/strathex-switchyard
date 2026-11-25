@@ -1,0 +1,102 @@
+{
+  "schema": "switchyard-full-linux-source-summary/v1",
+  "sourceCommit": "49a50537794f06e1277e5cafb5611d08ac459215",
+  "sourceTree": "530770b92da4d968e91639aa66b6ce968ba94281",
+  "verificationReceipt": "isolated-test-fde1bf37-f5b2-4383-87a9-66a4b0eaa6cc.json",
+  "verificationReceiptSha256": "d76d4224e36a9184d9c2072c05c48332c2b5e311e5494413635b3594f16ddbed",
+  "success": false,
+  "completeRunAccepted": false,
+  "totals": {
+    "required": 311,
+    "passed": 306,
+    "failed": 5,
+    "tests": 1906,
+    "passedTests": 1889,
+    "failedTests": 1,
+    "skippedTests": 16,
+    "cancelledTests": 0,
+    "todoTests": 0
+  },
+  "failureCategories": [
+    "Four build groups inherited mise shims instead of the existing pinned Node toolchain; no trust changes are authorized or made.",
+    "One deliberate public-permission fixture was masked to private mode by the transient unit UMask=0077; normal shell umask is 0022."
+  ],
+  "progressWrite": {
+    "completed": true,
+    "error": null
+  },
+  "failedGroups": [
+    {
+      "file": "build:companion",
+      "pattern": null,
+      "exitCode": 1,
+      "timeout": false,
+      "testCounts": null
+    },
+    {
+      "file": "build:linux-companion",
+      "pattern": null,
+      "exitCode": 1,
+      "timeout": false,
+      "testCounts": null
+    },
+    {
+      "file": "build:provider-host",
+      "pattern": null,
+      "exitCode": 1,
+      "timeout": false,
+      "testCounts": null
+    },
+    {
+      "file": "build:vscode",
+      "pattern": null,
+      "exitCode": 1,
+      "timeout": false,
+      "testCounts": null
+    },
+    {
+      "file": "apps/vscode-extension/test/named-pipe-transport.test.ts",
+      "pattern": null,
+      "exitCode": 1,
+      "timeout": false,
+      "testCounts": {
+        "total": 12,
+        "passed": 4,
+        "failed": 1,
+        "cancelled": 0,
+        "skipped": 7,
+        "todo": 0
+      }
+    }
+  ],
+  "allChildAndTreeCleanupVerified": true,
+  "cleanupReceipt": "linux-49a5053-failed-cleanup-1794007015582.json",
+  "cleanup": {
+    "schema": "switchyard-owned-full-linux-cleanup/v1",
+    "sourceCommit": "49a50537794f06e1277e5cafb5611d08ac459215",
+    "verificationReceipt": "isolated-test-fde1bf37-f5b2-4383-87a9-66a4b0eaa6cc.json",
+    "generatedFiles": 0,
+    "generatedBytes": 0,
+    "generatedDirectories": [
+      "apps/linux-companion/dist",
+      "apps/provider-adapter-host/dist",
+      "apps/vscode-extension/dist",
+      "apps/windows-companion/dist",
+      "packages/protocol/dist"
+    ],
+    "dependencyAliasCount": 9,
+    "trackedTreeClean": true,
+    "testChildrenExited": true,
+    "testParentEmpty": true,
+    "rootIdentityVerified": true,
+    "testParentIdentityVerified": true,
+    "worktreeRemoved": true,
+    "rootRemoved": true,
+    "testParentRemoved": true,
+    "markerRemoved": true,
+    "otherWorktreesPreserved": true,
+    "dependencyAliasIdentityAndTargetVerified": true
+  },
+  "providersAndWindowsGuestsDoubledWhereDeclared": true,
+  "installedChanged": false
+}

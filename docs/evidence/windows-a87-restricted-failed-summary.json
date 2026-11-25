@@ -1,0 +1,29 @@
+{
+  "schema": "switchyard-windows-restricted-owner-failed-summary/v1",
+  "sourceCommit": "a87f0486d99ca9fea55a992ddfd4fb683cb973ca",
+  "executionCommit": "51a6232777dc468c537b03eb20179e7dae1f0484",
+  "workflowRun": 42056621293,
+  "jobId": 127346622913,
+  "artifactId": 13432290477,
+  "archiveSha256": "cdb74960607e47fb1369f94bb4403a3d02e7e546328368ed5c1d69d741500603",
+  "digestVerified": true,
+  "privateReceipt": "windows-a87-restricted-owner-failed.json",
+  "success": false,
+  "errorCategory": "InvalidOperationException",
+  "nativeCode": null,
+  "managedHResult": -2146233079,
+  "failurePhase": "restricted-primary-token/historical-filter-observation",
+  "tokenRead": {
+    "informationClass": 21,
+    "stage": "size-probe",
+    "succeeded": false,
+    "nativeCode": 122,
+    "bytes": 1
+  },
+  "cause": "General token reader rejects the one-byte required size before reading the historical flag.",
+  "historicalFlagObservations": [],
+  "historicalFlagValueKnown": false,
+  "childCreated": false,
+  "protectedServiceAndContextPreserved": true,
+  "nativeCorrectionAccepted": false
+}

@@ -1,0 +1,132 @@
+{
+  "schema": "switchyard-pypi-wheel-identity-source-summary/v1",
+  "baseCommit": "8637183b869b84906e5d3bbcd4cbe70bf8c6c7d1",
+  "sourceFiles": {
+    "tools/layout-studio/shield-scanner-engine.mjs": "605ee8d166f61fa1907b90b488c25942994dbdb21cd20097ce5b1c41b4e48bb6",
+    "tools/layout-studio/repository-shield.mjs": "63e2b6200070f1ba8aa6ab0881c5861f73d7db3d3b67cf03389d70d58d48ad35",
+    "tools/layout-studio/pypi-wheel-identity.test.mjs": "fb2fb3dd3906c8926ee97f2379198429e0b60accf72ed772c4d5fc127be1b141",
+    "tools/layout-studio/repository-shield-python-wheels.test.mjs": "deb795f6a658d2db844ae16cfe91bf0a625e59cfac30601263314857af7f131c",
+    "tools/layout-studio/repository-windows-shield-python-wheels.test.mjs": "32dcfc5b5e93fd13f1f2597ec559096ea85f52606e234b10a507deaba19f7b57",
+    "tools/layout-studio/test-support/pypi-wheel-fixture.mjs": "2124e11d55c258a051dae516fa43ed3b5d1c5f35d6a6e7ace6f8b48d83bff6fc",
+    "tools/layout-studio/test-support/assert-python-wheel-shield.mjs": "fc58d42acc735ec828ebbd363861092054be7438519618fe2b4a01b88e51ca01",
+    "tools/layout-studio/test-support/repository-shield-fixture.mjs": "b5d3f4ab076f1f1ee4f1e1ad9374660d839a69193061e0db0952e7b652d3e900",
+    "tools/layout-studio/test-support/windows-execution-fixture.mjs": "227998087fec0685d1371d5e53b12a04d9f77abd8ee19207071e8e67d06a9d4b",
+    "scripts/run-isolated-tests.mjs": "d93e8339da8d8bc259be8f978a8977f4c36f0dde715eabf24339567b66767906",
+    "scripts/run-isolated-tests.test.mjs": "957d286f61fb36566b84979310244c82b009f1573f8cafad52e8bbe3d26469de",
+    "scripts/generate-pypi-wheel-oracle.py": "336584976678a2e1677ab23763276acde8f738e5d4558340e785275d80fbeada",
+    "scripts/fixtures/pypi-wheel-oracle.json": "fad40e5432c47dc0d1aad1cb2ea6d41ded275b57d6e0ba708fe92588072327f5"
+  },
+  "beforeImplementation": {
+    "name": "isolated-test-17ec81d0-cf5a-41b6-a8d7-58329266c1d0.json",
+    "sha256": "b0d5fb627a0be7ca84c2977ea90fe79b7d605afa66b5ad53b505556ed2f59e57",
+    "success": false,
+    "totals": {
+      "required": 1,
+      "passed": 0,
+      "failed": 1,
+      "tests": 2,
+      "passedTests": 0,
+      "failedTests": 2,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    }
+  },
+  "intermediateHostAdmissionIncomplete": {
+    "name": "isolated-test-efa60c95-8582-43bc-a43b-93470d58e411.json",
+    "sha256": "553b9f48af8f9496b33a47e40397dd956bcb808663b75befa53ba89aa77a88b5",
+    "success": false,
+    "totals": {
+      "required": 1,
+      "passed": 0,
+      "failed": 1,
+      "tests": 2,
+      "passedTests": 0,
+      "failedTests": 2,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    }
+  },
+  "focused": {
+    "name": "isolated-test-411c2e1e-9736-462f-bf8d-2a8a5d76ddf4.json",
+    "sha256": "21fa899be065217447e406e55c3681c72b46464b2460b952138a4759b257f21b",
+    "success": true,
+    "totals": {
+      "required": 8,
+      "passed": 8,
+      "failed": 0,
+      "tests": 100,
+      "passedTests": 100,
+      "failedTests": 0,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    }
+  },
+  "finalUnitFollowup": {
+    "name": "isolated-test-f20ce500-24fd-4429-90ca-4a723e6ed788.json",
+    "sha256": "775171a1b7e7ab695771b646f0b76e385a1fb9b1f9d1815194d4bf90bda977a0",
+    "success": true,
+    "totals": {
+      "required": 1,
+      "passed": 1,
+      "failed": 0,
+      "tests": 8,
+      "passedTests": 8,
+      "failedTests": 0,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    }
+  },
+  "acceptedDistinctTests": 101,
+  "newTests": 12,
+  "actualLinuxScannerJourneys": 6,
+  "windowsGuestDoubleJourneys": 6,
+  "oracle": {
+    "cases": 15,
+    "pythonVersion": "3.15.2",
+    "sources": [
+      {
+        "module": "zipfile",
+        "sha256": "a09d7de3e46e0fa3cc8d57e4edfb175b80c3bb01cc555fc4945098af908ad6bc"
+      },
+      {
+        "module": "email.parser",
+        "sha256": "5af6ef2ef9eb5aed6cae264ec2418ac466fe4316b41fd3f7ece4b149d521a1ee"
+      },
+      {
+        "module": "pip._vendor.packaging.utils",
+        "sha256": "33bf8930a89cdac3f562d57ff1a5bb795181fb1dc00ee282892aec55e09dd94a"
+      },
+      {
+        "module": "pip._vendor.packaging.version",
+        "sha256": "31cbbb4dfe98d62d20438157bf8b7483c71b2f98e8004b218e0229cffdaf2122"
+      }
+    ],
+    "validZipReadableInMemory": true,
+    "sevenSupportedIdentityCases": true,
+    "unsupportedWheelCasesIncluded": true
+  },
+  "typecheckPassed": true,
+  "originalPackageBudgetPassed": true,
+  "originalFileAndInputBudgetsUnchanged": true,
+  "allChildAndTreeCleanupVerified": true,
+  "originalRepositoryStatePreserved": true,
+  "ownedFocusedRootRemoved": true,
+  "archiveExtractionOrExecution": false,
+  "recordHashesVerified": false,
+  "publisherIdentityVerified": false,
+  "installedChanged": false,
+  "nativeWindowsAccepted": false,
+  "modelRequests": 0,
+  "hardwareOperations": 0,
+  "limits": [
+    "Only bounded single-disk ZIP stored/deflate metadata is supported; descriptors, ZIP64, encryption, comments and extra fields refuse.",
+    "Identity checks require METADATA, WHEEL version 1.0 and RECORD presence; RECORD hashes, tags, dependency resolution, code/license contents and publisher provenance remain unverified.",
+    "All results retain incomplete coverage.",
+    "Native task identity and Windows guest execution use the existing declared doubles; actual Linux scanner exits are independently checked.",
+    "Two initial regressions fail before implementation; two intermediate failures retain incomplete host admission before its correction."
+  ]
+}

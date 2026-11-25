@@ -1,0 +1,42 @@
+{
+  "schema": "switchyard-windows-module-free-lock-validation-summary/v1",
+  "sourceCommit": "4700d9a61a619b6475863c3172592b23876edced",
+  "executionCommit": "f55c8af6a020a704af0e3cf455fa1024901e667a",
+  "workflowRun": 42050282886,
+  "digestVerified": true,
+  "groups": [
+    {
+      "artifactId": 13426658232,
+      "archiveSha256": "525329fbf7fe13b3eadb0ad5d2932c692a3bf4e739bba8496ab6f8bc97a781c2",
+      "privateReceipt": "windows-470-sandbox-native.json",
+      "tests": 8,
+      "passed": 8,
+      "declaredSkipped": 0,
+      "cleanupVerified": true
+    },
+    {
+      "artifactId": 13426996766,
+      "archiveSha256": "7d481bed2705886ce47f5a15804a0e6d43c74f1da8d4108430635d6be159fe55",
+      "privateReceipt": "windows-470-ignored-tree-authority.json",
+      "tests": 3,
+      "passed": 3,
+      "declaredSkipped": 0,
+      "cleanupVerified": true
+    },
+    {
+      "artifactId": 13426168967,
+      "archiveSha256": "aa59a60a7a904ec10666bc407e5ecc2d144a8486e74b52384137f60aa9474abd",
+      "privateReceipt": "windows-470-leases.json",
+      "tests": 7,
+      "passed": 6,
+      "declaredSkipped": 1,
+      "cleanupVerified": true
+    }
+  ],
+  "nativeParserAndKernelLockExecuted": true,
+  "priorFailuresRemainFailed": true,
+  "priorFailureRootCauseEstablished": false,
+  "wholeWorkflowAccepted": false,
+  "guestAccepted": false,
+  "ordinaryAccountAccepted": false
+}

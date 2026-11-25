@@ -1,0 +1,168 @@
+{
+  "schema": "switchyard-signed-physical-intent-source-summary/v1",
+  "at": "2026-11-07T12:23:46.114Z",
+  "baseCommit": "e5a57816a47fa6434811b9c1efe81fedd6d3ff77",
+  "sourceFiles": {
+    "tools/layout-studio/physical-intent-contract.mjs": "026034ae5c44963a6ffefc3c872f1c224aff8800897d58e1c41871602cc036df",
+    "tools/layout-studio/physical-intent.mjs": "87f3dbafc43d184ed3e9274d75c1545b42cc1d68ffd78f8fadecbdbcc314c0c0",
+    "tools/layout-studio/instance.mjs": "f20cc1ab9eda6ac3a33b61567ca2f6fb59d032a9f303691529b9f67d407f2288",
+    "tools/layout-studio/serve.mjs": "5b4904a91856806a98973ad3dc0c73c35e37091c9551017de4a0e33214eecc32",
+    "tools/layout-studio/physical-intent.test.mjs": "d5f13e28abdc191fd98e54c94003fc793db77765acf5b1731f8902f3f85a4d50",
+    "tools/layout-studio/instance.test.mjs": "6d92f3159c5c3f02a8d08de7804b1f1d9c2b32f906f6c5be8cad0d6ae06ae40e"
+  },
+  "receipts": [
+    {
+      "name": "isolated-test-ad186a21-2ade-426e-a071-3a24f1965700.json",
+      "sha256": "c838840100d52fb005c964ff4f6a6241f80673b42e593517ce4edbba4143e2e0",
+      "success": false,
+      "totals": {
+        "required": 1,
+        "passed": 0,
+        "failed": 1,
+        "tests": 9,
+        "passedTests": 7,
+        "failedTests": 2,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "originalManifestCommandsBoundsSkipsAndCleanupVerified": true
+    },
+    {
+      "name": "isolated-test-bfddda58-6fb8-4714-abba-652c63fd02b5.json",
+      "sha256": "3c678c0bb871e2cd87f78511a8014acd2dd33b69fda8e7250e29ca48d21088c9",
+      "success": true,
+      "totals": {
+        "required": 2,
+        "passed": 2,
+        "failed": 0,
+        "tests": 21,
+        "passedTests": 21,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "originalManifestCommandsBoundsSkipsAndCleanupVerified": true
+    },
+    {
+      "name": "isolated-test-92cbc1d9-1a45-45a9-b8f2-8c32a096c604.json",
+      "sha256": "0d10ea5439d59a6aeb36d6c0e0385648157d56fe698184420a875d96fa407be2",
+      "success": true,
+      "totals": {
+        "required": 27,
+        "passed": 27,
+        "failed": 0,
+        "tests": 137,
+        "passedTests": 136,
+        "failedTests": 0,
+        "skippedTests": 1,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "originalManifestCommandsBoundsSkipsAndCleanupVerified": true
+    },
+    {
+      "name": "isolated-test-618e712d-cb8c-4b6a-ac93-1eb73822e7f9.json",
+      "sha256": "6a7f9410f14374952ddeb4cf4f1ea96aecad2850e1ce8b0fd58814e9e49d5702",
+      "success": true,
+      "totals": {
+        "required": 1,
+        "passed": 1,
+        "failed": 0,
+        "tests": 11,
+        "passedTests": 11,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "originalManifestCommandsBoundsSkipsAndCleanupVerified": true
+    },
+    {
+      "name": "isolated-test-cb495c42-a877-41ac-a6d7-083691331602.json",
+      "sha256": "350dcd9104150269776dd9941dc3274411c6014b912fc3038a625b3a4e49c2cd",
+      "success": false,
+      "totals": {
+        "required": 1,
+        "passed": 0,
+        "failed": 1,
+        "tests": 12,
+        "passedTests": 11,
+        "failedTests": 1,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "originalManifestCommandsBoundsSkipsAndCleanupVerified": true
+    },
+    {
+      "name": "isolated-test-2bf5e8a4-c626-4584-bb8d-e22a4d3c5e48.json",
+      "sha256": "d4b345b8f1f25997475dcde9966aa4ae513609bb91f4cf505dbe67f78c88b60a",
+      "success": true,
+      "totals": {
+        "required": 2,
+        "passed": 2,
+        "failed": 0,
+        "tests": 23,
+        "passedTests": 23,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "originalManifestCommandsBoundsSkipsAndCleanupVerified": true
+    }
+  ],
+  "accepted": {
+    "groups": 27,
+    "distinctPassedTests": 137,
+    "declaredSkippedTests": 1,
+    "explanation": "27-group run passed 136 tests; the final physical group retains its ten cases and adds one actual CLI-child demonstration. Repeated passes are not added. The final two protocol/physical groups pass all 23 cases after the clock correction, without adding those repeated passes to the distinct total.",
+    "finalFocusedPasses": 23
+  },
+  "typechecks": [
+    {
+      "command": "node node_modules/typescript/bin/tsc --noEmit -p tsconfig.json",
+      "success": true,
+      "repeatedAfterFinalClockCorrection": true
+    },
+    {
+      "command": "node node_modules/typescript/bin/tsc --noEmit -p apps/vscode-extension/tsconfig.build.json",
+      "success": true
+    }
+  ],
+  "scope": {
+    "signedRequestAndResponse": true,
+    "browserTokenNeverSent": true,
+    "instanceBuildPidOriginNonceAndInvocationBound": true,
+    "processMismatchRejectedBeforeEffect": true,
+    "activeCompartmentPolicyReused": true,
+    "closedIntentWithoutAccountContentOrCommand": true,
+    "nonceReplayRefusedBeforeEffect": true,
+    "replayCacheCeiling": 1024,
+    "originalFreshnessWindowMs": 10000,
+    "originalRequestDeadlineMs": 125000,
+    "originalResponseBoundBytes": 262144,
+    "unknownOutcomesNeverRetried": true,
+    "backwardClockCannotRevivePrunedNonce": true
+  },
+  "demonstration": {
+    "actualCliChild": true,
+    "actualAuthenticatedHttp": true,
+    "actualEncryptedState": true,
+    "invocationReceiptCorrelatedWithProtectedLaunchRecord": true,
+    "childExitVerified": true,
+    "nativeLaunchEffect": "controlled double",
+    "physicalKeyboardEvent": false,
+    "modelPromptSubmitted": false
+  },
+  "retainedFailure": "The original dispatcher accepted an unsigned replacement and a different saved PID; both negative cases failed before the correction.",
+  "limitations": [
+    "This is source software acceptance. The installed 51a73c7 application and frozen frontend are unchanged.",
+    "Older development/installed servers without the signed physical route refuse the new dispatcher; there is no bearer fallback.",
+    "A signed accepted dispatch is not evidence of a physical keyboard event, provider task completion or external application focus.",
+    "Native Windows and complete-current-tree acceptance are pending; existing package, application and all sixteen installation/recovery scenarios pass on Linux."
+  ],
+  "clockRegression": "A backward clock adjustment after expiry initially admitted an old nonce. The retained regression now passes; requests refuse until the previous observed time is reached."
+}

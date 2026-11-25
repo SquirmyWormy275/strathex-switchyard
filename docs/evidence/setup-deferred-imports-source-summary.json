@@ -1,0 +1,50 @@
+{
+  "schema": "switchyard-setup-deferred-imports-source/v1",
+  "basis": "20dc0668bdc55fb0c1a82b3cdfc8bff155bf6312",
+  "sourceSha256": {
+    "deployment/windows/Build-SwitchyardSetup.ps1": "1f467af6863b043fa862d6bdb2dc5b3ed7cff5383d5390eb4e9d3ce9a21ad729",
+    "scripts/verify-windows-native-setup.mjs": "d4372d39e448954f25d4c546f0e108e6a3a726501f9b9a6be235b61244ff9344",
+    "scripts/windows-setup-image.mjs": "071bdd863d8ab449a9bb46f4f12d355557fb556c135f24893c367c4dc9bed3aa",
+    "scripts/windows-restricted-owner-report.test.mjs": "0c0bcaa4bc6efdcba82916156ba460cc27720ac98139e6bf827117ba48e40931"
+  },
+  "focused": {
+    "receipt": "isolated-test-5348d0d0-2843-46f0-a3b5-14ea5843e83e.json",
+    "totals": {
+      "required": 4,
+      "passed": 4,
+      "failed": 0,
+      "tests": 50,
+      "passedTests": 50,
+      "failedTests": 0,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    },
+    "allChildAndTreeCleanupVerified": true
+  },
+  "deferredLibraries": [
+    "shell32.dll",
+    "ole32.dll"
+  ],
+  "dependentLoadFlags": 2048,
+  "nativeBuildAccepted": false,
+  "originalOwnerAcceptedChecks": 0,
+  "specificFailingDllEstablished": false,
+  "permissionsChanged": false,
+  "installedChanged": false,
+  "parserFollowup": {
+    "receipt": "isolated-test-e5b38955-d5fe-4bb8-af59-faf7ab98a8f5.json",
+    "totals": {
+      "required": 1,
+      "passed": 1,
+      "failed": 0,
+      "tests": 25,
+      "passedTests": 25,
+      "failedTests": 0,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    },
+    "allChildAndTreeCleanupVerified": true
+  }
+}

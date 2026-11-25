@@ -1,0 +1,40 @@
+{
+  "schema": "switchyard-child-self-query-source-summary/v1",
+  "basis": "ee69de873a31262108f0adfb5a4cd303996793c7",
+  "sourceSha256": {
+    "deployment/windows/test-support/storage-broker-protocol/RestrictedSelfTokenQuery.cs": "293fed0cd0ea4f188d4a5478a4786124255e2a1617783ae4a661fe94008be672",
+    "deployment/windows/test-support/storage-broker-protocol/ColdRandomProcess.cs": "5ca2a3a083618daa237da1a0111308cff6e32958029f73d27627ea5a0e6d0e20",
+    "deployment/windows/test-support/storage-broker-protocol/NativeRestrictedHostProof.cs": "6488d4f1ea5970dbfc16cb18726e1bfedb828413c2f85e22f44aa10061805b01",
+    "deployment/windows/test-support/storage-broker-protocol/Program.cs": "1b74e455c1add132664299a38009c656ab57847085f7744f386e24a9ff0268d5",
+    "scripts/windows-restricted-owner-report.mjs": "7cf8a87570c1499f12b4ad40e9441cb7fe591981891dcc715e873efe7217c251",
+    "scripts/windows-restricted-owner-report.test.mjs": "21836a546e3017f5849384bb14c0b07a6f6ef27e8fa200def35c1a23c726245b"
+  },
+  "scope": "CI-only explicit correction to each actual suspended child token object DACL; never linked into the shipped helper/setup.",
+  "change": "Preserve the exact observed Admin/SYSTEM/logon ACEs and add one current-user allow ACE for TOKEN_QUERY (8). An existing exact query entry is verified idempotently; unfamiliar ACLs refuse.",
+  "verification": [
+    "Exact before/after ACL hashes and byte-for-byte expected ordered ACE readback, original owner/control flags, and all original token restriction checks.",
+    "Open mutation status is reserved before the effect; apply-requested/readback failures remain visible with closed finite fields and cleanup flags.",
+    "The unchanged cold probe must observe query-only success while query+duplicate and query+duplicate+impersonate remain Access Denied.",
+    "Original pinned Node image, 90-second deadline, eight owner checks, identity/restriction assertions and independent tree retirement remain mandatory."
+  ],
+  "managed": {
+    "receipt": "managed-source-build-1793956497155.json",
+    "builds": 2,
+    "warnings": 0,
+    "errors": 0,
+    "portableChecks": 1936,
+    "existingSdk": "8.0.424",
+    "ownedScratchRemoved": true
+  },
+  "projection": {
+    "receipt": "isolated-test-56344cd7-dead-4a68-ad14-c4062d827a98.json",
+    "tests": 16,
+    "childAndTreeCleanupVerified": true
+  },
+  "limits": [
+    "Native correction/readback, query/duplicate access and Node startup are pending Windows CI. This source is not yet an accepted repair.",
+    "The parent opens a narrowly scoped WRITE_DAC handle to the actual owned suspended child token. No source-account ACL, token default DACL, restricting SID, privilege, integrity, provider default, registry or runtime fallback changes.",
+    "No duplicate/impersonation or broader child rights are granted, including if query alone fails to repair CryptoAPI.",
+    "Every historical failed run and its fixture remains failed/preserved. No guest/UAC/ordinary-user acceptance is inferred."
+  ]
+}

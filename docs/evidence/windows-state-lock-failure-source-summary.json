@@ -1,0 +1,37 @@
+{
+  "schema": "switchyard-state-lock-failure-source-summary/v1",
+  "basis": "a061be089ec42c1ee8301c8327491d3e82528879",
+  "sourceSha256": {
+    "tools/layout-studio/keyless-lease-pool.mjs": "9a324867eec0c3568a5f2c57a2cdc73693ead6df7316bdfbb7fbee0ebf8aa153",
+    "tools/layout-studio/keyless-lease-pool.test.mjs": "cb2df6febfe9fc93fe7b80eea7a02b11675bf7b59c9b05ebf547a0eb68d503db",
+    "scripts/windows-broker-owner-proof.mjs": "b92d4ba88b72baa3e1ed3db610f2de67bfafc440bbf368f821cbfd58738bb82e",
+    "scripts/windows-restricted-owner-report.mjs": "0b2847e97d33de3c4a674b548951d149be50ee7ee685cef43a276efd011d8cb9",
+    "scripts/windows-restricted-owner-report.test.mjs": "2d809afeb8559ee4158edc56d65380a050f3f287fa6c395e0f63f6a6462728f4",
+    "deployment/windows/test-support/storage-broker-protocol/NativeRestrictedHostProof.cs": "0c062770558ed52a1ba046ed94eb836cf6f6e7896fea7d71daff69834c652c30",
+    "deployment/windows/test-support/storage-broker-protocol/Program.cs": "3d9a0ff30fbec72b7156733f248d6c6ef0e428b7eb4da7a07d97b745291f4700",
+    "deployment/windows/test-support/storage-broker-protocol/StateLockFailureEvidence.cs": "9fe7dbf245068cd4314ac2d27ca6fe0b9894566077d9f8c9d7af962642a5e8b9"
+  },
+  "change": "Retain bounded lock-worker phase, fixed progress, failure kind, exit/signal and spawn code through the original JavaScript owner result, native parent and privacy projection. Initialization and initial mode update have distinct phases.",
+  "focused": {
+    "receipt": "isolated-test-68d4f464-f241-4897-b3a8-ae01ccfc263b.json",
+    "groups": 3,
+    "passed": 37,
+    "declaredSkips": 1,
+    "childTreeAndTemporaryCleanupVerified": true
+  },
+  "managed": {
+    "receipt": "managed-source-build-1793957460859.json",
+    "builds": 2,
+    "warnings": 0,
+    "errors": 0,
+    "portableChecks": 1965,
+    "newProjectionChecks": 29,
+    "ownedScratchRemoved": true,
+    "existingSdk": "8.0.424"
+  },
+  "limits": [
+    "Native restricted-owner followup pending; no fix for private-state initialization is claimed.",
+    "Diagnostics contain no raw helper messages, state, credentials or paths. They do not prove a lease or grant authority.",
+    "No deadline, child rights, token restriction, account or runtime fallback changes. All original owner success and cleanup assertions remain required."
+  ]
+}

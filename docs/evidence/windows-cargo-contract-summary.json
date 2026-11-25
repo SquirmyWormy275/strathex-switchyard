@@ -1,0 +1,28 @@
+{
+  "schema": "switchyard-windows-cargo-contract/v1",
+  "sourceCommit": "701f915478f6cbd788216c927cac4f047370d2e3",
+  "executionCommit": "4b131da22435565001c83b2ed463c2bfde300764",
+  "sourceAndExecutionTree": "32454845692612776c5db2e403c36d35430cc0f2",
+  "runId": 42220245596,
+  "artifact": {
+    "id": 13504010280,
+    "bytes": 985,
+    "sha256": "22349a74ba3bd635a06e9ad59f3d4eeb317fab6fb8f2b985f8bb19a070ca65e1",
+    "privateReceipt": "windows-cargo-701-native.json",
+    "zipSavedLocally": false
+  },
+  "totals": {
+    "required": 1,
+    "passed": 1,
+    "failed": 0,
+    "tests": 4,
+    "passedTests": 4,
+    "failedTests": 0,
+    "skippedTests": 0,
+    "cancelledTests": 0,
+    "todoTests": 0
+  },
+  "allChildAndTreeCleanupVerified": true,
+  "scope": "Actual Windows host execution of four Cargo Supply Chain/Release contracts with controlled guest execution. Stable and prerelease/build versions, original inputs and exact cleanup verify.",
+  "nativeGuestAcceptance": false
+}

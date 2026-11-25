@@ -1,0 +1,33 @@
+{
+  "schema": "switchyard-windows-node-rng-imports-source/v1",
+  "basis": "1508ea97ff128586f75c03258654042454072400",
+  "sourceSha256": {
+    ".github/workflows/switchyard-windows-filesystem.yml": "1412317d65d60953bc28eda5523ccd8f95499ac9b637837f691e36a7ab36ae89",
+    "deployment/windows/test-support/storage-broker-protocol/Build-ColdRandom.ps1": "38d8b7d65d7943e37db2b6c4c36011b6e8380b8c26cb79b7c4ce8840393af189",
+    "scripts/verify-windows-storage-broker.mjs": "603c065016d2d9c10f3c92736dce678b2bef7bdf9f2ef61250146b224712b783",
+    "scripts/windows-restricted-owner-report.mjs": "9b1c4a1b5632d010624a8aef885b9f959258de3b8bcf40337b0784349f38a466",
+    "scripts/windows-restricted-owner-report.test.mjs": "42ea446b8de2f8474c822f4dd3b605f7a638af17fe7f9d4ae15c60812480d46e",
+    "scripts/windows-scenario-groups.test.mjs": "7f44c62d3e8548f068dcc9400ea58684a9c939b3b88672d63f571992a5aafaa7",
+    "scripts/inspect-windows-node-imports.mjs": "37104be85e6ed983f4f5b22d5fbcc15a74a189541ae3e795c4392332de2ae7aa"
+  },
+  "focused": {
+    "receipt": "isolated-test-1cbc1c06-2064-4068-a29d-70e229d0fe1c.json",
+    "groups": 2,
+    "passedTests": 19,
+    "allChildAndTreeCleanupVerified": true
+  },
+  "scriptSyntaxChecks": true,
+  "nativeAcceptance": "pending",
+  "purpose": "Observe fixed RNG method imports of the exact pinned CI Node image using the existing dumpbin tool. Hash checks bind the build observation and later restricted owner coordinator to the same executable.",
+  "limits": [
+    "Only four fixed method-presence flags, an image digest and false runtime-branch/startup claims are retained. Raw dump paths, unrelated imports and addresses are not uploaded.",
+    "The existing cold CNG probe and original restricted Node journey are unchanged. No new SDK, model, token privilege, account, desktop or RNG fallback.",
+    "Imported functions alone do not prove which OpenSSL RNG branch executes or identify the CSPRNG failure cause.",
+    "PowerShell/toolchain execution and actual import observation await native CI.",
+    "An attempted focused selection named a nonexistent scenarios test; manifest validation stopped before creating a temporary parent or launching a test. The corrected two-group run passes."
+  ],
+  "references": [
+    "https://raw.githubusercontent.com/nodejs/node/v24.14.0/deps/openssl/openssl/providers/implementations/rands/seeding/rand_win.c",
+    "https://learn.microsoft.com/en-us/cpp/build/reference/imports-dumpbin?view=msvc-170"
+  ]
+}

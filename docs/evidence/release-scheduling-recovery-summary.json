@@ -1,0 +1,60 @@
+{
+  "schema": "switchyard-release-scheduling-recovery-source/v1",
+  "basis": "7dd2c36450ce7d9a6f2d188327a164214bde3a25",
+  "sourceSha256": {
+    ".github/workflows/b122-windows.yml": "629ceccdf0fefebe828779703277d8d404c201f56cd1dd72151e0e02f3232d21",
+    "scripts/run-isolated-tests.mjs": "53530f34f0d8f23d0a6ba6270b19757b928c85f0b4e6e4bc44db9a722117edca",
+    "scripts/windows-backend-shards.mjs": "1c657f197b85eea74ec8dac63e986bc6123c19a60411978d0ecbf9d55efde6ee",
+    "scripts/windows-backend-shards.test.mjs": "6435f56d9f2c7c88d5e09ecf46e8c84a30824bc208079d11b27ccb364d6edd56",
+    "tools/layout-studio/codex-editor-recovery.test.mjs": "515546f421eb5a1c6029abca5fe09efc3a00177db2194cfb052179865700da6e"
+  },
+  "focused": [
+    {
+      "receipt": "isolated-test-5f9a90b3-fc34-4693-b1ce-10660b038e23.json",
+      "totals": {
+        "required": 5,
+        "passed": 5,
+        "failed": 0,
+        "tests": 42,
+        "passedTests": 42,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "allChildAndTreeCleanupVerified": true
+    },
+    {
+      "receipt": "isolated-test-d5cc2682-4c76-4877-9eb7-b2b46ba18e1b.json",
+      "totals": {
+        "required": 4,
+        "passed": 4,
+        "failed": 0,
+        "tests": 40,
+        "passedTests": 39,
+        "failedTests": 0,
+        "skippedTests": 1,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "allChildAndTreeCleanupVerified": true
+    }
+  ],
+  "typecheckPassed": true,
+  "backendShards": 4,
+  "backendGroups": 171,
+  "groupCounts": [
+    43,
+    43,
+    43,
+    42
+  ],
+  "allOriginalBackendFilesAndCasesPreserved": true,
+  "originalChildBoundsPreserved": true,
+  "perShardCiMinutes": 20,
+  "pythonSelection": "One executable beneath the pinned setup-python pythonLocation; original version, hash and reparse checks remain.",
+  "crashFixture": "Pause the original carrier after birth verification before killing its host; parent-death SIGKILL deterministically preserves the stale socket under test. Production code unchanged.",
+  "nativeSchedulingAcceptance": false,
+  "correctedCompleteLinuxAcceptance": false,
+  "installedChanged": false
+}

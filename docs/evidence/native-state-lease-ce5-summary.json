@@ -1,0 +1,70 @@
+{
+  "schema": "switchyard-native-state-lease-followup/v1",
+  "source": "ce5be6a33d661696464c13b8ec077127665f759d",
+  "executionMerge": "f659e3f191ed248c0315257e41783e97967bb640",
+  "cohorts": {
+    "leases": {
+      "runId": 42158347051,
+      "artifactId": 13475403469,
+      "archiveSha256": "f176e51d21b174be76b5e02184c9277d73a3451891e9765c80f3fbe5f8b46cb4",
+      "receipt": "windows-native-leases-ce5.json",
+      "totals": {
+        "required": 2,
+        "passed": 2,
+        "failed": 0,
+        "tests": 19,
+        "passedTests": 18,
+        "failedTests": 0,
+        "skippedTests": 1,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "success": true,
+      "allChildAndTreeCleanupVerified": true
+    },
+    "shieldSupplyChain": {
+      "runId": 42158347051,
+      "artifactId": 13474914063,
+      "archiveSha256": "cf7ed582a89322e1ece3fe982dd1c1001b5d133cb0fdb639ccbe4017fe5d4024",
+      "receipt": "windows-shield-supply-chain-ce5.json",
+      "totals": {
+        "required": 1,
+        "passed": 1,
+        "failed": 0,
+        "tests": 1,
+        "passedTests": 1,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "success": true,
+      "allChildAndTreeCleanupVerified": true
+    },
+    "policyOutput": {
+      "runId": 42158346972,
+      "artifactId": 13476175300,
+      "archiveSha256": "fc558f455cc8529140edf9f3236f03b2e7531f950c6e3422ad569e044126163c",
+      "receipt": "windows-policy-output-ce5.json",
+      "totals": {
+        "required": 2,
+        "passed": 2,
+        "failed": 0,
+        "tests": 23,
+        "passedTests": 23,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "success": true,
+      "allChildAndTreeCleanupVerified": true
+    }
+  },
+  "behaviorVerified": "Actual default native helper: per-transaction Windows kernel sharing, exact file replacement/hard-link refusal, malformed release, parent-loss and detached owner retirement.",
+  "limits": [
+    "Original PowerShell startup failures remain failed; separate corrected native cohorts pass at this exact source.",
+    "Full Windows acceptance remains unaccepted. Restricted primary child still fails DLL initialization.",
+    "No ordinary-user account, interactive setup/UAC, guest VM, physical keyboard or live provider-account acceptance is inferred."
+  ]
+}

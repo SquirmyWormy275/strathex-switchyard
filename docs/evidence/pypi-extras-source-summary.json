@@ -1,0 +1,125 @@
+{
+  "schema": "switchyard-pypi-extras-source-summary/v1",
+  "baseCommit": "9f35961ca18087b2406e7e2ad716b5fe97ebc2bb",
+  "sourceFiles": [
+    {
+      "path": "tools/layout-studio/shield-scanner-engine.mjs",
+      "sha256": "298cc2790455d1863958e3827e671187c955a784d9c26ba12778220015a8f94b"
+    },
+    {
+      "path": "tools/layout-studio/repository-shield.mjs",
+      "sha256": "2884ab2f2394ee19631e73891b9848c8f5420870f1536d79ef7e32abfb828b20"
+    },
+    {
+      "path": "tools/layout-studio/shield-scanner-engine.test.mjs",
+      "sha256": "54f39c34409fb54ecb2df6c280bf79e95e40851d4463ae9be56b152c4f9a0324"
+    },
+    {
+      "path": "tools/layout-studio/repository-shield-pypi.test.mjs",
+      "sha256": "c9359ea456932452a1056f28c6173478a332f965fa5a399617dc90ff949cc5ac"
+    },
+    {
+      "path": "tools/layout-studio/repository-windows-shield-pypi.test.mjs",
+      "sha256": "cd249b11b07b7e2f3d08a1f8beff2c04bda5fb021db0960b524a0f05259e2b03"
+    },
+    {
+      "path": "tools/layout-studio/repository-shield-pypi-artifacts.test.mjs",
+      "sha256": "294b350f927498b89d710c86e4dbbe5f796d352f2dcdf98eec6f8ddb026e2456"
+    },
+    {
+      "path": "tools/layout-studio/test-support/assert-pypi-shield.mjs",
+      "sha256": "66ddd834268908691c408095a148a97ed2bd5d281f025563de1678c3ae01f3b9"
+    },
+    {
+      "path": "tools/layout-studio/test-support/shield-scanner-fixture.mjs",
+      "sha256": "926f00429320d4062311fbf234049a839c200103772fe1c8991d3ef44f1b1cc7"
+    },
+    {
+      "path": "scripts/run-isolated-tests.mjs",
+      "sha256": "502230de9dd25d8e4409b222744527762f90742e8810e8858d5866b5f5a96085"
+    },
+    {
+      "path": "scripts/generate-pypi-requirements-oracle.py",
+      "sha256": "2f92266937d872b91fb0d93d5354cd20df0822661fc5ec8c9acd6c80d732cdff"
+    },
+    {
+      "path": "scripts/fixtures/pypi-requirements-oracle.json",
+      "sha256": "5956254f5022916d22e8a79942d5be3f25fb637a2c71f060d89868abf36d1f55"
+    }
+  ],
+  "receipts": [
+    {
+      "name": "isolated-test-3e1796c5-1e1d-4dd7-a8f7-8771c2a92022.json",
+      "sha256": "319324b681e325edc5eba4b06a6d05ecf59b47eec4ae87afc96544ebc71f3200",
+      "totals": {
+        "required": 10,
+        "passed": 10,
+        "failed": 0,
+        "tests": 105,
+        "passedTests": 105,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "allChildAndTreeCleanupVerified": true
+    },
+    {
+      "name": "isolated-test-114ba008-19cb-437b-960c-bf8148b1ecf3.json",
+      "sha256": "b2f851564711496bf337bd7d42988b5d5bf790c85db7c2102d96a4a1a1e3698f",
+      "totals": {
+        "required": 1,
+        "passed": 1,
+        "failed": 0,
+        "tests": 1,
+        "passedTests": 1,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "allChildAndTreeCleanupVerified": true
+    }
+  ],
+  "distinctGroups": 10,
+  "acceptedTests": 106,
+  "oracle": {
+    "cases": 39,
+    "pipVersion": "26.2.2",
+    "packagingVersion": "26.2",
+    "sources": [
+      {
+        "module": "pip._internal.req.req_file",
+        "sha256": "7661814b167d763d5e3aad8d5eff786e8af4bb59fc3f8f80be624bfaf63322c1"
+      },
+      {
+        "module": "pip._vendor.packaging.requirements",
+        "sha256": "43e05d107556e4aefce46057b7b45c3f8504b1d20a5a8585aa5ac78d1e16579d"
+      },
+      {
+        "module": "pip._vendor.packaging.utils",
+        "sha256": "33bf8930a89cdac3f562d57ff1a5bb795181fb1dc00ee282892aec55e09dd94a"
+      }
+    ]
+  },
+  "newActualLinuxScannerExits": 2,
+  "newWindowsGuestDoubleJourneys": 2,
+  "extrasArtifactCombinations": 6,
+  "continuationsBeforeCommentsVerified": true,
+  "originalLogicalRowBound": 8192,
+  "declaredExtrasBound": 64,
+  "perExtraNameBound": 128,
+  "typecheckPassed": true,
+  "originalPackageBudgetPassed": true,
+  "allOwnedTestParentsRemoved": true,
+  "dependenciesResolved": false,
+  "packagesInstalled": false,
+  "downloads": 0,
+  "publicQueries": 0,
+  "modelPrompts": 0,
+  "hidOpened": false,
+  "installedChanged": false,
+  "frontendChanged": false,
+  "extensionActivationChanged": false,
+  "nativeWindowsAcceptance": false
+}

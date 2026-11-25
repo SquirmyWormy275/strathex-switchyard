@@ -1,0 +1,28 @@
+{
+  "schema": "switchyard-role-refusal-refresh-running-demo/v1",
+  "sourceCommit": "0aeb31704579eaba2fb03f870380af65cefbe01d",
+  "frontend": "c77f3fe8d57d71176023bd8dbad71c3c3f1c2a7f6d8747951137ce3f3c5b0aef",
+  "origin": "http://127.0.0.1:35019",
+  "checks": [
+    "all 36 served frontend assets match the installed review",
+    "unauthenticated saved-state access refused",
+    "named synthetic role saves once and stale choice refuses",
+    "pre-binding reviewed choice refuses without queuing a replacement target",
+    "reviewed frontend route queues exact status and independently running signed SDK acknowledges it",
+    "stale reviewed role refuses after selecting Work",
+    "returning to Personal cannot revive the old confirmation",
+    "one original command and four planned controls remain after returning",
+    "preview refuses actual launch and native focus"
+  ],
+  "success": true,
+  "synthetic": true,
+  "modelPrompts": 0,
+  "hardwareOperations": 0,
+  "nativeAppEffects": 0,
+  "accountOperations": 0,
+  "browserVisualAcceptance": false,
+  "backendJourneyEvidence": "reviewed-role-choice-running-demo-summary.json",
+  "serverStartedAtSource": "7a9f9c1491a95f68a8ead97a249dc451c66278bb",
+  "backendSourceUnchanged": true,
+  "previewRetainedForReview": true
+}

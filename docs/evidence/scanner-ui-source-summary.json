@@ -1,0 +1,106 @@
+{
+  "schema": "switchyard-scanner-ui-source-evidence/v1",
+  "scope": "Named-task scanner setup review/save/recovery and separate permission/execution handoffs through authenticated HTTP",
+  "runs": [
+    {
+      "receiptId": "e7317a48-a364-4230-8896-9862aa00f313",
+      "sha256": "c6d988562a5f1a249c2b0a2b15fddf78db818663e81ddaa1c1d84a144bd2556e",
+      "totals": {
+        "required": 8,
+        "passed": 8,
+        "failed": 0,
+        "tests": 93,
+        "passedTests": 93,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "files": [
+        "scripts/windows-complete-shards.test.mjs",
+        "scripts/run-isolated-tests.test.mjs",
+        "deployment/suite/release.test.mjs",
+        "tools/layout-studio/scanner-recipe-draft.test.mjs",
+        "tools/layout-studio/scanner-recipe-save.test.mjs",
+        "tools/layout-studio/execution-ui.test.mjs",
+        "tools/layout-studio/authority-ui.test.mjs",
+        "tools/layout-studio/scanner-ui.test.mjs"
+      ],
+      "originalBoundsPreserved": true,
+      "ownedCleanupComplete": true
+    },
+    {
+      "receiptId": "6fca1d53-056a-4705-80ab-4cd68d406dad",
+      "sha256": "587382a427b5dd1782279b4fc81f3e3b71dc23c19076f75bfc0fbe840f336b66",
+      "totals": {
+        "required": 3,
+        "passed": 3,
+        "failed": 0,
+        "tests": 22,
+        "passedTests": 22,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "files": [
+        "tools/layout-studio/execution-ui.test.mjs",
+        "tools/layout-studio/authority-ui.test.mjs",
+        "tools/layout-studio/scanner-ui.test.mjs"
+      ],
+      "originalBoundsPreserved": true,
+      "ownedCleanupComplete": true
+    }
+  ],
+  "overlap": "Eight original groups pass 93 tests. The final three UI groups pass 22 tests after adding staged/history provenance and portable review-only fixture coverage; totals overlap.",
+  "interactionCases": 7,
+  "sourceFiles": {
+    "tools/layout-studio/scanner-ui.mjs": "a3dc1330989e4b2a255747cf78c015c9f969b01b7bfafe70fe12b6e3eb21549c",
+    "tools/layout-studio/scanner-ui.test.mjs": "4811feae5baf0a89a0f6f730d1cd22a7393636dceaf5a5dbd3dd4f2794145a0a",
+    "tools/layout-studio/authority-ui.mjs": "6c02735f624ac08c9f6bf780e73d9664e889b3d0caa61b10008352815cf738c8",
+    "tools/layout-studio/execution-ui.mjs": "6d43e7eb999972243fa2b05f02cf2c3d9e2c2732f7a91830c5c36cb3c576fa56",
+    "tools/layout-studio/suite-ui.mjs": "05edef47ea42016eeb49c4d454e45b563506a6b81fb17791db3cb30019488319",
+    "tools/layout-studio/serve.mjs": "acc5175115b32a78ded895724f056cc5788433d89f9d75136e513cfd240042c6",
+    "tools/layout-studio/index.html": "a36ca384c974403f00d2d648cafc06594af73e757e39ad206c40b18ab7d7b01a",
+    "deployment/suite/release.mjs": "022c70a75e4c81e3ff5d3c63f45b08883a163c98d326d67bdb07c47d8a3eac94"
+  },
+  "interactionBoundary": "Actual temporary Git, signed fixture feeds, encrypted state and authenticated HTTP. The native task identity and exclusive filesystem-save boundary are explicit doubles in the UI group; no native Linux/NTFS boundary acceptance is inferred. The separately included original scanner-recipe-save/draft groups exercise their existing Linux contracts. Execution review uses an explicit portable review-only Linux port; execution apply is never called.",
+  "livePreview": {
+    "schema": "switchyard-scanner-ui-preview/v1",
+    "origin": "http://127.0.0.1:37337",
+    "checks": [
+      "exact scanner module served",
+      "scanner, permission and execution controls served",
+      "preview begins in keyboard-only mode",
+      "empty signed-feed inventory grants no authority",
+      "empty save history",
+      "preview refuses coding/scanner-save/review",
+      "preview refuses coding/scanner-save/apply",
+      "preview refuses coding/scanner-save/recover",
+      "restored keyboard-only preview"
+    ],
+    "repositoryWrites": 0,
+    "scansStarted": 0,
+    "hardwareOpened": false,
+    "modelRequests": 0,
+    "visualAcceptance": false,
+    "browserBlocker": "CUA createBrowserTab and getTab both fail before navigation/inspection with undefined timeoutMs; supported troubleshooting and fresh-tab inspection did not resolve it."
+  },
+  "priorPreviewOwnedStateRemoved": true,
+  "staticControlIdsPresent": 21,
+  "localDocumentationLinksVerified": 86,
+  "limitations": [
+    "Signed scanner/advisory feed trust installation remains a separate operator configuration; the picker cannot import trust or download a feed.",
+    "Browser visual/responsive acceptance remains blocked before inspection.",
+    "No installed update, native account/task operation, Windows guest execution, physical device or model request is accepted by this checkpoint."
+  ],
+  "reviewBundle": {
+    "sourceCommit": "74bd215c106d6812163c047a3f88347442747f36",
+    "digest": "27f10868d1a282d6536dc8d3d90b69fc365c2905e906ac9373a37a741b4969b7",
+    "assets": 31,
+    "allBytesVerified": true,
+    "priorPointerDatedBackupVerified": true,
+    "installed": false,
+    "visuallyAccepted": false
+  }
+}

@@ -1,0 +1,44 @@
+{
+  "kind": "optional-runtime",
+  "sourceCommit": "b600a6d29e5d9ffd9c4439640ad70ff5fa14e439",
+  "executionCommit": "91353d21983d081a236ddf34c4f1e3fe270447d2",
+  "runId": 42246264439,
+  "jobId": 127991024754,
+  "artifactId": 13519708910,
+  "archiveBytes": 759,
+  "archiveSha256": "7065455a41efdd19c0d75cfaefc8a9566330e6a9bcecd2bea029f477cf23f0fa",
+  "privateReceipt": "windows-runtime-b600-native.json",
+  "receipt": {
+    "schema": "switchyard-fresh-platform-runtime/v1",
+    "at": "2026-11-06T16:13:34.914Z",
+    "platform": "win32",
+    "succeeded": true,
+    "hardwareOpened": false,
+    "providerAccountUsed": false,
+    "microphoneOpened": false,
+    "temporaryRuntimeRemoved": true,
+    "install": {
+      "releaseId": "53e4cfb170605edf9ae8028a45197f0eb07569b439d5cf22a4fb50e65f194b18",
+      "python": "3.12.14",
+      "packageCount": 49,
+      "extraDistributions": [],
+      "modelLoaded": true,
+      "installedComponents": [
+        "python",
+        "model"
+      ]
+    },
+    "recheck": {
+      "sameRelease": true,
+      "modelLoaded": true,
+      "packageCount": 49
+    },
+    "verifiedTools": {
+      "uvVersion": "uv 0.12.7 (61291a8ca 2026-08-27 x86_64-pc-windows-msvc)",
+      "uvSha256": "a98374aee19f113b7f2527f748306b59fc3244fb548e838ec8a9893685861f96",
+      "helperSha256": "627dda23b3a015ec7414fa44cbc05a6b287b7460ff2fdabbbd6992b24508644e"
+    },
+    "requirementSha256": "fb20c4aa2a14a849da06447e9d755f3a16824aad46e78b1632f7a3567836bacc"
+  },
+  "zipSavedLocally": false
+}

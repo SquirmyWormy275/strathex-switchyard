@@ -1,0 +1,27 @@
+{
+  "schema": "switchyard-complete-linux-acceptance/v1",
+  "source": "2eeb2f9e758dda1b784f160e8ddc63495ce14682",
+  "receipt": "isolated-test-0dce5635-6919-49d3-833c-dd7854c285c5.json",
+  "accepted": true,
+  "totals": {
+    "required": 243,
+    "passed": 243,
+    "failed": 0,
+    "tests": 1559,
+    "passedTests": 1548,
+    "failedTests": 0,
+    "skippedTests": 11,
+    "cancelledTests": 0,
+    "todoTests": 0
+  },
+  "cleanupReceipt": "linux-2eeb2f9-cleanup-1793944963526.json",
+  "allChildAndTreeCleanupVerified": true,
+  "ownedTemporaryParentIdentityVerifiedAndRemoved": true,
+  "exactCheckoutAliasesBuildsAndMarkerRemoved": true,
+  "testLimitsUnchanged": true,
+  "limits": [
+    "Includes CVSS 2, independent owner retirement and exact editor target preparation. The later signed editor consumer retains separate six-group/63-check evidence.",
+    "The earlier a9cefaf quota failure remains retained.",
+    "Windows restricted child startup, installed current-source acceptance, actual provider loading, terminal attachment, hardware and approved accounts remain separate."
+  ]
+}

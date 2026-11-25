@@ -12,5 +12,6 @@ tmp/
 .npm-cache*/
 .tools/
 artifacts/
+/runtime/
 **/bin/
 **/obj/

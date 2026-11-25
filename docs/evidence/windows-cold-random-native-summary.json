@@ -1,0 +1,95 @@
+{
+  "schema": "switchyard-cold-random-native/v1",
+  "source": "83d4139bfb0659d47f75829b5dc1b37a0783697b",
+  "executionMerge": "e68e12db8e70a0e00f463abdbebf7dd780a58024",
+  "tree": "1fd39d28151766ac80cac94c3a5b9cd797c6f8d7",
+  "mergeParentAndTreeVerified": true,
+  "runId": 42174235481,
+  "jobId": 127749175819,
+  "artifactId": 13483255435,
+  "archiveSha256": "da55650001deefc1a0f8d32bcf972d1b21585c8961c1e50be399f0016cbdf30e",
+  "archiveDigestVerified": true,
+  "privateReceipt": "windows-cold-random-83d-native.json",
+  "jobConclusion": "failure",
+  "coldRandom": {
+    "schema": "switchyard-cold-restricted-random/v1",
+    "executableSha256": "40e610f6e64402c4fa0dcd213ca7943ba7ddf5af5bace35243b70a8a1ebf9da8",
+    "waitResult": 0,
+    "exitCode": 0,
+    "reportValid": true,
+    "report": {
+      "systemStatus": 0,
+      "providerOpenStatus": 0,
+      "providerStatus": 0,
+      "providerCloseStatus": 0,
+      "handlesClosedVerified": true,
+      "buffersClearedVerified": true
+    },
+    "primaryTokenVerified": true,
+    "tokenRecheckedAfterExit": true,
+    "treeExitVerified": true,
+    "processHandlesClosedVerified": true,
+    "creatorQuotaRestoredVerified": true,
+    "standardIo": {
+      "schema": "switchyard-restricted-child-stdio/v1",
+      "standardHandles": 3,
+      "inheritanceRestricted": true,
+      "stdinEof": true,
+      "stdoutBytes": 0,
+      "stderrBytes": 0,
+      "outputBounded": true,
+      "handlesClosedVerified": true,
+      "drainsCompleted": true,
+      "stderr": {
+        "category": "empty",
+        "function": null,
+        "code": null,
+        "sourceFile": null,
+        "sourceLine": null
+      }
+    },
+    "nodeStartupAccepted": false
+  },
+  "nodeExit": {
+    "waitResult": 0,
+    "exitCode": 134,
+    "resultAvailable": false
+  },
+  "nodeStdio": {
+    "schema": "switchyard-restricted-child-stdio/v1",
+    "standardHandles": 3,
+    "inheritanceRestricted": true,
+    "stdinEof": true,
+    "stdoutBytes": 0,
+    "stderrBytes": 663,
+    "outputBounded": true,
+    "handlesClosedVerified": true,
+    "drainsCompleted": true,
+    "stderr": {
+      "category": "assertion",
+      "function": "ncrypto::CSPRNG",
+      "code": null,
+      "sourceFile": "node.cc",
+      "sourceLine": 1221
+    }
+  },
+  "originalFailedFixtureRemoved": false,
+  "otherNativeJobs": [
+    {
+      "id": 127749175649,
+      "lane": "filesystem",
+      "conclusion": "success"
+    },
+    {
+      "id": 127749175733,
+      "lane": "native-setup",
+      "conclusion": "success"
+    }
+  ],
+  "conclusion": "Cold native BCrypt system-preferred and explicit Microsoft Primitive Provider operations succeed under the exact restricted primary token. The pinned Node owner still aborts in ncrypto::CSPRNG before its JavaScript entrypoint. This rules out a universal cold BCrypt access failure in this fixture; it does not establish the OpenSSL failure cause or a repair.",
+  "limits": [
+    "No entropy retained, token relaxed, account created or guest accepted.",
+    "Cold probe process handles, Job tree, pipes, token recheck, provider handles and buffer clearing verify. The failed Node fixture stays preserved.",
+    "Only the small digest-verified JSON receipt is retained locally; no archive, SDK or Windows executable was downloaded to the workstation."
+  ]
+}

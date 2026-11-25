@@ -1,0 +1,27 @@
+{
+  "schema": "switchyard-batched-inspection-running-demo/v1",
+  "sourceCommit": "dfa40fb1a1059c9d4f9e78c3265b5c89ea1fe039",
+  "frontend": "3265d16737fae14d99c7c5a0792af4c5e7cd743320f0abc84263bf22490770ed",
+  "origin": "http://127.0.0.1:34713",
+  "checks": [
+    "all 36 current reviewed assets served with exact hashes",
+    "unauthenticated saved state refused",
+    "named synthetic role binds once and stale choice refuses",
+    "pre-binding confirmation refuses without a command",
+    "independently running signed adapter acknowledges one exact reviewed status command",
+    "workspace change refuses stale reviewed control",
+    "returning to Personal cannot revive prior review",
+    "four named controls and one original command remain",
+    "preview refuses actual native application navigation and launch"
+  ],
+  "success": true,
+  "synthetic": true,
+  "modelPrompts": 0,
+  "hardwareOperations": 0,
+  "nativeAppEffects": 0,
+  "accountOperations": 0,
+  "browserVisualAcceptance": false,
+  "previewRetainedForReview": true,
+  "originalAttempt": "Initial metadata assertion preceded the signed adapter heartbeat; no command or role binding occurred. The resumed check joins actual readiness within fifteen seconds.",
+  "sourceNote": "Server started at dfa40fb with only unpublished shortcut diagnostic edits, outside the loaded preview backend and unchanged frontend."
+}

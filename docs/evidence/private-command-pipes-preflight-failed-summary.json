@@ -1,0 +1,22 @@
+{
+  "schema": "switchyard-private-pipe-preflight-failed/v1",
+  "sourceCommit": "25f07e94c8b7c9d0978ee57253aef82353f01ccb",
+  "executionCommit": "3e01f167b08e0491aad58ddb7d44a7b15b01640d",
+  "sourceAndExecutionTree": "0014cc3a58fa846e315ecf935ed515f6e5248c4a",
+  "runId": 42261618390,
+  "artifactId": 13525630518,
+  "archiveBytes": 691,
+  "archiveSha256": "a9803a2ca95a7060f9a7f53ff57ab2d96bc754fc8512332135351dc713b36306",
+  "zipSavedLocally": false,
+  "privateReceipt": "windows-private-pipe-25f-preflight-failed.json",
+  "passedPreflightChecks": 1,
+  "diagnostic": "The native runtime worker failed before its suspended identity was reported.",
+  "preciseWorkerStartStageRetained": false,
+  "nativePipeChecksReached": false,
+  "restrictedOwnerJourneyReached": false,
+  "candidateAccepted": false,
+  "installedChanged": false,
+  "elevationRequested": false,
+  "serviceInstalled": false,
+  "volumeOpened": false
+}

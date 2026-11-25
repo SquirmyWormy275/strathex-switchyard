@@ -1,0 +1,27 @@
+{
+  "schema": "switchyard-complete-linux-acceptance/v1",
+  "source": "359a825a743790ef399d24a2f867527381d1c944",
+  "receipt": "isolated-test-556d6fff-8ef0-411f-aa6a-8bc7c5fb16d9.json",
+  "accepted": true,
+  "totals": {
+    "required": 242,
+    "passed": 242,
+    "failed": 0,
+    "tests": 1545,
+    "passedTests": 1534,
+    "failedTests": 0,
+    "skippedTests": 11,
+    "cancelledTests": 0,
+    "todoTests": 0
+  },
+  "cleanupReceipt": "linux-359a825-cleanup-1793943201472.json",
+  "allChildAndTreeCleanupVerified": true,
+  "ownedTemporaryParentIdentityVerifiedAndRemoved": true,
+  "exactCheckoutAliasesBuildsAndMarkerRemoved": true,
+  "testLimitsUnchanged": true,
+  "limits": [
+    "Includes authenticated owner routes and installed metadata verifier source. Later owner-stop and CVSS changes retain separate focused checks.",
+    "The preceding a9cefaf quota failure remains retained.",
+    "Windows native restricted-child startup, actual provider loading, exact IDE handoff, hardware and approved accounts remain separate acceptance."
+  ]
+}

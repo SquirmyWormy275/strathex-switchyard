@@ -1,0 +1,60 @@
+{
+  "schema": "switchyard-windows-bootstrap-contention/v1",
+  "sourceCommit": "2fb81bc345b6fab85838672b1c054a74c5fa0233",
+  "mergeCommit": "aec85b85ca2ada39eb23ba0e6659db0bd56d1366",
+  "sourceTree": "49ab8aaba61c54b365d6db291a3c7c927e56a6f8",
+  "runId": 42615316762,
+  "jobId": 129154818239,
+  "artifactId": 13674025946,
+  "originalEnvelopeSha256": "b7b57b1443acebed67b45c3fa78b93195b179cc04b851d4750a5c274398ac043",
+  "receiptSha256": "eb8ee385db00f753b493777b694b82ce0dd7a825f8cb3d10ff4a641999b3d9d4",
+  "originalReceiptId": "cf129208-2a37-40c4-95d0-1058f7dbd01e",
+  "totals": {
+    "required": 13,
+    "passed": 12,
+    "failed": 1,
+    "tests": 12,
+    "passedTests": 12,
+    "failedTests": 0,
+    "skippedTests": 0,
+    "cancelledTests": 0,
+    "todoTests": 0
+  },
+  "failed": {
+    "file": "deployment/windows/Test-B122TrustedBootstrap.ps1#powershell5",
+    "durationMs": 78713,
+    "effectiveTimeoutMs": 300000,
+    "exitCode": 1,
+    "timeout": false,
+    "outputDigest": "cff22c7b81ddb0e0b52948ad897a98f32e5b5bbdb24135ae4348b2518c15016c",
+    "failureDiagnostic": "D:\\a\\strathex-switchyard\\strathex-switchyard\\deployment\\windows\\Test-B122TrustedBootstrap.ps1 : Exception calling \r\n\"ReadAllText\" with \"1\" argument(s): \"The process cannot access the file \r\n'C:\\Users\\runneradmin\\AppData\\Local\\Temp\\i-0P7I6i\\[redacted]\\state \r\nroot\\bootstrap-invocations.txt' because it is being used by another process.\"\r\n    + CategoryInfo          : NotSpecified: (:) [Test-B122TrustedBootstrap.ps1], MethodInvocationException\r\n    + FullyQualifiedErrorId : IOException,Test-B122TrustedBootstrap.ps1\r\n \r\n"
+  },
+  "audit": {
+    "sourceAndMergeTreeEqual": true,
+    "originalManifestAndCommands": true,
+    "originalBoundsAndSkips": true,
+    "serialOrder": true,
+    "outputBounds": true,
+    "childTreeCleanup": true
+  },
+  "correction": {
+    "file": "deployment/windows/Test-B122TrustedBootstrap.ps1",
+    "sha256": "e57ceeadbabaeb9ffe4579cc020bf85d927453e4b8f3535701be73d332b006ba",
+    "change": "The existing 15-second counter wait treats only Windows sharing/lock violations (32/33) as not ready. Exact count, process births, kill/exit, staging and terminal assertions remain. All other errors still fail.",
+    "inference": "The only intentional concurrent counter read is the crash-readiness loop; the failed native diagnostic reports sharing contention but does not identify its source line. The change addresses that demonstrated unguarded wait, not every possible external file lock.",
+    "nativeAccepted": false,
+    "deadlineUnchanged": true,
+    "productionBootstrapChanged": false,
+    "localHarnessEvidence": {
+      "receiptId": "8cb181e1-3c25-4741-b4c0-5cf8ecd2d942",
+      "receiptSha256": "aa2356c820d7186c7a2c1196596fc282219a4aebfc377d7e341698ae7aa6cd25",
+      "groups": 2,
+      "passes": 32,
+      "nativePowerShellExecuted": false
+    }
+  },
+  "limitations": [
+    "This complete Windows cohort failed; 22 other workers reported success but their receipts were not audited for a full-suite acceptance claim.",
+    "No Windows PowerShell executable is available locally. Original native PowerShell 5.1/pwsh follow-up runs through normal branch pushes; no retry or deadline change was requested."
+  ]
+}

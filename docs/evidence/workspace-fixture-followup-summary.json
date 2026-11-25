@@ -1,0 +1,91 @@
+{
+  "schema": "switchyard-workspace-fixture-followup-summary/v1",
+  "date": "2026-11-24",
+  "baseCommit": "cd770c07106948bc37d285dc026e1d2f043ea4c7",
+  "nativeFailures": [
+    {
+      "sourceCommit": "c41807c7473f3d1908a4d68f8ee127c517f490fa",
+      "mergeCommit": "5cc7cb2704245d1507f4180165e803c2da6e5664",
+      "sourceTree": "49a6dc4fec5d5ec698edef0a167e89d5eb57b50d",
+      "sourceTreeVerified": true,
+      "workflow": 45482338547,
+      "job": 138759110307,
+      "artifact": 14963806554,
+      "archiveSha256": "68c5eeea8912bd87715c1a2603fb1744a8ea4bbaab393a339525c3420e0b2e08",
+      "receiptSha256": "f6fac5c1d6fac2fcac6f5bb4f7c562d3cc987a88327216370a73d8d90866b301",
+      "receiptFile": "c418-worker19-original.json",
+      "zipRetained": false,
+      "runId": "ca3ce35c-a709-4b54-93eb-1d90b15c2fe2",
+      "totals": {
+        "required": 23,
+        "passed": 22,
+        "failed": 1,
+        "tests": 194,
+        "passedTests": 166,
+        "failedTests": 1,
+        "skippedTests": 27,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "failedGroup": "apps/windows-companion/test/windows-host-action-consumer.test.ts",
+      "error": "Windows host-action ambiguous recovery settlement timed out.",
+      "originalCommandsBoundsSkipsOrderAndCleanupVerified": true
+    },
+    {
+      "sourceCommit": "87cfc307743e2705c1d424763096ec20e6d4e40b",
+      "mergeCommit": "222b1292786e05072cecff458ab3b9eef45d5870",
+      "sourceTree": "00d8c583adf5bfeaa14421d259e0bd765a92ecc7",
+      "sourceTreeVerified": true,
+      "workflow": 45484595010,
+      "job": 138766967711,
+      "artifact": 14964441409,
+      "archiveSha256": "3ac77eee3f5309d923a783cf4733a8dd9f13aff96a28a2d188c2f3a135305cab",
+      "receiptSha256": "9adbc4d9e0e6734b432673ecdbaeee297e7d4e5a4c65f45f3e55be54934f492b",
+      "receiptFile": "87cfc-worker11-original.json",
+      "zipRetained": false,
+      "runId": "8b11fe10-983d-4b01-8c26-86db5ca66da2",
+      "totals": {
+        "required": 23,
+        "passed": 22,
+        "failed": 1,
+        "tests": 173,
+        "passedTests": 162,
+        "failedTests": 1,
+        "skippedTests": 10,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "failedGroup": "tools/layout-studio/workspace-ui.test.mjs",
+      "error": "A late Suite handler accessed its document after fixture teardown.",
+      "originalCommandsBoundsSkipsOrderAndCleanupVerified": true
+    }
+  ],
+  "sourceFiles": {
+    "tools/layout-studio/workspace-ui.test.mjs": "1bb37882a5014bbef36d4c585c7ffa3bf3cf5c80a81a2f3af2a4ddbeed15fc20"
+  },
+  "local": {
+    "receipt": "isolated-test-c46cbf34-d50a-4f60-bffd-8132211b902b.json",
+    "sha256": "db493575031dda5612af0fce2c6fcbe3fa709c7a1960ff12981f84ccc1085fea",
+    "totals": {
+      "required": 2,
+      "passed": 2,
+      "failed": 0,
+      "tests": 20,
+      "passedTests": 20,
+      "failedTests": 0,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    },
+    "cleanupVerified": true
+  },
+  "correction": "Join promises returned by the workspace selection, retry and refresh event listeners before retiring the fixture document and HTTP host. All five workspace behavior assertions and original deadlines remain unchanged.",
+  "hostActionStatus": "The unchanged 75 ms recovery-settlement case passes locally and in the following native cohort; the earlier intermittent failure remains unresolved. No production or fixture timeout was increased.",
+  "nativeWindowsAcceptance": "pending normal-push checks",
+  "productionRuntimeChanged": false,
+  "installedLinuxSource": "65b5aacc8df8ebb1cb7f592eafff2d3c2000ba86",
+  "limits": [
+    "These are event/HTTP interaction fixtures, not a graphical browser acceptance.",
+    "The failed full cohorts remain failed; later focused passes do not replace their original receipts."
+  ]
+}

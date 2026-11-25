@@ -1,0 +1,34 @@
+{
+  "schema": "switchyard-restricted-namespace-source/v1",
+  "basis": "ce5be6a33d661696464c13b8ec077127665f759d",
+  "sourceSha256": {
+    "deployment/windows/test-support/storage-broker-protocol/RestrictedNamespaceAccess.cs": "fcacd3b6e44fe5ce3f09e9a79cce9b1569fbadfe0135a15458eb9d0afe729896",
+    "deployment/windows/test-support/storage-broker-protocol/NativeRestrictedHostProof.cs": "eb8950d98a0a7099fe425a0de0b403a3eacdc7da85e1a765e9335138e19017c4",
+    "scripts/windows-restricted-owner-report.mjs": "6d6d59a6eeb6905879fceed7498846718f0fb49cc1381183d16b263a10723959"
+  },
+  "behavior": "Test-only access checks against three existing fixed OS namespace categories, three access masks and the original/restricted tokens. No enumeration, object creation, ACL or token changes.",
+  "privacy": "Only fixed scope/access labels and NTSTATUS values; session IDs, paths and SIDs are not returned. All opened handles must close.",
+  "managedBuild": {
+    "receipt": "managed-source-build-1793936924125.json",
+    "targets": 2,
+    "warnings": 0,
+    "errors": 0,
+    "portableChecksPassed": 1816,
+    "ownedScratchRemoved": true,
+    "existingSdkReused": true
+  },
+  "software": {
+    "receipt": "isolated-test-d54a4a96-5040-408e-bbad-5fe629fc8a48.json",
+    "groups": 2,
+    "testsPassed": 28,
+    "allChildCleanupVerified": true,
+    "typecheck": true
+  },
+  "nativeAcceptance": "pending",
+  "limits": [
+    "This observes a possible remaining boundary; it does not identify the cause before native results.",
+    "The original restricted-child creation, token/Job guards, deadlines and exit assertions are unchanged.",
+    "A passing access matrix cannot upgrade a failed child or accept an ordinary account."
+  ],
+  "reference": "https://learn.microsoft.com/en-us/windows/win32/devnotes/ntopendirectoryobject"
+}

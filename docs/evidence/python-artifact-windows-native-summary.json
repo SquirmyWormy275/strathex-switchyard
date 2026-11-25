@@ -1,0 +1,31 @@
+{
+  "schema": "switchyard-pypi-artifact-windows-native/v1",
+  "sourceCommit": "d551ccffbde77a889ddf45ccd006ab3d756bf70f",
+  "executionCommit": "49d6bbcca91aa1ab5f561783de562b944eaf4c0d",
+  "sourceAndExecutionTree": "580138828459329b4c7ab19641335ed568f45ea5",
+  "runId": 42248991758,
+  "jobId": 127999197128,
+  "artifactId": 13520410031,
+  "archiveBytes": 1003,
+  "archiveSha256": "b17f2c7ea2ad099133cdb4603e70024f402283277405929a907df8c3243a732c",
+  "zipSavedLocally": false,
+  "privateReceipt": "windows-pypi-artifact-d551-native.json",
+  "totals": {
+    "required": 1,
+    "passed": 1,
+    "failed": 0,
+    "tests": 11,
+    "passedTests": 9,
+    "failedTests": 0,
+    "skippedTests": 2,
+    "cancelledTests": 0,
+    "todoTests": 0
+  },
+  "durationMs": 184694,
+  "timeoutMs": 300000,
+  "allChildAndTreeCleanupVerified": true,
+  "windowsHostAccepted": true,
+  "guestDoubled": true,
+  "nativeGuestAccepted": false,
+  "installedChanged": false
+}

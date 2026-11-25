@@ -9,17 +9,21 @@ import type {
   ProviderExecutableIdentity,
   ProviderProcessEffectRequest
 } from "../src/provider-desktop.ts";
+import { providerIds, windowsEditorProductIdentity } from "../src/provider-desktop.ts";
 import {
+  NodeProviderDesktopHelperTransport,
   WindowsProviderDesktopProcessPort,
   type ProviderDesktopHelperInvocation,
   type ProviderDesktopHelperSession,
-  type ProviderDesktopHelperTransport
+  type ProviderDesktopHelperTransport,
+  type WindowsProviderDesktopProcessPortOptions
 } from "../src/windows-provider-process.ts";
 
 const digest = (value: string | Buffer): string => createHash("sha256").update(value).digest("hex");
 const responseSchema = "sxsy-b122.provider-desktop-response";
 
 class FakeSession implements ProviderDesktopHelperSession {
+  readonly processId = 7111;
   readonly writes: string[] = [];
   readonly responses: string[] = [];
   terminated = false;
@@ -84,25 +88,194 @@ async function fixture(context: test.TestContext) {
   return { root, helperPath, executablePath, identity };
 }
 
-function port(helperPath: string, helperSha256: string, transport: FakeTransport) {
+function port(helperPath: string, helperSha256: string, transport: FakeTransport, focusOnly = false, callbacks: Partial<Pick<WindowsProviderDesktopProcessPortOptions, "onHelperOwned" | "onHelperStopped">> = {}) {
   return new WindowsProviderDesktopProcessPort({
     helperPath,
     helperSha256,
     transport,
+    focusOnly,
+    ...(focusOnly ? { onHelperOwned: async () => {}, onHelperStopped: async () => {} } : {}),
+    ...callbacks,
     hostEnvironment: { SystemRoot: "C:\\Windows", WINDIR: "C:\\Windows", PATH: "must-not-leak", SECRET_TOKEN: "must-not-leak" }
   });
 }
 
 function envelope(request: Record<string, unknown>, kind: "ready" | "result" | "error", body: Record<string, unknown>): string {
-  return JSON.stringify({ schema: responseSchema, version: 1, requestId: request.requestId, kind, ...body });
+  return JSON.stringify({ schema: responseSchema, version: 2, requestId: request.requestId, kind, ...body });
 }
+const helperOwner = Object.freeze({ processId: 7111, processStartTime: "133000000000000001" });
+const ownerHello = (changes = {}) => JSON.stringify({ schema: "switchyard-native-focus-owner/v1", ...helperOwner, ...changes });
+
+test("owned Claude launch persists its helper before requests and returns the new process birth", async context => {
+  const setup = await fixture(context), transport = new FakeTransport(), events: string[] = [];
+  transport.configure = session => {
+    session.responses.push(ownerHello());
+    session.onWrite = request => {
+      events.push(String(request.kind ?? request.action));
+      session.responses.push(request.kind === "authorize"
+        ? envelope(request, "result", { processId: 4200, processStartTime: "133000000000000002", surfaceId: "hwnd:20aa", distinctSurface: true })
+        : envelope(request, "ready", { authorizationToken: "a".repeat(64), preexistingSurfaceIds: [] }));
+    };
+  };
+  const processPort = new WindowsProviderDesktopProcessPort({ helperPath: setup.helperPath, helperSha256: digest("fixed native helper"), transport, hostEnvironment: { SystemRoot: "C:\\Windows" }, claudeLaunchOnly: true,
+    onHelperOwned: async owner => { assert.deepEqual(owner, helperOwner); assert.equal(transport.sessions[0]!.writes.length, 0); events.push("owned"); },
+    onHelperStopped: async owner => { assert.deepEqual(owner, helperOwner); assert(transport.sessions[0]!.terminated); events.push("stopped"); } });
+  const result = await processPort.launch({ provider: "claude_desktop", operationId: "owned-claude-launch", identity: setup.identity, args: [], requireDistinctSurface: false, signal: new AbortController().signal, shell: false, beforeEffect: async () => { events.push("reviewed"); } });
+  assert.deepEqual(transport.invocations[0]!.arguments, ["--native-claude-launch-v1"]);
+  assert.deepEqual(result, { processId: 4200, processStartTime: "133000000000000002", surfaceId: "hwnd:20aa", distinctSurface: true });
+  assert.deepEqual(events, ["owned", "launch", "reviewed", "authorize", "stopped"]);
+});
+
+test("owned Claude launch refuses mixed modes, missing persistence and other targets before helper startup", async context => {
+  const setup = await fixture(context), transport = new FakeTransport();
+  const options = { helperPath: setup.helperPath, helperSha256: digest("fixed native helper"), transport, hostEnvironment: { SystemRoot: "C:\\Windows" }, claudeLaunchOnly: true };
+  assert.throws(() => new WindowsProviderDesktopProcessPort(options), /persistence callbacks/);
+  const callbacks = { onHelperOwned: async () => {}, onHelperStopped: async () => {} };
+  assert.throws(() => new WindowsProviderDesktopProcessPort({ ...options, ...callbacks, focusOnly: true }), /mutually exclusive/);
+  const processPort = new WindowsProviderDesktopProcessPort({ ...options, ...callbacks });
+  const request = { provider: "claude_desktop" as const, operationId: "refused-launch", identity: setup.identity, args: [], requireDistinctSurface: false, signal: new AbortController().signal, shell: false as const, beforeEffect: async () => { assert.fail("refused mode cannot authorize an effect"); } };
+  for (const change of [{ args: ["--new-window"], requireDistinctSurface: true }, { args: ["prompt.txt"] }]) await assert.rejects(processPort.launch({ ...request, ...change }), /normal Claude Desktop launch/);
+  await assert.rejects(processPort.launch({ ...request, provider: "chatgpt_desktop" }), /normal Claude Desktop launch/);
+  await assert.rejects(processPort.listRunning({ ...setup.identity, productIdentity: { productId: "openai.chatgpt-desktop", displayName: "ChatGPT Desktop", publisher: "OpenAI, L.L.C.", role: "desktop" } }, request.signal), /only Claude Desktop/);
+  await assert.rejects(processPort.listRunning({ ...setup.identity, productIdentity: windowsEditorProductIdentity }, request.signal), /Claude Desktop|fixed desktop provider/);
+  await assert.rejects(processPort.focusExisting({ ...request, process: { processId: 4200, processStartTime: "133000000000000002", windowId: "hwnd:20aa", isForeground: false, identity: setup.identity } }), /cannot focus/);
+  assert.equal(transport.invocations.length, 0);
+});
+
+test("owned Claude launch cannot send requests after a failed owner write or replace an uncertain helper", async context => {
+  const setup = await fixture(context), transport = new FakeTransport(); let retired = false;
+  transport.configure = session => { session.responses.push(ownerHello()); };
+  const processPort = new WindowsProviderDesktopProcessPort({ helperPath: setup.helperPath, helperSha256: digest("fixed native helper"), transport, hostEnvironment: { SystemRoot: "C:\\Windows" }, claudeLaunchOnly: true,
+    onHelperOwned: async () => { throw Error("synthetic owner write failure"); },
+    onHelperStopped: async () => { if (!retired) throw Error("synthetic retirement failure"); } });
+  await assert.rejects(processPort.listRunning(setup.identity, new AbortController().signal), { code: "PROVIDER_HELPER_RETIREMENT_UNCONFIRMED" });
+  assert.equal(transport.sessions[0]!.writes.length, 0);
+  await assert.rejects(processPort.listRunning(setup.identity, new AbortController().signal), { code: "PROVIDER_HELPER_RETIREMENT_UNCONFIRMED" });
+  assert.equal(transport.invocations.length, 1); retired = true; assert.equal((await processPort.retireOwned()).stopped, true);
+});
+
+test("owned Claude launch rejects missing new-process birth even after an effect acknowledgement", async context => {
+  const setup = await fixture(context), transport = new FakeTransport(); let approvals = 0, retired = 0;
+  transport.configure = session => {
+    session.responses.push(ownerHello());
+    session.onWrite = request => { session.responses.push(request.kind === "authorize"
+      ? envelope(request, "result", { processId: 4200, surfaceId: "hwnd:20aa", distinctSurface: true })
+      : envelope(request, "ready", { authorizationToken: "b".repeat(64), preexistingSurfaceIds: [] })); };
+  };
+  const processPort = new WindowsProviderDesktopProcessPort({ helperPath: setup.helperPath, helperSha256: digest("fixed native helper"), transport, hostEnvironment: { SystemRoot: "C:\\Windows" }, claudeLaunchOnly: true,
+    onHelperOwned: async () => {}, onHelperStopped: async () => { retired++; } });
+  await assert.rejects(processPort.launch({ provider: "claude_desktop", operationId: "lost-new-birth", identity: setup.identity, args: [], requireDistinctSurface: false, signal: new AbortController().signal, shell: false, beforeEffect: async () => { approvals++; } }), /birth/);
+  assert.equal(approvals, 1); assert.equal(retired, 1); assert.equal(transport.invocations.length, 1);
+});
+
+test("VS Code is focus-only and cannot enter the companion provider or application-launch catalog", async context => {
+  const setup = await fixture(context), identity = { ...setup.identity, productIdentity: windowsEditorProductIdentity }, transport = new FakeTransport();
+  assert.deepEqual(providerIds, ["claude_desktop", "chatgpt_desktop", "claude_code", "codex"]);
+  const observed = { processId: 4100, processStartTime: "133000000000000001", surfaceId: "hwnd:100f", isForeground: false };
+  transport.configure = session => {
+    session.responses.push(ownerHello());
+    session.onWrite = request => {
+      if (request.action === "list") { assert.equal(request.provider, "vscode"); session.responses.push(envelope(request, "result", { observations: [observed] })); }
+      else if (request.action === "focus") { assert.equal(request.provider, "vscode"); session.responses.push(envelope(request, "ready", { ...observed, authorizationToken: "a".repeat(64) })); }
+      else session.responses.push(envelope(request, "result", { ...observed, windowFocusVerified: true }));
+    };
+  };
+  const focus = port(setup.helperPath, digest("fixed native helper"), transport, true), legacy = port(setup.helperPath, digest("fixed native helper"), transport);
+  await assert.rejects(legacy.listRunning(identity, new AbortController().signal), /fixed desktop provider/); assert.equal(transport.invocations.length, 0);
+  const [process] = await focus.listRunning(identity, new AbortController().signal); assert.ok(process);
+  let barriers = 0;
+  const request = { provider: "vscode" as const, operationId: "editor-focus", identity, process, signal: new AbortController().signal, shell: false as const, async beforeEffect() { barriers++; } };
+  await assert.rejects(legacy.focusExisting(request), /not allowed/); assert.equal(barriers, 0);
+  assert.deepEqual(await focus.focusExisting(request), { processId: 4100 }); assert.equal(barriers, 1); assert.equal(transport.invocations.length, 2);
+  await assert.rejects(focus.listRunning({ ...identity, productIdentity: { ...windowsEditorProductIdentity, displayName: "VS Code Insiders" } }, new AbortController().signal), /fixed desktop provider/);
+  assert.equal(transport.invocations.length, 2);
+});
+
+test("focus helper ownership is recorded before requests and cleared only after exact child closure", async context => {
+  const setup = await fixture(context), transport = new FakeTransport(), events: string[] = [];
+  transport.configure = session => {
+    session.responses.push(ownerHello());
+    session.onWrite = request => { events.push("request"); session.responses.push(envelope(request, "result", { observations: [] })); };
+    session.wait = async () => { events.push("exit"); return { code: 0, signal: null }; };
+  };
+  const processPort = port(setup.helperPath, digest("fixed native helper"), transport, true, {
+    async onHelperOwned(owner) { assert.deepEqual(owner, helperOwner); assert.equal(Object.isFrozen(owner), true); events.push("owned"); },
+    async onHelperStopped(owner) { assert.deepEqual(owner, helperOwner); events.push("stopped"); }
+  });
+  assert.deepEqual(await processPort.listRunning(setup.identity, new AbortController().signal), []);
+  assert.deepEqual(events, ["owned", "request", "exit", "stopped"]);
+});
+
+test("focus helper refuses missing, substituted or lossy owner identity before writing requests", async context => {
+  const setup = await fixture(context);
+  for (const changes of [{ processId: 7112 }, { processId: undefined }, { processStartTime: 133000000000000001 }, { processStartTime: "0" }, { processStartTime: "1".repeat(513) }, { extra: "untrusted" }, { schema: "older-owner/v0" }]) {
+    const transport = new FakeTransport(); let owned = 0;
+    transport.configure = session => { session.responses.push(ownerHello(changes)); };
+    await assert.rejects(port(setup.helperPath, digest("fixed native helper"), transport, true, { async onHelperOwned() { owned++; } }).listRunning(setup.identity, new AbortController().signal), /owner|birth|identity/i);
+    assert.equal(owned, 0); assert.equal(transport.sessions[0]!.writes.length, 0); assert.equal(transport.sessions[0]!.terminated, true);
+  }
+});
+
+test("failed owner persistence cannot send a request and failed retirement persistence blocks replacement", async context => {
+  const setup = await fixture(context), transport = new FakeTransport(); let owned = 0, allowRetirement = false;
+  transport.configure = session => { session.responses.push(ownerHello()); session.onWrite = request => session.responses.push(envelope(request, "result", { observations: [] })); };
+  const processPort = port(setup.helperPath, digest("fixed native helper"), transport, true, {
+    async onHelperOwned() { if (++owned === 1) throw Error("synthetic owner write failure"); },
+    async onHelperStopped() { if (!allowRetirement) throw Error("synthetic retirement write failure"); }
+  });
+  await assert.rejects(processPort.listRunning(setup.identity, new AbortController().signal), { code: "PROVIDER_HELPER_RETIREMENT_UNCONFIRMED", retirementPhase: "record", retirementReason: "rejected" });
+  assert.equal(transport.sessions[0]!.writes.length, 0);
+  await assert.rejects(processPort.listRunning(setup.identity, new AbortController().signal), { code: "PROVIDER_HELPER_RETIREMENT_UNCONFIRMED", retirementPhase: "record", retirementReason: "rejected" });
+  assert.equal(transport.invocations.length, 1);
+  allowRetirement = true;
+  assert.deepEqual(await processPort.listRunning(setup.identity, new AbortController().signal), []); assert.equal(transport.invocations.length, 2);
+});
+
+test("retirement deadline identifies its phase and reuses the original pending record before replacement", async context => {
+  const setup = await fixture(context), transport = new FakeTransport();
+  let started!: () => void, release!: () => void, stopped = 0;
+  const entered = new Promise<void>(resolve => { started = resolve; });
+  const gate = new Promise<void>(resolve => { release = resolve; });
+  transport.configure = session => { session.responses.push(ownerHello()); session.onWrite = request => session.responses.push(envelope(request, "result", { observations: [] })); };
+  const processPort = port(setup.helperPath, digest("fixed native helper"), transport, true, {
+    async onHelperStopped() { stopped++; started(); await gate; }
+  });
+  context.mock.timers.enable({ apis: ["setTimeout"] });
+  const pending = processPort.listRunning(setup.identity, new AbortController().signal);
+  const refused = assert.rejects(pending, { code: "PROVIDER_HELPER_RETIREMENT_UNCONFIRMED", retirementPhase: "record", retirementReason: "deadline" });
+  await entered;
+  context.mock.timers.tick(2000); await refused;
+  assert.equal(transport.invocations.length, 1); assert.equal(stopped, 1);
+  const replacement = processPort.listRunning(setup.identity, new AbortController().signal);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(transport.invocations.length, 1); assert.equal(stopped, 1);
+  release();
+  assert.deepEqual(await replacement, []);
+  assert.equal(transport.invocations.length, 2); assert.equal(stopped, 2);
+});
+
+test("cancellation joins pending owner persistence before recording helper retirement", async context => {
+  const setup = await fixture(context), transport = new FakeTransport(), controller = new AbortController(), events: string[] = [];
+  let started!: () => void, release!: () => void;
+  const recording = new Promise<void>(resolve => { started = resolve; }), gate = new Promise<void>(resolve => { release = resolve; });
+  transport.configure = session => { session.responses.push(ownerHello()); };
+  const processPort = port(setup.helperPath, digest("fixed native helper"), transport, true, {
+    async onHelperOwned() { started(); await gate; events.push("owned"); },
+    async onHelperStopped() { events.push("stopped"); }
+  });
+  const pending = processPort.listRunning(setup.identity, controller.signal); void pending.catch(() => {});
+  await recording; controller.abort();
+  try { await new Promise(resolve => setImmediate(resolve)); assert.deepEqual(events, []); assert.equal(transport.sessions[0]!.writes.length, 0); }
+  finally { release(); }
+  await assert.rejects(pending, /cancel/i); assert.deepEqual(events, ["owned", "stopped"]); assert.equal(transport.sessions[0]!.writes.length, 0);
+});
 
 test("list uses only the exact hash-bound helper and a sanitized fixed protocol", async (context) => {
   const setup = await fixture(context);
   const transport = new FakeTransport();
   transport.configure = (session) => {
     session.onWrite = (request) => session.responses.push(envelope(request, "result", {
-      observations: [{ processId: 4100, surfaceId: "hwnd:100f", isForeground: true }]
+      observations: [{ processId: 4100, processStartTime: "133000000000000001", surfaceId: "hwnd:100f", isForeground: true }]
     }));
   };
   const processPort = port(setup.helperPath, digest("fixed native helper"), transport);
@@ -111,9 +284,10 @@ test("list uses only the exact hash-bound helper and a sanitized fixed protocol"
 
   assert.equal(observations.length, 1);
   assert.equal(observations[0]?.windowId, "hwnd:100f");
+  assert.equal(observations[0]?.processStartTime, "133000000000000001");
   assert.equal(observations[0]?.isForeground, true);
   assert.deepEqual(observations[0]?.identity, setup.identity);
-  assert.deepEqual(transport.invocations[0]?.arguments, ["--stdio-v1"]);
+  assert.deepEqual(transport.invocations[0]?.arguments, ["--stdio-v2"]);
   assert.deepEqual(transport.invocations[0]?.environment, { SystemRoot: "C:\\Windows", WINDIR: "C:\\Windows" });
   const request = JSON.parse(transport.sessions[0]!.writes[0]!) as Record<string, unknown>;
   assert.equal(request.action, "list");
@@ -121,6 +295,21 @@ test("list uses only the exact hash-bound helper and a sanitized fixed protocol"
   assert.equal("cwd" in request, false);
   assert.equal("command" in request, false);
   assert.equal(JSON.stringify(request).includes("must-not-leak"), false);
+});
+
+test("focus-only helper mode cannot launch a provider or silently use the broader helper entrypoint", async (context) => {
+  const setup = await fixture(context), transport = new FakeTransport();
+  transport.configure = session => { session.responses.push(ownerHello()); session.onWrite = request => session.responses.push(envelope(request, "result", { observations: [] })); };
+  const processPort = port(setup.helperPath, digest("fixed native helper"), transport, true);
+  assert.deepEqual(await processPort.listRunning(setup.identity, new AbortController().signal), []);
+  assert.deepEqual(transport.invocations[0]!.arguments, ["--native-desktop-focus-v3"]);
+  let barriers = 0;
+  for (const requireDistinctSurface of [false, true]) await assert.rejects(processPort.launch({
+    provider: "claude_desktop", operationId: "forbidden-suite-launch", identity: setup.identity,
+    args: requireDistinctSurface ? ["--new-window"] : [], requireDistinctSurface,
+    signal: new AbortController().signal, shell: false, async beforeEffect() { barriers++; }
+  }), /focus-only.*cannot launch/i);
+  assert.equal(transport.invocations.length, 1); assert.equal(barriers, 0);
 });
 
 test("focus authorizes only after the host barrier while the helper holds the exact one-surface identity", async (context) => {
@@ -131,19 +320,19 @@ test("focus authorizes only after the host barrier while the helper holds the ex
     session.onWrite = (request) => {
       if (request.kind === "authorize") {
         ordering.push("authorize");
-        session.responses.push(envelope(request, "result", { processId: 4100, surfaceId: "hwnd:100f" }));
+        session.responses.push(envelope(request, "result", { processId: 4100, processStartTime: "133000000000000001", surfaceId: "hwnd:100f", windowFocusVerified: true }));
       } else {
         ordering.push("prepare");
-        session.responses.push(envelope(request, "ready", { authorizationToken: "a".repeat(64), processId: 4100, surfaceId: "hwnd:100f" }));
+        session.responses.push(envelope(request, "ready", { authorizationToken: "a".repeat(64), processId: 4100, processStartTime: "133000000000000001", surfaceId: "hwnd:100f", windowFocusVerified: true }));
       }
     };
   };
   const processPort = port(setup.helperPath, digest("fixed native helper"), transport);
-  const request: ProviderProcessEffectRequest & { readonly process: { readonly processId: number; readonly windowId: string; readonly isForeground: boolean; readonly identity: ProviderExecutableIdentity } } = {
+  const request: ProviderProcessEffectRequest & { readonly process: { readonly processId: number; readonly processStartTime: string; readonly windowId: string; readonly isForeground: boolean; readonly identity: ProviderExecutableIdentity } } = {
     provider: "claude_desktop",
     operationId: "focus-operation",
     identity: setup.identity,
-    process: { processId: 4100, windowId: "hwnd:100f", isForeground: true, identity: setup.identity },
+    process: { processId: 4100, processStartTime: "133000000000000001", windowId: "hwnd:100f", isForeground: true, identity: setup.identity },
     signal: new AbortController().signal,
     shell: false,
     async beforeEffect() { ordering.push("barrier"); }
@@ -151,6 +340,7 @@ test("focus authorizes only after the host barrier while the helper holds the ex
 
   assert.deepEqual(await processPort.focusExisting(request), { processId: 4100 });
   assert.deepEqual(ordering, ["prepare", "barrier", "authorize"]);
+  assert.equal(JSON.parse(transport.sessions[0]!.writes[0]!).expectedProcessStartTime, "133000000000000001");
   const authorization = JSON.parse(transport.sessions[0]!.writes[1]!) as Record<string, unknown>;
   assert.equal(authorization.kind, "authorize");
   assert.equal(authorization.authorizationToken, "a".repeat(64));
@@ -161,7 +351,7 @@ test("focus never authorizes an ambiguous, changed, or cancelled surface", async
   const transport = new FakeTransport();
   transport.configure = (session) => {
     session.onWrite = (request) => session.responses.push(envelope(request, "ready", {
-      authorizationToken: "b".repeat(64), processId: 9999, surfaceId: "hwnd:changed"
+      authorizationToken: "b".repeat(64), processId: 9999, processStartTime: "133000000000000001", surfaceId: "hwnd:changed"
     }));
   };
   const processPort = port(setup.helperPath, digest("fixed native helper"), transport);
@@ -170,7 +360,7 @@ test("focus never authorizes an ambiguous, changed, or cancelled surface", async
     provider: "claude_desktop",
     operationId: "changed-focus",
     identity: setup.identity,
-    process: { processId: 4100, windowId: "hwnd:100f", isForeground: true, identity: setup.identity },
+    process: { processId: 4100, processStartTime: "133000000000000001", windowId: "hwnd:100f", isForeground: true, identity: setup.identity },
     signal: new AbortController().signal,
     shell: false,
     async beforeEffect() { barrierCalled = true; }
@@ -182,7 +372,7 @@ test("focus never authorizes an ambiguous, changed, or cancelled surface", async
   const cancelledTransport = new FakeTransport();
   cancelledTransport.configure = (session) => {
     session.onWrite = (request) => session.responses.push(envelope(request, "ready", {
-      authorizationToken: "c".repeat(64), processId: 4100, surfaceId: "hwnd:100f"
+      authorizationToken: "c".repeat(64), processId: 4100, processStartTime: "133000000000000001", surfaceId: "hwnd:100f"
     }));
   };
   const controller = new AbortController();
@@ -190,13 +380,76 @@ test("focus never authorizes an ambiguous, changed, or cancelled surface", async
     provider: "claude_desktop",
     operationId: "cancelled-focus",
     identity: setup.identity,
-    process: { processId: 4100, windowId: "hwnd:100f", isForeground: true, identity: setup.identity },
+    process: { processId: 4100, processStartTime: "133000000000000001", windowId: "hwnd:100f", isForeground: true, identity: setup.identity },
     signal: controller.signal,
     shell: false,
     async beforeEffect() { controller.abort(new Error("cancelled")); }
   }), /cancel/i);
   assert.equal(cancelledTransport.sessions[0]?.writes.length, 1);
   assert.equal(cancelledTransport.sessions[0]?.terminated, true);
+});
+
+test("focus refuses a recycled PID even when the executable and window handle match", async (context) => {
+  const setup = await fixture(context), transport = new FakeTransport();
+  let barrierCalls = 0;
+  transport.configure = session => { session.onWrite = request => session.responses.push(envelope(request,
+    request.kind === "authorize" ? "result" : "ready", {
+      authorizationToken: "d".repeat(64), processId: 4100, surfaceId: "hwnd:100f",
+      processStartTime: "133000000000000002", windowFocusVerified: true
+    })); };
+  const process = { processId: 4100, windowId: "hwnd:100f", isForeground: false,
+    processStartTime: "133000000000000001", identity: setup.identity };
+  await assert.rejects(port(setup.helperPath, digest("fixed native helper"), transport).focusExisting({
+    provider: "claude_desktop", operationId: "recycled-pid", identity: setup.identity, process,
+    signal: new AbortController().signal, shell: false, async beforeEffect() { barrierCalls++; }
+  }), /birth|start|changed/i);
+  assert.equal(barrierCalls, 0);
+  assert.equal(transport.sessions[0]?.writes.length, 1);
+  assert.equal(transport.sessions[0]?.terminated, true);
+});
+
+test("focus requires unchanged process birth and native foreground readback after authorization", async (context) => {
+  const setup = await fixture(context);
+  for (const changed of ["birth", "missing-birth", "readback", "missing-readback"]) {
+    const transport = new FakeTransport(); let barrierCalls = 0;
+    transport.configure = session => { session.onWrite = request => {
+      const authorized = request.kind === "authorize";
+      session.responses.push(envelope(request, authorized ? "result" : "ready", {
+        authorizationToken: "e".repeat(64), processId: 4100, surfaceId: "hwnd:100f",
+        processStartTime: authorized && changed === "missing-birth" ? undefined : authorized && changed === "birth" ? "133000000000000002" : "133000000000000001",
+        windowFocusVerified: authorized && changed === "missing-readback" ? undefined : !(authorized && changed === "readback")
+      }));
+    }; };
+    const process = { processId: 4100, windowId: "hwnd:100f", isForeground: false,
+      processStartTime: "133000000000000001", identity: setup.identity };
+    await assert.rejects(port(setup.helperPath, digest("fixed native helper"), transport).focusExisting({
+      provider: "claude_desktop", operationId: "readback-" + changed, identity: setup.identity, process,
+      signal: new AbortController().signal, shell: false, async beforeEffect() { barrierCalls++; }
+    }), /birth|start|changed|readback|foreground/i);
+    assert.equal(barrierCalls, 1); assert.equal(transport.sessions[0]?.writes.length, 2);
+    assert.equal(transport.sessions[0]?.terminated, true);
+  }
+});
+
+test("list refuses missing or lossy process birth identities", async (context) => {
+  const setup = await fixture(context);
+  for (const processStartTime of [undefined, 133000000000000001, "0", "01", "-1", "18446744073709551616"]) {
+    const transport = new FakeTransport();
+    transport.configure = session => { session.onWrite = request => session.responses.push(envelope(request, "result", {
+      observations: [{ processId: 4100, surfaceId: "hwnd:100f", isForeground: false, processStartTime }]
+    })); };
+    await assert.rejects(port(setup.helperPath, digest("fixed native helper"), transport).listRunning(setup.identity, new AbortController().signal), /birth|start/i);
+    assert.equal(transport.sessions[0]?.terminated, true);
+  }
+});
+
+test("old helper protocol cannot substitute for witnessed process discovery", async (context) => {
+  const setup = await fixture(context), transport = new FakeTransport();
+  transport.configure = session => { session.onWrite = request => session.responses.push(envelope(request, "result", { version: 1,
+    observations: [{ processId: 4100, processStartTime: "133000000000000001", surfaceId: "hwnd:100f", isForeground: false }]
+  })); };
+  await assert.rejects(port(setup.helperPath, digest("fixed native helper"), transport).listRunning(setup.identity, new AbortController().signal), /bound to the exact request/i);
+  assert.equal(transport.sessions[0]?.terminated, true);
 });
 
 test("fresh launch binds fixed arguments and proves a new distinct surface", async (context) => {
@@ -302,4 +555,92 @@ test("helper identity drift and malformed or oversized native output fail closed
   malformedTransport.configure = (session) => { session.onWrite = () => session.responses.push("x".repeat(70_000)); };
   await assert.rejects(port(setup.helperPath, digest("fixed native helper"), malformedTransport).listRunning(setup.identity, new AbortController().signal), /oversized|invalid|response/i);
   assert.equal(malformedTransport.sessions[0]?.terminated, true);
+});
+
+test("unconfirmed helper exit blocks results and replacement until the original session retires", async (context) => {
+  const setup = await fixture(context), transport = new FakeTransport();
+  let confirmed = false, waits = 0, terminations = 0;
+  transport.configure = session => {
+    session.onWrite = request => session.responses.push(envelope(request, "result", { observations: [] }));
+    session.terminate = async () => { terminations++; throw Error("synthetic kill failure"); };
+    session.wait = async () => { waits++; if (!confirmed) throw Error("synthetic unavailable exit"); return { code: 0, signal: null }; };
+  };
+  const processPort = port(setup.helperPath, digest("fixed native helper"), transport), signal = new AbortController().signal;
+  const unconfirmed = (error: unknown) => error instanceof Error && "code" in error && error.code === "PROVIDER_HELPER_EXIT_UNCONFIRMED";
+  await assert.rejects(processPort.listRunning(setup.identity, signal), unconfirmed);
+  await assert.rejects(processPort.listRunning(setup.identity, signal), unconfirmed);
+  assert.equal(transport.invocations.length, 1); assert.equal(waits, 2); assert.equal(terminations, 2);
+  confirmed = true;
+  assert.deepEqual(await processPort.listRunning(setup.identity, signal), []);
+  assert.equal(transport.invocations.length, 2); assert.equal(waits, 4);
+});
+
+test("a helper that never confirms exit reaches the fixed retirement bound and remains owned", async (context) => {
+  const setup = await fixture(context), transport = new FakeTransport();
+  transport.configure = session => {
+    session.onWrite = request => session.responses.push(envelope(request, "result", { observations: [] }));
+    session.wait = () => new Promise(() => {});
+  };
+  const processPort = port(setup.helperPath, digest("fixed native helper"), transport);
+  await assert.rejects(processPort.listRunning(setup.identity, new AbortController().signal), /original.*exit.*unconfirmed/i);
+  assert.equal(transport.sessions.length, 1); assert.equal(transport.sessions[0]!.terminated, true);
+  transport.sessions[0]!.wait = async () => ({ code: 0, signal: null });
+  transport.configure = session => { session.onWrite = request => session.responses.push(envelope(request, "result", { observations: [] })); };
+  assert.deepEqual(await processPort.listRunning(setup.identity, new AbortController().signal), []);
+});
+
+test("helper ownership is reserved before asynchronous startup and concurrent operations do not replace it", async (context) => {
+  const setup = await fixture(context), transport = new FakeTransport();
+  let started!: () => void, release!: () => void;
+  const starting = new Promise<void>(resolve => { started = resolve; }), gate = new Promise<void>(resolve => { release = resolve; });
+  const original = transport.start.bind(transport);
+  let starts = 0;
+  transport.start = async invocation => { starts++; started(); if (starts === 1) await gate; return original(invocation); };
+  transport.configure = session => { session.onWrite = request => session.responses.push(envelope(request, "result", { observations: [] })); };
+  const processPort = port(setup.helperPath, digest("fixed native helper"), transport), signal = new AbortController().signal;
+  const pending = processPort.listRunning(setup.identity, signal); void pending.catch(() => {});
+  await starting;
+  try { await assert.rejects(processPort.listRunning(setup.identity, signal), /already in progress/); }
+  finally { release(); }
+  assert.deepEqual(await pending, []); assert.equal(transport.invocations.length, 1);
+});
+
+test("cancellation waits for the exact helper exit and rejects unconfirmed retirement", async (context) => {
+  const setup = await fixture(context), transport = new FakeTransport(), controller = new AbortController();
+  let waited = false;
+  transport.configure = session => {
+    session.onWrite = () => controller.abort();
+    session.onRead = () => new Promise(() => {});
+    session.terminate = async () => { throw Error("synthetic termination failure"); };
+    session.wait = async () => { waited = true; throw Error("synthetic missing exit"); };
+  };
+  await assert.rejects(port(setup.helperPath, digest("fixed native helper"), transport).listRunning(setup.identity, controller.signal), /original.*exit.*unconfirmed/i);
+  assert.equal(waited, true); assert.equal(transport.invocations.length, 1);
+});
+
+test("native helper transport joins actual owned child closure after termination", async () => {
+  const session = await new NodeProviderDesktopHelperTransport().start({ helperPath: process.execPath, helperSha256: "a".repeat(64), arguments: ["--input-type=module", "-e", 'process.stdout.write("ready\\n");setInterval(()=>{},1000);'], environment: {} });
+  try { assert.equal(await session.read(), "ready"); }
+  finally { await session.terminate(); }
+  const exit = await session.wait(); assert.ok(Number.isInteger(exit.code)); assert.ok(exit.signal !== null || exit.code !== 0);
+});
+
+test("native helper transport never returns queued output after a terminal protocol error", async () => {
+  const session = await new NodeProviderDesktopHelperTransport().start({ helperPath: process.execPath, helperSha256: "a".repeat(64), arguments: ["--input-type=module", "-e", 'process.stdout.write("queued\\n",()=>process.stderr.write("x".repeat(4097)));setInterval(()=>{},1000);'], environment: {} });
+  try { await session.wait(); await assert.rejects(session.read(), /diagnostic output/); }
+  finally { await session.terminate(); await session.wait(); }
+});
+
+test("closed helper protocol failures cannot promote earlier results and do not retain exited ownership", async (context) => {
+  const setup = await fixture(context), transport = new FakeTransport();
+  for (const flags of [{ protocolFailed: true }, { unreadResponses: 1 }]) {
+    transport.configure = session => {
+      session.onWrite = request => session.responses.push(envelope(request, "result", { observations: [] }));
+      session.wait = async () => ({ code: 0, signal: null, ...flags });
+    };
+    const processPort = port(setup.helperPath, digest("fixed native helper"), transport);
+    await assert.rejects(processPort.listRunning(setup.identity, new AbortController().signal), /earlier result was not accepted/);
+    transport.configure = session => { session.onWrite = request => session.responses.push(envelope(request, "result", { observations: [] })); };
+    assert.deepEqual(await processPort.listRunning(setup.identity, new AbortController().signal), []);
+  }
 });

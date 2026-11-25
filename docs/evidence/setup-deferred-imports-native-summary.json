@@ -1,0 +1,47 @@
+{
+  "schema": "switchyard-setup-deferred-import-acceptance/v1",
+  "observations": [
+    {
+      "schema": "switchyard-setup-deferred-import-native/v1",
+      "sourceCommit": "56d115efebbec5d70f6232a83a1c64fa76cf49d6",
+      "executionCommit": "a79b0c1757bbc156b337c2dd3ee049aac757d639",
+      "sourceAndExecutionTree": "1d8a54c49cfa65be016a8fb62785ae6c146c265a",
+      "runId": 42268548295,
+      "jobId": 128067159864,
+      "artifactId": 13528047020,
+      "archiveBytes": 4638,
+      "archiveSha256": "e283c3f6406cf346ee1ad0bf9d82e5c96c0e4e5328b0d13c5ba71c9671e14497",
+      "zipSavedLocally": false,
+      "privateReceipt": "windows-setup-owner-56d-native.json",
+      "success": false,
+      "workerExitCode": 3221225794,
+      "workerStdoutBytes": 0,
+      "originalOwnerAcceptedChecks": 0,
+      "failedPhase": "probe-identity-return-structured-result-code3221225794-bytes0",
+      "specificFailingDllEstablished": false
+    },
+    {
+      "schema": "switchyard-setup-deferred-import-native/v1",
+      "sourceCommit": "56d115efebbec5d70f6232a83a1c64fa76cf49d6",
+      "executionCommit": "a79b0c1757bbc156b337c2dd3ee049aac757d639",
+      "sourceAndExecutionTree": "1d8a54c49cfa65be016a8fb62785ae6c146c265a",
+      "runId": 42268548295,
+      "jobId": 128067159820,
+      "artifactId": 13528167743,
+      "archiveBytes": 1034,
+      "archiveSha256": "fb45edc96f9fa559419dd12da211e8008023ef6e86c7c6652116a878283ba871",
+      "zipSavedLocally": false,
+      "privateReceipt": "windows-setup-setup-56d-native.json",
+      "success": true,
+      "checks": 6,
+      "image": {
+        "dependentLoadFlags": 2048,
+        "deferredUiImportsVerified": true,
+        "runtimeModuleIsolationVerified": false
+      },
+      "nativeExitVerified": true
+    }
+  ],
+  "restrictedOwnerAccepted": false,
+  "installedChanged": false
+}

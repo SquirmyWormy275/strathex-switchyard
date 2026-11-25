@@ -1,0 +1,43 @@
+{
+  "schema": "switchyard-role-choices-windows-lane-summary/v1",
+  "baseCommit": "642f5a224157db1409d05db2710c71c171dfeed7",
+  "sourceFiles": {
+    ".github/workflows/switchyard-windows-filesystem.yml": "5f566ac86f1be7ccfcbf2e4c75ba14ca1ea086d399a0e85ba0eaa478b890cabd",
+    "scripts/verify-windows-storage-contracts.mjs": "c0737f4955b012f0b33f7cb5c952cb8a15e6fee8fc5f190a79428bf93e89cd54",
+    "scripts/windows-scenario-groups.test.mjs": "c6ccb374cd1cd634c6117cbc9692b0a73878e9953572f02ea8bbe2d843455dd4",
+    "tools/layout-studio/role-dispatch.test.mjs": "f03b43c79529c59f8291cea5c23865b4da771cbad4ed1e1841968b0ff6abe0cd"
+  },
+  "receipts": [
+    {
+      "id": "8914a455-3ecf-4ec3-b1d1-75dcbd5b0faf",
+      "sha256": "c79bcf304febb343520369e5e333e26b2b4c9d0904a9ffd780ec48b2a41827f6",
+      "totals": {
+        "required": 2,
+        "passed": 2,
+        "failed": 0,
+        "tests": 33,
+        "passedTests": 33,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "originalManifestCommandsBoundsSkipsAndCleanupVerified": true
+    }
+  ],
+  "accepted": {
+    "groups": 2,
+    "passedTests": 33,
+    "skippedTests": 0
+  },
+  "scope": [
+    "An independent role-choices matrix entry selects the complete original role-dispatch.test.mjs group by identity, without a partial test filter or cloned manifest.",
+    "Existing native helper, child deadlines, job limits, skip expectations and fail-fast/concurrency rules are preserved.",
+    "Local tests cover authenticated encrypted-state choices, drift and lease races, and workflow selection."
+  ],
+  "limitations": [
+    "This is local Linux source acceptance of CI wiring, not native Windows acceptance.",
+    "No workflow was manually dispatched, cancelled or retried; normal branch events schedule the new lane.",
+    "The frozen frontend and installed runtime are unchanged."
+  ]
+}

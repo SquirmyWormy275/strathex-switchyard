@@ -1,0 +1,43 @@
+{
+  "schema": "switchyard-installed-tmux-trust-boundary-summary/v1",
+  "sourceCommit": "c2fe4d8fb245a4ca2761c9e2699f986c0df8b8b4",
+  "applicationRelease": "b6098cc95540382582ce2c35216c97742cd8b8797c0b58d33bf1c24fbd6098a6",
+  "normalUpdateChecks": 6,
+  "normalUpdateReceipt": "assignment-legends-1793888592949.json",
+  "installedPaneFocusAccepted": false,
+  "nativeAccountDiscoveryAccepted": true,
+  "blockedCheck": "native-workspace-trust",
+  "trustApprovalSent": false,
+  "modelPromptsSubmitted": 0,
+  "keyboardOpened": false,
+  "lastReceipt": "installed-tmux-focus-1793889285674.json",
+  "lastValidationRestored": true,
+  "lastOriginalFocusRestored": true,
+  "lastOwnedProcessExitsVerified": 4,
+  "lastOwnedSocketAndDirectoryRemoved": true,
+  "ownedCheckoutAndBundleRemoved": true,
+  "checkoutCleanup": "tmux-installed-checkout-cleanup-1793889757886.json",
+  "earlierFailures": [
+    {
+      "receipt": "installed-tmux-focus-1793888644070.json",
+      "phase": "exact-native-inventory",
+      "restorationVerified": true
+    },
+    {
+      "receipt": "installed-tmux-focus-1793888894086.json",
+      "phase": "exact-native-inventory",
+      "restorationVerificationFailed": true,
+      "manualWorkspaceRecovery": "failed-tmux-workspace-recovery-1793889170028.json",
+      "manualScratchRecovery": "failed-tmux-scratch-recovery-1793889170073.json",
+      "manualRecoverySelectedPersonal": true,
+      "exactPreFailureSelectionProven": false
+    }
+  ],
+  "softwareGuardTests": {
+    "groups": 2,
+    "tests": 18,
+    "receipt": "isolated-test-79289402-9446-489d-b05f-41544305b2de.json",
+    "everyChildCleanupVerified": true
+  },
+  "failedManifestPrototype": "isolated-test-11c59e1e-a434-4bd3-8ab8-0cada759c66f.json"
+}

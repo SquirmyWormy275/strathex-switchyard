@@ -1,0 +1,186 @@
+{
+  "schema": "switchyard-native-history-index-leases/v1",
+  "sourceCommit": "6b4089cab2a741e64e964829aab3a6f19df1438e",
+  "executionCommit": "440148795e3da4a2d1176ea4b0f0d99ec199f5c9",
+  "sourceAndExecutionTree": "567287bea743473de4b669199e236f8b19b2a30c",
+  "runId": 42274732782,
+  "workflowJobs": 66,
+  "workflowJobsSuccessful": 66,
+  "selectedArtifactProofs": [
+    {
+      "artifactId": 13532137508,
+      "name": "switchyard-windows-history-native-440148795e3da4a2d1176ea4b0f0d99ec199f5c9",
+      "archiveBytes": 862,
+      "archiveSha256": "4ad03ad6ae93b364d9f998171d62b2f2ff2a428af4965f386af111ea5baa026a",
+      "receiptSha256": "786644bd7ade48ff32e7e7dc6c20c0dfa79ab9bac48c4f17169bf3e2fe9e44bf",
+      "privateReceipt": "windows-boundary-6b4089c-13532137508.json",
+      "schema": "switchyard-windows-history-native-proof/v1",
+      "success": true,
+      "totals": null,
+      "checks": 6,
+      "independentlyStoppedGuardians": 3,
+      "scope": "native-packet-staging-not-task-or-guest",
+      "allChildAndTreeCleanupVerified": true,
+      "groups": [],
+      "jobId": 128088425498
+    },
+    {
+      "artifactId": 13531972840,
+      "name": "switchyard-windows-index-native-440148795e3da4a2d1176ea4b0f0d99ec199f5c9",
+      "archiveBytes": 857,
+      "archiveSha256": "b22d55bf81a8870b24edc92ae3df65baf328888336b4bc63d703d73bd3df90b3",
+      "receiptSha256": "37be1257f50e7de694032b9c6028d2c4960054a0b9e2532d983b1db120773573",
+      "privateReceipt": "windows-boundary-6b4089c-13531972840.json",
+      "schema": "switchyard-windows-index-native-proof/v1",
+      "success": true,
+      "totals": null,
+      "checks": 6,
+      "independentlyStoppedGuardians": 3,
+      "scope": "native-packet-staging-not-task-or-guest",
+      "allChildAndTreeCleanupVerified": true,
+      "groups": [],
+      "jobId": 128088425498
+    },
+    {
+      "artifactId": 13533335410,
+      "name": "switchyard-storage-contract-history-windows-scanner-440148795e3da4a2d1176ea4b0f0d99ec199f5c9",
+      "archiveBytes": 983,
+      "archiveSha256": "a6c2020abda0178c6eb51acbc5edea7e75996ebd0cf86b385f7df919e2aecac8",
+      "receiptSha256": "c5ec7f75d3b2cb45e41b128f743f9e82dc71a9bfd41fdfe0b52bd2415975fc5e",
+      "privateReceipt": "windows-boundary-6b4089c-13533335410.json",
+      "schema": null,
+      "success": true,
+      "totals": {
+        "required": 1,
+        "passed": 1,
+        "failed": 0,
+        "tests": 2,
+        "passedTests": 2,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "checks": 0,
+      "independentlyStoppedGuardians": null,
+      "scope": null,
+      "allChildAndTreeCleanupVerified": true,
+      "groups": [
+        {
+          "file": "tools/layout-studio/repository-windows-shield-history.test.mjs",
+          "pattern": null,
+          "counts": {
+            "total": 2,
+            "passed": 2,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        }
+      ],
+      "jobId": 128088430477
+    },
+    {
+      "artifactId": 13533765069,
+      "name": "switchyard-storage-contract-index-scanner-440148795e3da4a2d1176ea4b0f0d99ec199f5c9",
+      "archiveBytes": 985,
+      "archiveSha256": "e32d3eeb5441e4eb035622b1e48cdcbabd6cdd5a8c2f665b0b4eed11e32cfdd9",
+      "receiptSha256": "d28ce849e9286822b22279bea6913b489afa3320d655bdaac9cb217221903f63",
+      "privateReceipt": "windows-boundary-6b4089c-13533765069.json",
+      "schema": null,
+      "success": true,
+      "totals": {
+        "required": 1,
+        "passed": 1,
+        "failed": 0,
+        "tests": 2,
+        "passedTests": 2,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "checks": 0,
+      "independentlyStoppedGuardians": null,
+      "scope": null,
+      "allChildAndTreeCleanupVerified": true,
+      "groups": [
+        {
+          "file": "tools/layout-studio/repository-windows-shield-index.test.mjs",
+          "pattern": null,
+          "counts": {
+            "total": 2,
+            "passed": 2,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        }
+      ],
+      "jobId": 128088430459
+    },
+    {
+      "artifactId": 13532122788,
+      "name": "switchyard-storage-contract-leases-440148795e3da4a2d1176ea4b0f0d99ec199f5c9",
+      "archiveBytes": 1132,
+      "archiveSha256": "e608dce7e7c601d86ef6476c9333ffc4911df8d18baaf9da30eb5010f9ef9714",
+      "receiptSha256": "4e6034f12a2cc104821cea516642451f7eda9753d9103bba5fbc381579daf4e7",
+      "privateReceipt": "windows-boundary-6b4089c-13532122788.json",
+      "schema": null,
+      "success": true,
+      "totals": {
+        "required": 2,
+        "passed": 2,
+        "failed": 0,
+        "tests": 25,
+        "passedTests": 24,
+        "failedTests": 0,
+        "skippedTests": 1,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "checks": 0,
+      "independentlyStoppedGuardians": null,
+      "scope": null,
+      "allChildAndTreeCleanupVerified": true,
+      "groups": [
+        {
+          "file": "tools/layout-studio/state-lock.test.mjs",
+          "pattern": null,
+          "counts": {
+            "total": 11,
+            "passed": 10,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 1,
+            "todo": 0
+          }
+        },
+        {
+          "file": "tools/layout-studio/keyless-lease-pool.test.mjs",
+          "pattern": null,
+          "counts": {
+            "total": 14,
+            "passed": 14,
+            "failed": 0,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          }
+        }
+      ],
+      "jobId": 128088429175
+    }
+  ],
+  "zipSavedLocally": false,
+  "nativePacketChecks": 12,
+  "nativePacketGuardianExits": 6,
+  "packetGitWitnessSynthetic": true,
+  "sourceGitObservedByNativePacketProof": false,
+  "scannerGuestExecutionDoubled": true,
+  "actualGuestAccepted": false,
+  "installedWindowsAccepted": false,
+  "workstationChanged": false
+}

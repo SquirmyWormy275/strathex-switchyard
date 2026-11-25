@@ -1,0 +1,122 @@
+{
+  "schema": "switchyard-windows-editor-project-context/v1",
+  "at": "2026-11-07T11:39:32.955Z",
+  "baseCommit": "318fafcaf65342ba4a8de87bc7606535735b2f5c",
+  "sourceFiles": {
+    "apps/vscode-extension/src/studio-windows-editor-launch.ts": "c2984feabc8b90373f6684cdc781a99d4fd647fe241c1a18b60bf4249a210dfe",
+    "apps/vscode-extension/src/vscode-like.ts": "a5a1795e77230e426295fc64345270ddbe7769e164d96f812057f46c98d54cc9",
+    "apps/vscode-extension/test/studio-windows-editor-launch.test.ts": "9c6782d79307e1f01c93affa2a4bea4273c82be44bd657a969020e649816158e",
+    "tools/layout-studio/windows-coding-editor-connections.test.mjs": "85fd03e10c96b4fcdb564fe444c05d2223dbed1a86b4596eaf8c4a87a6798b1a"
+  },
+  "receipts": [
+    {
+      "name": "isolated-test-0de6bb6e-62a2-444d-b250-a1d7eb12fd91.json",
+      "sha256": "aa0356bd739f1f6f1ff2c8444a784bac01efa1f486474a2a0f39325099e88405",
+      "success": false,
+      "totals": {
+        "required": 1,
+        "passed": 0,
+        "failed": 1,
+        "tests": 12,
+        "passedTests": 7,
+        "failedTests": 5,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "timeout": false,
+      "originalCleanupVerified": true
+    },
+    {
+      "name": "isolated-test-b9eaf9ea-1543-42f3-bf87-0c79b4c6dc45.json",
+      "sha256": "76ced283d2f73721515283c7b91ef23d4bb77252f122ee02b9e46707f6cc5639",
+      "success": false,
+      "totals": {
+        "required": 1,
+        "passed": 0,
+        "failed": 1,
+        "tests": 0,
+        "passedTests": 0,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "timeout": true,
+      "originalCleanupVerified": true
+    },
+    {
+      "name": "isolated-test-bdd91576-cda5-45ed-89e2-e10746963e22.json",
+      "sha256": "894190ab5270d6f90128db309ccc1ad51f28090d5791595d958ddc84c76ac9bf",
+      "success": true,
+      "totals": {
+        "required": 1,
+        "passed": 1,
+        "failed": 0,
+        "tests": 12,
+        "passedTests": 12,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "timeout": false,
+      "originalCleanupVerified": true
+    },
+    {
+      "name": "isolated-test-fffcd89f-9b8b-43ed-8f38-7fad9cade388.json",
+      "sha256": "f9b58c3fc1056791c1105c869d5f550a8b4f2e1ef675f3721b83e7d22c1f7cc0",
+      "success": true,
+      "totals": {
+        "required": 8,
+        "passed": 8,
+        "failed": 0,
+        "tests": 69,
+        "passedTests": 67,
+        "failedTests": 0,
+        "skippedTests": 2,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "timeout": false,
+      "originalCleanupVerified": true
+    }
+  ],
+  "accepted": {
+    "groups": 8,
+    "passedTests": 67,
+    "skippedTests": 2
+  },
+  "typechecks": [
+    {
+      "command": "node node_modules/typescript/bin/tsc --noEmit -p tsconfig.json",
+      "success": true
+    },
+    {
+      "command": "node node_modules/typescript/bin/tsc --noEmit -p apps/vscode-extension/tsconfig.build.json",
+      "success": true
+    }
+  ],
+  "scope": {
+    "originalWorkspaceFolderRetained": true,
+    "localFileUriRequired": true,
+    "ambiguousRootsRefused": true,
+    "workspaceChangeInvalidatesReview": true,
+    "contextRecheckedAcrossSignedReview": true,
+    "workspaceDepartureRetiresOriginalCarrier": true,
+    "terminalAndProviderPreserved": true,
+    "shutdownJoinsOriginalBoundedRetirement": true,
+    "uncertainRetirementStillFails": true,
+    "fixtureAttemptsAllCleanup": true
+  },
+  "failureNotes": [
+    "Five original regressions reproduced stale project admission and missing retirement.",
+    "First correction exposed cancellation of an in-flight signed retirement; fixture cleanup then reached its original 45-second bound. Harness verified owned-tree termination.",
+    "Final shutdown preserves original request bounds and joins cleanup before closing the transport. No timeout or assertion was relaxed."
+  ],
+  "limitations": [
+    "Linux-host verification uses explicit Windows native/file and VS Code/provider doubles; the composed carrier and signed/encrypted lifecycle are real.",
+    "Native Windows acceptance of this source is pending.",
+    "Command activation, guided project selection UI and live account/task/TUI behavior remain unfinished; no installed backend or frontend changed."
+  ]
+}

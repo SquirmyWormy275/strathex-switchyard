@@ -1,0 +1,62 @@
+{
+  "schema": "switchyard-cvss-v4-summary/v1",
+  "basis": "e534d5022fadaf4c192bef1ea415a471f89f67da",
+  "sourceSha256": {
+    "tools/layout-studio/cvss-v4-data.mjs": "6a4c0d983bb1f4ad9ca7d64c5fefa3c9de73cc0635f8692d70691c1a8a486c0d",
+    "tools/layout-studio/cvss-v4-metrics.mjs": "d90a5216fd15ead8fe1257d2d7a7bb14ca087143adb0e97b6874d9b7074527fb",
+    "tools/layout-studio/cvss-v4-metrics.test.mjs": "1d360f7ff89daa69d24615dc2510cdab4f1e127ed4673e38f76a849553673c28",
+    "tools/layout-studio/osv-advisory-source.mjs": "71577db21e4cc0d5f86e4d3352b4cb1a664c2dcef372f0e3afd7b7f3d62fa5b7",
+    "tools/layout-studio/osv-advisory-source.test.mjs": "7bc14481bce85d2ac768d80759b0a9efb5c59f21b8a5c88122f682ae3e4c2eb8",
+    "tools/layout-studio/repository-shield-osv-source.test.mjs": "9f44a33645836d87a6120fad2eb73cf6820b9743d9a2155b48de81a50f17e8ea",
+    "deployment/suite/release.test.mjs": "37d7f7cb4974acc5535396c508c1c7eef78b9699c75efcce7a3f98a2a67aa419",
+    "scripts/test-support/cvss-v4-cases.mjs": "e458a908a7d3cb18b54e84f54523c7b8d8bd34398c82f9ebc254ccbabd493936",
+    "scripts/verify-cvss-v4-reference.mjs": "22b8b5f0ea4652fecc023b2a59395e61ddb1308b913027e2caef1b17430cecf1",
+    "scripts/verify-task-owner-host.mjs": "3531a3ab151485657e4f2305155feb24f32502dd9cc46c663c3cf2af9672dcce",
+    "scripts/run-isolated-tests.mjs": "d2121647352814d59344acb4ab8f629dc3054485b98bcc40595734e7e0051a3a"
+  },
+  "referenceReceipt": "cvss-v4-reference-1793952654048.json",
+  "referenceCommit": "c5b0d409ae9f57c44264c6ce5f27d89298e1d32a",
+  "referenceCases": 463204,
+  "cohorts": {
+    "all-base": 104976,
+    "all-base-threat": 209952,
+    "sampled-inheritance": 6148,
+    "all-impact-requirement-threat": 104976,
+    "all-modified-exploitability-impact": 34992,
+    "all-supplemental": 2160
+  },
+  "independentResultSha256": "0182d40549b5c09012bf428b5aa443b6e0c9880acd902e8430b2261dc22407ee",
+  "referenceAlgorithmShipped": false,
+  "scoringDataShippedWithAttribution": true,
+  "referenceCleanupReceipt": "cvss-v4-reference-cleanup-1793952761640.json",
+  "referenceFilesRemoved": true,
+  "focused": [
+    {
+      "receipt": "isolated-test-22e4ef75-6ded-4d99-921a-7a16f6718677.json",
+      "groups": 4,
+      "passedTests": 51,
+      "childAndTreeCleanupVerified": true
+    },
+    {
+      "receipt": "isolated-test-dc6d8d3a-efe7-4be1-a2d7-a766a61f749a.json",
+      "groups": 1,
+      "passedTests": 5,
+      "childAndTreeCleanupVerified": true
+    },
+    {
+      "receipt": "isolated-test-e6cacbba-01c1-495a-826f-1779ab079b2a.json",
+      "groups": 1,
+      "passedTests": 2,
+      "childAndTreeCleanupVerified": true
+    }
+  ],
+  "typecheck": true,
+  "preflightFailure": "An ad-hoc package-test selection named a nonexistent CLI test and stopped before creating temporary storage or starting tests. The corrected exact release group then passed.",
+  "limits": [
+    "The comparison covers every base vector and base/threat combination plus the declared environmental, inheritance and supplemental cohorts; it is not an exhaustive cross-product of all optional metrics.",
+    "Actual isolated Linux scanner execution and Windows guest doubles retain critical failed/incomplete outcomes, native-exit evidence and unusable gates despite zero supplied context scores.",
+    "Package and source checks are complete. Installed acceptance of this source is separate and was not yet run when this receipt was written.",
+    "Source metrics are not local environmental evidence or publisher authentication. Coverage, broader ecosystems and native Windows guest validation remain unfinished.",
+    "No model request, live task, account switch, device transaction or frontend change occurs."
+  ]
+}

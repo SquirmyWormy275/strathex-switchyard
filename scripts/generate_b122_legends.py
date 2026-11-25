@@ -12,7 +12,6 @@ import argparse
 import hashlib
 import io
 import json
-import shutil
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
@@ -24,6 +23,8 @@ from reportlab.lib.colors import Color, HexColor, black, white
 from reportlab.lib.pagesizes import A4
 from reportlab.pdfbase.pdfmetrics import stringWidth
 from reportlab.pdfgen import canvas
+from b122_legend_geometry import geometry, PDF_SHA256, SVG_SHA256
+from b122_legend_render import draw_compact, draw_full, individual_svg, MIN_LEGEND_FONT
 
 rl_config.invariant = 1
 
@@ -105,7 +106,7 @@ SHORT_ACTIONS = {
     ("COMPOUND", "alt"): "WORKFLOW PALETTE",
     ("COMPOUND", "shift_alt"): "LFG - GATED",
     ("RUN", "shift"): "DEBUG TARGET",
-    ("RUN", "alt"): "STOP MANAGED RUN",
+    ("RUN", "alt"): "STOP OWNED RUN",
     ("RUN", "shift_alt"): "LAUNCH WEB APP",
     ("VOICE", "shift"): "SWITCH PROVIDER",
     ("VOICE", "alt"): "BIND SESSION",
@@ -123,10 +124,6 @@ SHORT_ACTIONS = {
     ("SANDBOX", "shift_alt"): "REBUILD FULL",
     ("SANDBOX", "ctrl_shift_alt"): "QUARANTINE",
 }
-
-TOP_CENTERS = tuple((50.7 + 61.2 * column, row_y) for row_y in (617.0, 505.2) for column in range(9))
-FULL_CENTERS = tuple((66.2 + 115.8 * column, row_y) for row_y in (325.4, 207.5, 90.0) for column in range(5))
-
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
@@ -196,12 +193,13 @@ def build_all(root: Path, template: Path) -> list[Path]:
         "sourceProtocolVersion": data["protocolVersion"],
         "sourceManifestSha256": hashlib.sha256(CONTROL_MAP.read_bytes()).hexdigest(),
         "physicalPositionStatus": "unassigned-within-bank",
+        "template": {"sourcePdfSha256": PDF_SHA256, "sourceSvgSha256": SVG_SHA256, "units": "points", "inkInsetPoints": 0.5, "minimumFontPoints": MIN_LEGEND_FONT, "capFitVerified": False},
         "controls": items,
-    }, indent=2) + "\n", encoding="utf-8")
+    }, indent=2) + "\n", encoding="utf-8", newline="\n")
     outputs = [manifest_path]
     for item in items:
         destination = legends / "individual" / f"{item['logicalId']}-{item['control'].lower().replace('_', '-')}.svg"
-        destination.write_text(individual_svg(item, PALETTES["ibm-blue"]), encoding="utf-8")
+        destination.write_text(individual_svg(item, PALETTES["ibm-blue"], SHORT_ACTIONS), encoding="utf-8", newline="\n")
         outputs.append(destination)
     for palette_name, palette in PALETTES.items():
         destination = pdfs / f"SXSY-B122-legends-{palette_name}.pdf"
@@ -219,6 +217,9 @@ def build_all(root: Path, template: Path) -> list[Path]:
 def make_legend_pdf(template: Path, destination: Path, items: Sequence[Mapping], palette: Palette) -> None:
     if not template.is_file():
         raise FileNotFoundError(f"Template not found: {template}")
+    if hashlib.sha256(template.read_bytes()).hexdigest() != PDF_SHA256:
+        raise ValueError("The source template changed; review its geometry and attribution first.")
+    shapes = geometry()
     source = PdfReader(str(template))
     media_box = source.pages[0].mediabox if len(source.pages) == 1 else None
     page_size = None if media_box is None else (round(float(media_box.width), 2), round(float(media_box.height), 2))
@@ -230,10 +231,10 @@ def make_legend_pdf(template: Path, destination: Path, items: Sequence[Mapping],
         c = canvas.Canvas(overlay_bytes, pagesize=A4, invariant=1)
         c.setTitle(f"SXSY-B122 {bank_name} legends - {palette.name}")
         c.setAuthor("STRATHEX SWITCHYARD; template geometry by cyber_engineer")
-        for item, center in zip(bank_items, TOP_CENTERS[: len(bank_items)], strict=True):
-            draw_compact(c, center, item, palette)
-        for item, center in zip(bank_items, FULL_CENTERS[: len(bank_items)], strict=True):
-            draw_full(c, center, item, palette)
+        for item, face in zip(bank_items, shapes["compact"][: len(bank_items)], strict=True):
+            draw_compact(c, face, item, palette)
+        for item, shape in zip(bank_items, shapes["full"][: len(bank_items)], strict=True):
+            draw_full(c, shape, item, palette, SHORT_ACTIONS)
         c.setFillColor(palette.dark)
         c.setFont("Helvetica-Bold", 6.5)
         c.drawString(18, 24, f"SXSY-B122 / {bank_name} / {palette.name}")
@@ -243,9 +244,9 @@ def make_legend_pdf(template: Path, destination: Path, items: Sequence[Mapping],
         overlay_bytes.seek(0)
         # merge_page mutates the page object, so use a fresh source page for
         # each bank rather than carrying the prior bank's overlay forward.
-        page = PdfReader(str(template)).pages[0]
+        writer.add_page(PdfReader(str(template)).pages[0])
+        page = writer.pages[-1]
         page.merge_page(PdfReader(overlay_bytes).pages[0])
-        writer.add_page(page)
         writer.pages[-1].compress_content_streams(level=9)
     writer.add_metadata({
         "/Title": f"SXSY-B122 canonical legends - {palette.name}",
@@ -254,108 +255,9 @@ def make_legend_pdf(template: Path, destination: Path, items: Sequence[Mapping],
         "/Creator": "scripts/generate_b122_legends.py",
         "/Producer": "pypdf",
     })
-    writer.compress_identical_objects(remove_duplicates=True, remove_unreferenced=True)
+    writer.compress_identical_objects(remove_identicals=True, remove_orphans=True)
     with destination.open("wb") as stream:
         writer.write(stream)
-
-
-def draw_compact(c: canvas.Canvas, center: tuple[float, float], item: Mapping, palette: Palette) -> None:
-    x, y = center
-    c.setFillColor(palette.dark)
-    c.rect(x - 15.0, y - 18.2, 30.0, 36.4, fill=1, stroke=0)
-    c.setFillColor(palette.accent)
-    c.rect(x - 15.0, y + 12.6, 30.0, 5.6, fill=1, stroke=0)
-    c.setFillColor(white)
-    c.setFont("Helvetica-Bold", 5.0)
-    c.drawCentredString(x, y + 14.0, item["logicalId"])
-    draw_wrapped(c, item["displayName"], x, y - 2.0, 26.5, 17.5, "Helvetica-Bold", 6.5, white)
-
-
-def draw_full(c: canvas.Canvas, center: tuple[float, float], item: Mapping, palette: Palette) -> None:
-    x, y = center
-    c.setFillColor(palette.dark)
-    c.rect(x - 18.2, y - 18.2, 36.4, 36.4, fill=1, stroke=0)
-    c.setFillColor(palette.accent)
-    c.rect(x - 18.2, y + 12.7, 36.4, 5.5, fill=1, stroke=0)
-    c.setFillColor(white)
-    c.setFont("Helvetica-Bold", 4.7)
-    c.drawCentredString(x, y + 14.0, item["logicalId"])
-    draw_wrapped(c, item["displayName"], x, y - 2.5, 32.0, 18.5, "Helvetica-Bold", 6.3, white)
-    panels = (
-        ("shift", "S", x, y + 39.0, 49.0, 15.0, 0),
-        ("alt", "A", x - 41.5, y, 44.0, 14.0, 90),
-        ("shift_alt", "S+A", x + 41.5, y, 44.0, 14.0, -90),
-        ("ctrl_shift_alt", "C+S+A", x, y - 39.0, 49.0, 15.0, 0),
-    )
-    for modifier, prefix, px, py, width, height, rotation in panels:
-        action = SHORT_ACTIONS.get((item["control"], modifier), "RESERVED")
-        c.saveState()
-        c.translate(px, py)
-        c.rotate(rotation)
-        c.setFillColor(palette.light if action != "RESERVED" else HexColor("#EEEEEE"))
-        c.roundRect(-width / 2, -height / 2, width, height, 2, fill=1, stroke=0)
-        c.setFillColor(palette.dark if action != "RESERVED" else HexColor("#777777"))
-        c.setFont("Helvetica-Bold", 4.2)
-        c.drawCentredString(0, 2.1, prefix)
-        draw_wrapped(c, action, 0, -3.0, width - 3.0, 6.5, "Helvetica-Bold", 3.8, palette.dark if action != "RESERVED" else HexColor("#777777"))
-        c.restoreState()
-
-
-def draw_wrapped(c: canvas.Canvas, text: str, x: float, y: float, width: float, height: float, font: str, max_size: float, color: Color) -> None:
-    words = text.split()
-    candidates: list[list[str]] = [[text]]
-    if len(words) > 1:
-        for split in range(1, len(words)):
-            candidates.append([" ".join(words[:split]), " ".join(words[split:])])
-    best: tuple[float, list[str]] | None = None
-    for lines in candidates:
-        size = max_size
-        while size >= 3.0:
-            line_height = size * 1.05
-            if len(lines) * line_height <= height and max(stringWidth(line, font, size) for line in lines) <= width:
-                if best is None or size > best[0]:
-                    best = (size, lines)
-                break
-            size -= 0.2
-    if best is None:
-        raise ValueError(f"Legend cannot fit safely: {text}")
-    size, lines = best
-    c.setFillColor(color)
-    c.setFont(font, size)
-    line_height = size * 1.05
-    start = y + (len(lines) - 1) * line_height / 2
-    for index, line in enumerate(lines):
-        c.drawCentredString(x, start - index * line_height, line)
-
-
-def individual_svg(item: Mapping, palette: Palette) -> str:
-    panels = []
-    panel_specs = (("shift", "S", 60, 7, 80, 26), ("alt", "A", 4, 50, 50, 36), ("shift_alt", "S+A", 146, 50, 50, 36), ("ctrl_shift_alt", "C+S+A", 60, 107, 80, 26))
-    for modifier, prefix, x, y, width, height in panel_specs:
-        action = SHORT_ACTIONS.get((item["control"], modifier), "RESERVED")
-        panels.append(f'<rect x="{x}" y="{y}" width="{width}" height="{height}" rx="4" fill="{hex_color(palette.light if action != "RESERVED" else HexColor("#EEEEEE"))}"/><text x="{x + width/2}" y="{y + 10}" class="mod">{prefix}</text><text x="{x + width/2}" y="{y + 20}" class="action" textLength="{width - 5}" lengthAdjust="spacingAndGlyphs">{escape_xml(action)}</text>')
-    name_lines = balanced_svg_lines(item["displayName"])
-    name_markup = "".join(f'<text x="100" y="{74 + index * 14 - (len(name_lines) - 1) * 7}" class="name" text-anchor="middle">{escape_xml(line)}</text>' for index, line in enumerate(name_lines))
-    return f'''<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="200" height="140" viewBox="0 0 200 140" role="img" aria-labelledby="title desc">
-  <title id="title">{escape_xml(item['displayName'])} relegendable insert</title>
-  <desc id="desc">Logical ID {item['logicalId']}; physical position remains unassigned within the {item['bank']}.</desc>
-  <style>.id{{font:700 8px sans-serif;fill:#fff}}.name{{font:700 12px sans-serif;fill:#fff}}.mod{{font:700 7px sans-serif;fill:{hex_color(palette.dark)};text-anchor:middle}}.action{{font:700 5px sans-serif;fill:{hex_color(palette.dark)};text-anchor:middle}}</style>
-  <rect x="60" y="40" width="80" height="60" rx="4" fill="{hex_color(palette.dark)}"/>
-  <rect x="60" y="40" width="80" height="13" rx="4" fill="{hex_color(palette.accent)}"/>
-  <text x="100" y="49" class="id" text-anchor="middle">{item['logicalId']}</text>
-  {name_markup}
-  {''.join(panels)}
-</svg>
-'''
-
-
-def balanced_svg_lines(text: str) -> list[str]:
-    words = text.split()
-    if len(text) <= 11 or len(words) == 1:
-        return [text]
-    candidates = [([" ".join(words[:index]), " ".join(words[index:])], abs(len(" ".join(words[:index])) - len(" ".join(words[index:])))) for index in range(1, len(words))]
-    return min(candidates, key=lambda candidate: candidate[1])[0]
 
 
 def make_calibration_pdf(destination: Path) -> None:
@@ -536,14 +438,6 @@ def draw_paragraph(c: canvas.Canvas, text: str, x: float, y: float, width: float
     for index, rendered in enumerate(lines):
         c.drawString(x, y - index * leading, rendered)
     return max(leading, len(lines) * leading)
-
-
-def hex_color(color: Color) -> str:
-    return "#%02X%02X%02X" % tuple(round(channel * 255) for channel in (color.red, color.green, color.blue))
-
-
-def escape_xml(value: str) -> str:
-    return value.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace('"', "&quot;")
 
 
 def compare_tree(expected_root: Path, actual_root: Path, generated: Iterable[Path]) -> None:

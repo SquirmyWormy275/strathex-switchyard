@@ -1,0 +1,43 @@
+{
+  "schema": "switchyard-native-windows-checkpoint-summary/v1",
+  "sourceCommit": "c8b12160bb8dea7f535b22dde852299417b01d96",
+  "executionCommit": "70c50eaf6b33cef26012db13030b96e10eb64e9e",
+  "workflowRun": 42036945776,
+  "helperSha256": "65549ce0581cc11586ed59b3fe56acff32212d6461af740461a24fa66b4d4f04",
+  "artifacts": [
+    {
+      "id": 13420380001,
+      "archiveSha256": "21536e65f5d1ef2edeeca321438962804e34182abad871cd25cedd2181a1a831",
+      "receipt": "windows-c8b-filesystem.json",
+      "success": true,
+      "checks": 30,
+      "nativeCalls": 39,
+      "ownedDiskAttachedAndDetached": true,
+      "nativeGuardianExitAndOwnedCleanupVerified": true
+    },
+    {
+      "id": 13418649182,
+      "archiveSha256": "87ebc729641432cceb593f686987ed88c022d20539323eccad3bd01bfac1012b",
+      "receipt": "windows-c8b-native-setup.json",
+      "success": true,
+      "checks": 6,
+      "restrictedMetadataChecks": 13,
+      "nativeExitVerified": true,
+      "exactServiceAndFilesRetired": true
+    }
+  ],
+  "archiveDigestsVerified": true,
+  "nativeCppBuildAccepted": true,
+  "wholeWorkflowAccepted": false,
+  "separateFailures": [
+    "restricted-primary-token/restriction-flags",
+    "state-lock acquisition deadline",
+    "Windows Shield exception contract child deadline"
+  ],
+  "earlierNativeSetupFailuresRemainFailed": true,
+  "earlierNativeSetupFailureCauseEstablished": false,
+  "normalUserSetupAccepted": false,
+  "guestLaunched": false,
+  "accountCreated": false,
+  "physicalDeviceOpened": false
+}

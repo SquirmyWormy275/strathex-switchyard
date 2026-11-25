@@ -1,0 +1,118 @@
+{
+  "schema": "switchyard-claude-desktop-focus-source-evidence/v1",
+  "scope": "Exact reviewed Windows Claude Desktop focus, independent saved identity, authenticated UI and closed navigation shortcuts",
+  "runs": [
+    {
+      "receiptId": "072ac1d6-ce03-454a-9d7b-45a9b876fe3a",
+      "sha256": "56ca9156112bb732f8f7f172e611ffd30a85d318dd2213ecb6fe597ffd348850",
+      "totals": {
+        "required": 12,
+        "passed": 12,
+        "failed": 0,
+        "tests": 177,
+        "passedTests": 177,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "files": [
+        "scripts/windows-backend-shards.test.mjs",
+        "scripts/run-isolated-tests.test.mjs",
+        "deployment/suite/release.test.mjs",
+        "tools/layout-studio/configuration.test.mjs",
+        "tools/layout-studio/suite.test.mjs",
+        "tools/layout-studio/integrations.test.mjs",
+        "tools/layout-studio/client-ui.test.mjs",
+        "tools/layout-studio/native-focus-ui.test.mjs",
+        "tools/layout-studio/connection-ui.test.mjs",
+        "tools/layout-studio/physical-intent.test.mjs",
+        "tools/layout-studio/native-focus-gateway.test.mjs",
+        "tools/layout-studio/windows-native-focus.test.mjs"
+      ],
+      "originalBoundsPreserved": true,
+      "ownedCleanupComplete": true
+    },
+    {
+      "receiptId": "a96a5785-bc1d-43a9-9870-885528048562",
+      "sha256": "ec15b46b1fa4156a4c4281ea013e0d5af1ec75747647c4558de76aee4cefd77f",
+      "totals": {
+        "required": 4,
+        "passed": 4,
+        "failed": 0,
+        "tests": 39,
+        "passedTests": 39,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "files": [
+        "tools/layout-studio/client-ui.test.mjs",
+        "tools/layout-studio/native-focus-ui.test.mjs",
+        "tools/layout-studio/connection-ui.test.mjs",
+        "tools/layout-studio/voice-ui.test.mjs"
+      ],
+      "originalBoundsPreserved": true,
+      "ownedCleanupComplete": true
+    }
+  ],
+  "sourceFiles": {
+    "tools/layout-studio/windows-native-focus.mjs": "282456524fe5f14a9bf4bb83dd93666ca6176ec3cb9f890a693116857014b21c",
+    "tools/layout-studio/client-integrations.mjs": "4f296db75d01e999b8b958093305b1dc470e3100de44c6499f74bd805d7b8d13",
+    "tools/layout-studio/host.mjs": "15d6c29e418f90e6c4b5f3e338a4a06648e8bd89c99f994d6d7b701561c50323",
+    "tools/layout-studio/workspace.mjs": "3fd97d0a29bfae72f1a81cc0656b787158f600d194452fa57af80c6a2a767c71",
+    "tools/layout-studio/connection.mjs": "8f3d9b4c6f0829f682cca4be65f088beb69cd20f7fd98390e7ae44816d556c34",
+    "tools/layout-studio/client-ui.mjs": "cd10a724ae07cf2412a494e4b69b4d63beb8ecf66714c37b9dac6b8565eedd78",
+    "tools/layout-studio/physical-intent-contract.mjs": "e3ff9289c2f5bbe73b9283c3e7576cf23a60de192a66a1c2a503a97a5ecf790a",
+    "tools/layout-studio/windows-native-focus.test.mjs": "7be6670c13544e0f473fb8b6d3ec8e054568eb14a0a386fae2988469dfb6b74e",
+    "tools/layout-studio/native-focus-ui.test.mjs": "4f7cc75b8768f4cdef2053549b7a57f0339f1a638895b913dccc74b93c55e1b6",
+    "tools/layout-studio/configuration.test.mjs": "10b3fb51b38b47a497cb5a816390242843c3b91e4971a7e554293dda6b8fd9a0",
+    "tools/layout-studio/connection-ui.test.mjs": "5d8aff54434f870799d889d440a397d3b7131e78eea5a5a9fad00de70490223c",
+    "apps/desktop-hotkeys/Program.cs": "0770491a0396ab85582b45f2b7af6a477fd72fedac9907449c62cb739bcdaf01",
+    "scripts/verify-client-platform.mjs": "01d5d7812a9f73c92da86d68dab91b6dc5e2fe0d1ce0d3370fb30ce3ba2f3ed1"
+  },
+  "helper": {
+    "receiptSha256": "cf4fc05f422b51bc0d225730da4c57232195de77359bacf17d331371a943364c",
+    "sdk": "8.0.424",
+    "offline": true,
+    "warningsAsErrors": true,
+    "selfTest": {
+      "schema": "sxsy-b122.provider-desktop-self-test",
+      "version": 1,
+      "status": "ok",
+      "desktopProtocolVersion": 2,
+      "processBirthGrammarVerified": true,
+      "focusOnlyPolicyVerified": true,
+      "nativeEditorPolicyVerified": true,
+      "currentProcessVerified": null,
+      "ownerQueryVerified": null,
+      "processId": 618005,
+      "processStartTime": null,
+      "tokenAccessMask": 8,
+      "windowFocused": false
+    },
+    "linuxFocusExitCode": 65,
+    "ownedFilesRemoved": 61,
+    "ownedBytesRemoved": 1926362,
+    "cleanupComplete": true
+  },
+  "originalBuildFailure": {
+    "receiptSha256": "a558223bc8550ca7924de4cece27aad0cc071907763bad0dca88f9d4735f6326",
+    "cause": "Temporary build staging omitted other C# files included implicitly by the original project.",
+    "originalOutcome": "failed",
+    "correction": "Copy all original implicit C# project inputs into owned staging. No production or compiler guard changed.",
+    "ownedFilesRemoved": 20,
+    "cleanupComplete": true
+  },
+  "boundaries": [
+    "Actual authenticated HTTP, executable hashing and encrypted storage; native Windows signatures, process and window responses are explicit doubles.",
+    "Separate Claude Desktop identity cannot reuse a ChatGPT request or select Claude Code. Final-effect policy/image checks and exact helper retirement are unchanged.",
+    "A successful focus cannot establish account, project, conversation, task attachment, task resumption or completion.",
+    "No real application, account, prompt, keyboard, microphone or installed workspace was changed by these tests.",
+    "Windows product/company/signature matching remains strict. A real installed MSIX image and interactive desktop still require acceptance.",
+    "Linux Claude focus and native application launch remain unfinished. Linux refuses without a Code/web/application fallback.",
+    "The helper keeps process access 0x101000 and token QUERY 8. No ACL, identity, runtime fallback, timeout or skip changed.",
+    "Browser automation is unavailable before inspection; interaction fixtures are not visual acceptance."
+  ]
+}

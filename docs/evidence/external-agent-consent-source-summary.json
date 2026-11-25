@@ -1,0 +1,134 @@
+{
+  "schema": "switchyard-external-agent-consent-source-summary/v1",
+  "baseCommit": "f74a3805a150b9675c70a0f1b3ea8f4b266cbc35",
+  "sourceFiles": {
+    "tools/layout-studio/custom-agents.mjs": "3a4b75addef2845cdc79ba96cd6669fe2a179ca81d00edc5959ad65f28ee2a8e",
+    "tools/layout-studio/agent-observation.mjs": "00877f5b186ccd67048f4ba401a526eedffa4adce6f252e9bdfd36b298d7bc35",
+    "integrations/agent-sdk.mjs": "302ff83b8b9005ae9b0de631937180f1589aa5f8a273aa81d6eaf4094254b8b5",
+    "integrations/switchyard_agent.py": "5492635e0ad566d3c059a0470f4fbb9e70116cb5461be4c45fefd7fb52c141e9",
+    "tools/layout-studio/agent-revocation.test.mjs": "35bc239d2cb01a04d0036ebee09be0379d85eef3dc20f87d6e6c0b447cdfac81",
+    "tools/layout-studio/agent-observation.test.mjs": "037a6d78fb1e8919505aa8e989ebc5716c683989e207b056209e025b68163629",
+    "tools/layout-studio/integrations.test.mjs": "7177f67e68b24b1dcc91e45e14521a03dee1680acc5bc6a97efca01332a44951",
+    "scripts/verify-agent-security-host.mjs": "adfcdab8376eb6e88a2a75c0a3e322e68b2f7e9bc949db13f6ef4c49b3eb3ed9",
+    ".github/workflows/switchyard-windows-filesystem.yml": "9203d209d9025d0e4af8f4a9dd2d069e2a73c87e6350b960f86b50957e4f7cb2",
+    "scripts/verify-windows-storage-contracts.mjs": "42343c14bedfc6254227d7f0a12359cd52dc1baacd6364cdc99688348fb4e227",
+    "scripts/windows-scenario-groups.test.mjs": "8ef5e1921c9d6d1fd4207070a12bba0ec11d091110391a799f8e7355fa9f3a35"
+  },
+  "receipts": [
+    {
+      "id": "9790ec39-0e61-4e02-a177-6df2fb0822ec",
+      "sha256": "ee2db57c95e1da87a2a5c77f91dee4cd6a3405a1ef03cb52ffe717232e2920a3",
+      "success": false,
+      "totals": {
+        "required": 1,
+        "passed": 0,
+        "failed": 1,
+        "tests": 17,
+        "passedTests": 15,
+        "failedTests": 2,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "originalManifestCommandsBoundsSkipsAndCleanupVerified": true
+    },
+    {
+      "id": "2e47e1ab-3ae6-4e53-af8f-8a57daefc92f",
+      "sha256": "03e74960b4b1776fe3c45b5c8aeab7336bfd1dfda74a14464d8e313dd0710e9a",
+      "success": false,
+      "totals": {
+        "required": 1,
+        "passed": 0,
+        "failed": 1,
+        "tests": 17,
+        "passedTests": 15,
+        "failedTests": 2,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "originalManifestCommandsBoundsSkipsAndCleanupVerified": true
+    },
+    {
+      "id": "766a517f-a3ef-494d-bdbc-e6ff5eb1cf2c",
+      "sha256": "a4d51940ed4becd9b4fa84a770299565831dc5a3a2ea9b66a6b96511f633c86f",
+      "success": true,
+      "totals": {
+        "required": 3,
+        "passed": 3,
+        "failed": 0,
+        "tests": 51,
+        "passedTests": 51,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "originalManifestCommandsBoundsSkipsAndCleanupVerified": true
+    },
+    {
+      "id": "bd9dd031-9de7-49fe-a05a-882921b6d9e4",
+      "sha256": "c29a5f18210dc86efb9da8733e795c74912b23d1f6ed9e3598e205f6190ca019",
+      "success": true,
+      "totals": {
+        "required": 8,
+        "passed": 8,
+        "failed": 0,
+        "tests": 132,
+        "passedTests": 132,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "originalManifestCommandsBoundsSkipsAndCleanupVerified": true
+    },
+    {
+      "id": "7df45c86-7178-443f-9052-4c37290b4530",
+      "sha256": "706c26bd2178388ac3e1fdc0edeed8ae60fdaf95cb1952dd00bcbbe7402044e1",
+      "success": true,
+      "totals": {
+        "required": 9,
+        "passed": 9,
+        "failed": 0,
+        "tests": 141,
+        "passedTests": 141,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "originalManifestCommandsBoundsSkipsAndCleanupVerified": true
+    }
+  ],
+  "accepted": {
+    "groups": 9,
+    "passedTests": 141,
+    "skippedTests": 0,
+    "rootTypecheck": true,
+    "extensionTypecheck": true,
+    "installedVerifierSyntax": true
+  },
+  "originalFailures": [
+    {
+      "receipt": "9790ec39-0e61-4e02-a177-6df2fb0822ec",
+      "reason": "Initial fixture omitted updatedAt, so ordinary retention removed its synthetic recording. Corrected before assessing product behavior."
+    },
+    {
+      "receipt": "2e47e1ab-3ae6-4e53-af8f-8a57daefc92f",
+      "reason": "Two corrected encrypted-store regressions reproduced delayed status/acknowledgement backfill and a report crossing recording generations with identical timestamps."
+    }
+  ],
+  "scope": [
+    "Node and Python SDKs retain the report-call timestamp before serialized queues, locks and sequence persistence. Existing 30-second freshness validation is unchanged.",
+    "Authenticated remote status and acknowledgements capture original eligible recording generations before waiting to mutate encrypted state. Later consent and identical-timestamp generation replacement cannot inherit the report.",
+    "An exact report can reconcile its original agent or command without being copied into recording history. Local command effects retain their existing atomic bookkeeping; no external completion or time savings are inferred.",
+    "The signed HTTP demonstration composes two store instances and their real encrypted state lease. A queued report updates the original agent but not replacement recording; a fresh report is then accepted, and credentials/session/content are absent from sealed bytes.",
+    "The independent Windows agent-consent lane selects all three complete original contract files without changing child bounds, skip counts, job limits or privileges."
+  ],
+  "limitations": [
+    "Installed 7393da1 and complete Linux 7f2a52a predate this correction; installed update and current native Windows acceptance remain pending.",
+    "No live enrolled agent, provider/model request, native task, account switch, microphone, keyboard or browser effect was performed.",
+    "External adapter reports remain self-reported metadata. Frozen frontend controls and broader external stream implementation remain separate."
+  ]
+}

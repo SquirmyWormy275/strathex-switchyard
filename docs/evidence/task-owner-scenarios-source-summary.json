@@ -1,0 +1,31 @@
+{
+  "schema": "switchyard-task-owner-scenarios-source/v1",
+  "basis": "dad54003853a5d6741ec16d38382b3220870bcf2",
+  "sourceSha256": {
+    "scripts/windows-scenario-groups.mjs": "055963bbaa3da60ef7afed7207d5177f7b49a376aa4157099eb8eded3f62bac4",
+    "scripts/windows-scenario-groups.test.mjs": "05de90f2cb4205e80a0d5b1663fd51e5e2ddf8057bd893c517210db5d940cbac",
+    "scripts/windows-backend-shards.test.mjs": "a45f931eab864eaa3a1cd287d144c3a511a7f42068c07ada53b6a5883b970f94",
+    "scripts/run-isolated-tests.mjs": "c560cddde0a848cfe742020073a6f4b4fbea4e6e9436171238b45c5255bb16a0",
+    "tools/layout-studio/coding-task-owners.test.mjs": "9498fb2ba26aae1cd3ffde67e573f6747dce428c350632a75bca118f763e0aff"
+  },
+  "focusedReceipt": "isolated-test-c1f74ce6-1432-4c0b-b74b-f6c16a1cdb97.json",
+  "totals": {
+    "required": 30,
+    "passed": 30,
+    "failed": 0,
+    "tests": 67,
+    "passedTests": 66,
+    "failedTests": 0,
+    "skippedTests": 1,
+    "cancelledTests": 0,
+    "todoTests": 0
+  },
+  "exactTaskOwnerCaseCount": 26,
+  "eachCasePassedOnce": true,
+  "childTimeoutMs": 45000,
+  "linuxOnlyDeclaredCases": 2,
+  "allChildAndTreeCleanupVerified": true,
+  "originalTestFileChanged": false,
+  "productionChanged": false,
+  "nativeAcceptance": false
+}

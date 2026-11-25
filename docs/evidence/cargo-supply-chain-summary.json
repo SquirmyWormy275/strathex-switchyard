@@ -1,0 +1,69 @@
+{
+  "schema": "switchyard-cargo-supply-chain/v1",
+  "basis": "e7dc53f7fff4952d0d97aa39721803f4ef53a5d4",
+  "sourceSha256": {
+    "scripts/collect-osv-advisories.mjs": "c3ac8ad91a4ba31bb2338510358423f39750922bf351cc08313998236023a2a0",
+    "scripts/run-isolated-tests.mjs": "bff360eadf24fc2d0c97f7620e6787463be0a5ded64a006ed8946bf034dd4a29",
+    "scripts/run-isolated-tests.test.mjs": "d2078441e5de0cb2624e3088f6b5d9b84c3952e557fff68f0d8186a35d2c5de3",
+    "tools/layout-studio/cargo-lock-inventory.test.mjs": "b180e7e8cd72adf612416aeb1e6a385a19f2882787708308a5847f2215764373",
+    "tools/layout-studio/osv-advisory-source.mjs": "4ba5e89f542f6137f4491ba08aee463a7e32334ac07794d4cf5284b0f48b77d1",
+    "tools/layout-studio/osv-advisory-source.test.mjs": "ddeb78dbca666e2eeb22a00c67137c41bac5dff12e6131f507294023f113fcdb",
+    "tools/layout-studio/repository-shield-cargo.test.mjs": "6e51b1b664c284e0053b963dfbad16ef9dd3752dfb85b5f00865f6c4dafe8d77",
+    "tools/layout-studio/repository-shield.mjs": "a351acff97146ec2cb1545f447f47ec625fc9cdae7ef50909fd23846c0454dce",
+    "tools/layout-studio/repository-windows-shield-cargo.test.mjs": "f771e217fc66464ac3e66785c944906166e35dd630de049dcf3bdc0e0eaf32f8",
+    "tools/layout-studio/shield-scanner-engine.mjs": "c4ded3989c1af473c15f5d86c1e2ea0de93ecb14954081870cdadd8b8578cf2a",
+    "tools/layout-studio/shield-scanner-engine.test.mjs": "5ae0258f23c828e2c6ab46bc2b0cee878357c1bc172b27d954763cc70d011e18",
+    "tools/layout-studio/test-support/assert-cargo-shield.mjs": "72e958724a8ab07495e9d1ee736b2b8b195976b86c0070e91303f83f78f7f4d8",
+    "tools/layout-studio/test-support/repository-shield-fixture.mjs": "f8f8641c66bd2d97edbbc301d906648803f97395dde3e70306208a7f5635e9fd",
+    "tools/layout-studio/test-support/shield-scanner-fixture.mjs": "42f1bf797619f176b09078a5ad8873a0ef8372a2bfd8197c9da85a58bc6a49ab",
+    "tools/layout-studio/test-support/windows-execution-fixture.mjs": "06a2c425021f590446059b8ab62e2a5665f00fa55e8024be0f581cba8ca480a9"
+  },
+  "receipt": "isolated-test-5b3f83fc-30cc-49c2-b169-5129e24c387e.json",
+  "groups": 8,
+  "passed": 81,
+  "skipped": 0,
+  "allChildAndTreeCleanupVerified": true,
+  "typecheckPassed": true,
+  "reference": {
+    "receipt": "cargo-tomllib-reference-1793966641066.json",
+    "schema": "switchyard-cargo-tomllib-reference/v1",
+    "validComparisons": 48,
+    "python": "3.15.2",
+    "tomllibSha256": "71f67036895f4c5acab942618af0cbd3d814451ba61e967f358d0f341a5b8f51",
+    "caseSetSha256": "adb3988310f25eb1ca48d4982dacbb85e30c7648269d70859b3d444a0fd6bf00",
+    "engineSha256": "c4ded3989c1af473c15f5d86c1e2ea0de93ecb14954081870cdadd8b8578cf2a",
+    "noDownloads": true,
+    "noPackageResolution": true,
+    "scriptSha256": "c45061e66bfa634df678094dcabac16420993a27e3261e2c2c069ce32a8c4ceb"
+  },
+  "developmentBom": {
+    "checkPassed": true,
+    "components": 7,
+    "workspaceComponents": 4,
+    "sha256": "c9e0de415080a840dd65908691884f85d7bbe464a85fb16472e579b4f0baf746"
+  },
+  "implemented": [
+    "Bounded Cargo 3/4 stable-version lock inventory inside the original single digest-pinned worker; malformed input refuses the complete file inventory.",
+    "Source-separated exact crates.io advisory matching, explicit collector selection and closed host/BOM validation.",
+    "Private source/dependency strings are hashed only; declared checksums do not become verified artifact hashes."
+  ],
+  "demonstration": {
+    "linux": "Two actual namespace scans: Supply Chain and Release, synthetic signed data, real protected state and authenticated failed/incomplete receipts.",
+    "windows": "Two guest-double execution cases. Native Windows guest acceptance is not established.",
+    "preserved": "Original Cargo.lock, Git index and HEAD remain unchanged; receipt replay is idempotent, child exits and scratch retirement verify.",
+    "network": "Only official documentation was read. No Rust OSV query, package resolution, install, model or account request ran."
+  },
+  "retainedFailure": {
+    "receipt": "isolated-test-6213b2bb-e592-4181-a8c6-32e9ff4e5daa.json",
+    "passed": 79,
+    "failed": 1,
+    "cause": "Explicit timeout test guard lacked the two new integration groups. Named entries were added without broadening the default bound.",
+    "allChildAndTreeCleanupVerified": true
+  },
+  "limits": [
+    "This focused cohort does not replace the earlier complete Linux 0ad510e run.",
+    "No installed update or live native task/account/hardware acceptance performed.",
+    "Cargo prereleases/build metadata, other TOML tables/fields/formats, target/feature resolution, graph reconstruction, licenses and artifact/publisher verification remain unfinished.",
+    "Collector stable-version numeric bounds remain narrower than lockfile inventory bounds. Clean selected inputs remain incomplete."
+  ]
+}

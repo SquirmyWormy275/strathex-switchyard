@@ -1,0 +1,92 @@
+{
+  "schema": "switchyard-workspace-recovery-installed/v1",
+  "at": "2026-11-24T20:28:11.742Z",
+  "success": true,
+  "sourceCommit": "56ca6685f8d94445abc214802e9ee89487e05757",
+  "release": "d355673fb2ac994f596a8d2a0f1d2bad3b5d3635f3e92428a1e216ac1c27773e",
+  "previousRelease": "ea4ae48345d8fc658658d1074bfc553d6042bad3c0a4a384ba6d58e2c3679f85",
+  "frontend": "d93938adc45fb58d42d5838c18dfd301b9a928eecaf9a08ac5c6a2bbc15a8e09",
+  "payloadFiles": 578,
+  "payloadBytes": 5107208,
+  "servedAssets": 36,
+  "workspaceCount": 54,
+  "workflowDefinitions": 57,
+  "conversations": 3,
+  "selected": "personal",
+  "unchangedStateFiles": 54,
+  "changedStateFiles": [
+    "personal.sealed.json"
+  ],
+  "semanticWorkspacesPreserved": 54,
+  "personalAuthorityEpoch": {
+    "before": 83,
+    "after": 83
+  },
+  "secondReadbackUnchanged": true,
+  "retainedVersions": 2,
+  "keyboardOpened": false,
+  "microphoneOpened": false,
+  "providerRequestsMade": false,
+  "visualAcceptance": false,
+  "installationBackupVerified": true,
+  "personalAudit": {
+    "before": 892,
+    "after": 896,
+    "unchangedPrefix": true,
+    "appendedOperations": [
+      "repository-effect-journal",
+      "restart-recovery",
+      "claude-creation-recovery",
+      "repository-effect-journal"
+    ]
+  },
+  "protectedBackupFilesVerified": 55,
+  "cleanup": {
+    "files": 579,
+    "bytes": 5211572,
+    "independentInstalledPayloadVerified": true
+  },
+  "metadataVerifiers": [
+    {
+      "scope": "Copilot request journal",
+      "checks": 7,
+      "sha256": "edec856812a551fabc1d30b7bda6670d02104dd02b9da1f1bd720ccd041ea6b3"
+    },
+    {
+      "scope": "Task owners, editor refusal, offline advisory and license metadata",
+      "checks": 18,
+      "sha256": "37c374848b5baa11feb7df535f2ff86ab9a13b7c0fc8c75cb952c08526882f15"
+    }
+  ],
+  "receiptHashes": [
+    {
+      "file": "copilot-metadata.json",
+      "sha256": "edec856812a551fabc1d30b7bda6670d02104dd02b9da1f1bd720ccd041ea6b3"
+    },
+    {
+      "file": "task-owner-metadata.json",
+      "sha256": "37c374848b5baa11feb7df535f2ff86ab9a13b7c0fc8c75cb952c08526882f15"
+    },
+    {
+      "file": "focused-833b204c-cf02-4d07-b18f-741928b37507.json",
+      "sha256": "4684872bf1f8dabb8cd8cc0225357273f319f3bca996633b0ff614635c3314ed"
+    },
+    {
+      "file": "focused-22003a68-b02b-4eea-9931-e8c8386910d9.json",
+      "sha256": "cee7efe28ff3fa913927ed33e3f3e6b2221dab2b01dbc0c1b33c9ef890272f4a"
+    },
+    {
+      "file": "focused-426922dd-d058-4743-869d-375d9e44273e.json",
+      "sha256": "6d96a33ec2092b6cba13d8074008fa66a96eb71646c0f7bc0e7f9ef8a11574f6"
+    }
+  ],
+  "verificationCorrections": [
+    "The first readback expected an authority-epoch increment. Source inspection confirms shutdown increments only after task authority was used; read-only metadata did not use it. Full non-audit state and the unchanged epoch were independently verified.",
+    "The staging cleanup check initially compared manifest serialization bytes. The normal installer pretty-prints the same manifest; both canonical identities and all payload hashes verify independently. No deletion occurred before that correction."
+  ],
+  "limits": [
+    "HTTP and DOM fixtures do not establish graphical browser acceptance.",
+    "Normal-push platform acceptance for this source is pending.",
+    "No physical keyboard, microphone, account, native task or model operation was performed."
+  ]
+}

@@ -1,0 +1,49 @@
+{
+  "schema": "switchyard-installed-pypi-summary/v1",
+  "sourceCommit": "810873876704414b3ff74e2541d4e2c0b339c766",
+  "applicationRelease": "346e908114da6b6e2651e366e04802a71fa4467a8fb770f9fa9fd038d6ff9d8e",
+  "success": true,
+  "updateChecks": 6,
+  "updateReceipt": "assignment-legends-1793885177713.json",
+  "proofs": [
+    {
+      "action": "shield_supply_chain",
+      "checks": 16,
+      "receipt": "installed-shield-baseline-1793885332435.json",
+      "scannerExitsVerified": 2,
+      "affectedFindings": 10,
+      "affectedOutcome": "failed",
+      "comparisonFindings": 0,
+      "comparisonOutcome": "incomplete"
+    },
+    {
+      "action": "release_shield",
+      "checks": 16,
+      "receipt": "installed-shield-baseline-1793885494390.json",
+      "scannerExitsVerified": 2,
+      "affectedFindings": 10,
+      "affectedOutcome": "failed",
+      "comparisonFindings": 0,
+      "comparisonOutcome": "incomplete"
+    }
+  ],
+  "sourceQueries": {
+    "ecosystem": "PyPI",
+    "affected": "requests@2.19.1",
+    "comparison": "packaging@25.0",
+    "recommendation": false,
+    "automaticRepositoryUpload": false,
+    "upstreamSignatureVerified": false,
+    "sourceFreshnessPreserved": true
+  },
+  "validationRestored": true,
+  "frozenHomeSha256": "20ba0095a6b9650046df34541872aa7e0a7cdc7db5182f065abb009127c6c130",
+  "ownedSourceSigningPackagesStagingBundleCheckoutRemoved": true,
+  "modelPromptsSubmitted": 0,
+  "keyboardOpened": false,
+  "microphoneOpened": false,
+  "environmentResolved": false,
+  "packagesInstalled": false,
+  "declaredHashesVerified": false,
+  "completeShieldAccepted": false
+}

@@ -1,0 +1,92 @@
+{
+  "schema": "switchyard-windows-measured-scheduling-source-summary/v1",
+  "baseCommit": "1f73061991ed3306e340db92b6f0344c47ee9628",
+  "sourceFiles": {
+    "scripts/windows-backend-shards.mjs": "b4b3ace42381a102cd3ea70db3e0bde6c403ada26190e527a29146f20c515ece",
+    "scripts/windows-backend-shards.test.mjs": "ed1df12f8c76192fd9846d7aade96c02655f95549b6b818786baac9e8b15b43d",
+    "scripts/run-isolated-tests.mjs": "e62c00bba68f250ed80b6a783a86a7dffcfada5e0a6d939cade8087f860d25c3",
+    "scripts/run-isolated-tests.test.mjs": "605a93f456e80f6fd8f45aa27cc58ed1a860715bbea499dd49070ee5645cd8b7",
+    "scripts/fixtures/windows-backend-costs.json": "12132c207c3b3b33a3bc663201a5910aa53e88adac25eaa61522d9fdd4b75563"
+  },
+  "beforeCorrection": {
+    "name": "isolated-test-c50e13f4-0084-4315-a0a9-e972c574545e.json",
+    "sha256": "9d6f097d53aa17d33f0b13f5e62f9a15ef07fe98c2568f241ca18a1ecaceb3fb",
+    "totals": {
+      "required": 1,
+      "passed": 0,
+      "failed": 1,
+      "tests": 3,
+      "passedTests": 2,
+      "failedTests": 1,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    },
+    "success": false
+  },
+  "corrected": {
+    "name": "isolated-test-81406833-e7c6-4df7-bf17-d55464c6b4b3.json",
+    "sha256": "8a6b2f086a0ed6c8c971e7be5d24f2d1e009e9bb861c455d6fb4c741ece7b621",
+    "totals": {
+      "required": 4,
+      "passed": 4,
+      "failed": 0,
+      "tests": 40,
+      "passedTests": 40,
+      "failedTests": 0,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    },
+    "success": true
+  },
+  "priorNativeTimingSource": "9f35961ca18087b2406e7e2ad716b5fe97ebc2bb",
+  "priorNativeReceiptDigests": [
+    {
+      "shard": 1,
+      "receiptSha256": "a883e9e3ad45fa602e4eb69399c66620d0e9fbc849ff43d438ab2d6a3e9facff"
+    },
+    {
+      "shard": 2,
+      "receiptSha256": "046c9c75d4c899f6b0ddafe248a82bac808b7f1d9ad32db7da261747bd7b0912"
+    },
+    {
+      "shard": 3,
+      "receiptSha256": "2dce891894d777cc0e59a6226ad6942793c27e03b1dc1f4e89e3bf696c1a12d4"
+    },
+    {
+      "shard": 4,
+      "receiptSha256": "ab9e30b7726ec3dee5ee303fdbe4bd7d14999270c5355b17cedb53bc2edc16d9"
+    }
+  ],
+  "timedGroups": 198,
+  "currentRequiredBackendGroups": 200,
+  "unmeasuredFallbackCostMs": 60000,
+  "previousEstimatedLoadsMs": [
+    654162,
+    1117130,
+    935383,
+    869714
+  ],
+  "balancedEstimatedLoadsMs": [
+    894103,
+    894141,
+    894132,
+    894013
+  ],
+  "estimatesAreNotDeadlinesOrNativeAcceptance": true,
+  "allOriginalGroupObjectsAndScenariosPreserved": true,
+  "originalChildBoundsPreserved": true,
+  "originalFourTwentyMinuteJobsPreserved": true,
+  "progressIsNeverCompleteVerification": true,
+  "progressContainsNoChildOutput": true,
+  "reporterFailureRetainsFinalReceiptsAndCleanupButRejectsVerification": true,
+  "typecheckPassed": true,
+  "originalFullPackageBudgetPassed": true,
+  "allChildAndTreeCleanupVerified": true,
+  "ownedFocusedRootRemoved": true,
+  "installedChanged": false,
+  "nativeWindowsAccepted": false,
+  "frontendChanged": false,
+  "hardwareOperations": 0
+}

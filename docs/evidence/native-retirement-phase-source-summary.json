@@ -1,0 +1,47 @@
+{
+  "schema": "switchyard-native-retirement-phase-source-summary/v1",
+  "at": "2026-11-07T06:54:13.273Z",
+  "sourceFiles": {
+    "scripts/windows-broker-owner-proof.mjs": "84fdd080f0f8cf26f8a067a80d2376d8fd161efe6b57a51336924265bff1db85",
+    "scripts/windows-restricted-owner-report.test.mjs": "d556cb6b2a1c97d42b353ae683f1eb1839762e68719aa9efdf94117affa7f86a",
+    "scripts/windows-restricted-owner-report.mjs": "0be8a99fc6f6ef3a546ae84e799c8ad230e5d8512c52ea6d7d77c50d0befaa8f",
+    "scripts/windows-descendant-query.mjs": "58cbb9483045e9f703c9b192f5c94f63b600825835fc58ffa117b5914c8b7455",
+    "tools/layout-studio/windows-storage-native.mjs": "673fc70a39d37d97b056e44a4f35a804891dafd34d05b374bb5c2fad33a665ff",
+    "tools/layout-studio/runtime-command.mjs": "d4dd534b5ae23651554fac74e98d6847054b65c6fc7454fb4d7c47a47e3b4745",
+    "apps/desktop-hotkeys/RuntimeCommandRunner.cs": "d272ba2b57d81a3954d3abdecd5cb1373648fce3c1cc8fed23c8fde68941123b",
+    "deployment/windows/test-support/storage-broker-protocol/NativeRestrictedHostProof.cs": "f05facdbc3c313980cf490be1efec8d2e22ad5a0306badd6f4a29685091309a2"
+  },
+  "receipt": "isolated-test-155aff57-c14b-453d-89e9-df678b8c93ad.json",
+  "receiptSha256": "b88945dacb1043f9fbb3956ef588a90f1e0561ac2e78d99576ba6e4ee67507af",
+  "groups": 5,
+  "passedTests": 80,
+  "skippedTests": 0,
+  "originalCommandsBoundsSkipsAndCleanupVerified": true,
+  "scope": {
+    "fixedOwnerOrdinalAndPhaseOnly": true,
+    "retainsOriginalStopAndGuardianAssertions": true,
+    "originalInventoryBound": 64,
+    "allEightNativeChecksStillRequired": true,
+    "fixtureRemovalStillAfterExactExitAndDirectoryIdentity": true,
+    "privatePathsAndProcessIdsExcluded": true,
+    "originalExceptionsPreserved": true,
+    "tokenQueryMask": 8,
+    "tokenPrivilegesAclOrRuntimeBoundaryChanged": false
+  },
+  "nativeFailure": {
+    "source": "5ec16fe9725c5ba20dec7b4a7a55451989f670f9",
+    "run": 42346369644,
+    "job": 128325074973,
+    "completedChecks": 7,
+    "requiredChecks": 8,
+    "recordedDescendantQueries": 55,
+    "allRecordedQueriesVerified": true,
+    "resolved": false
+  },
+  "limitations": [
+    "This adds precise diagnostics; it does not claim the native retirement failure is repaired.",
+    "The next original native CI journey must identify the failing owner assertion or directory retirement step.",
+    "No native Windows operation, account change, provider task, hardware access or new dependency download occurred on the pilot."
+  ],
+  "success": true
+}

@@ -1,0 +1,161 @@
+{
+  "schema": "switchyard-observation-ui-source-evidence/v1",
+  "scope": "Explicit source/session controls and reviewed aggregate context in the existing designer form",
+  "runs": [
+    {
+      "receiptId": "2f0de519-3c20-4ef2-844a-5a3dd148eebc",
+      "sha256": "993a724efe1e6a590ecbe95fab02a5785863bd8718c9d233a5975e6bdb61d42a",
+      "totals": {
+        "required": 13,
+        "passed": 13,
+        "failed": 0,
+        "tests": 130,
+        "passedTests": 130,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "files": [
+        "scripts/windows-complete-shards.test.mjs",
+        "scripts/run-isolated-tests.test.mjs",
+        "deployment/suite/release.test.mjs",
+        "tools/layout-studio/agent-observation.test.mjs",
+        "tools/layout-studio/host-action-observation.test.mjs",
+        "tools/layout-studio/editor-observation.test.mjs",
+        "tools/layout-studio/suite.test.mjs",
+        "tools/layout-studio/role-ui.test.mjs",
+        "tools/layout-studio/device-ui.test.mjs",
+        "tools/layout-studio/connection-ui.test.mjs",
+        "tools/layout-studio/portable-ui.test.mjs",
+        "tools/layout-studio/observation-ui.test.mjs",
+        "tools/layout-studio/design-observations.test.mjs"
+      ],
+      "originalBoundsPreserved": true,
+      "ownedCleanupComplete": true
+    },
+    {
+      "receiptId": "645189c0-b441-4da1-b1e0-0382de4e2af7",
+      "sha256": "c26558bd6bd5e4d39590d06c30a4b605a474b461defd5aaf312fdce5a64d42c3",
+      "totals": {
+        "required": 7,
+        "passed": 7,
+        "failed": 0,
+        "tests": 52,
+        "passedTests": 52,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "files": [
+        "scripts/run-isolated-tests.test.mjs",
+        "deployment/suite/release.test.mjs",
+        "tools/layout-studio/role-ui.test.mjs",
+        "tools/layout-studio/device-ui.test.mjs",
+        "tools/layout-studio/connection-ui.test.mjs",
+        "tools/layout-studio/portable-ui.test.mjs",
+        "tools/layout-studio/observation-ui.test.mjs"
+      ],
+      "originalBoundsPreserved": true,
+      "ownedCleanupComplete": true
+    }
+  ],
+  "overlap": "The final seven groups overlap the first run and add the sixth designer-form interaction case. Do not sum test counts as distinct cases.",
+  "sourceFiles": [
+    {
+      "file": "tools/layout-studio/observation-ui.mjs",
+      "sha256": "5d840899a9cd668847ec88a467ec908f08ff6561296c46e117a66e31f56d1ed6"
+    },
+    {
+      "file": "tools/layout-studio/observation-ui.test.mjs",
+      "sha256": "d9890f3d766aedfeb19b8608e40550709c8b2c2c36bc0fb3daec81fcd5f806c6"
+    },
+    {
+      "file": "tools/layout-studio/suite-ui.mjs",
+      "sha256": "f0391206052f7a5183ec93081f1197e3b3b237c26b42478afbd12b7409632b10"
+    },
+    {
+      "file": "tools/layout-studio/index.html",
+      "sha256": "71089cd0dcfe2db18922124a8aa973dd42317b458d652b1f43b924d8696b9e99"
+    },
+    {
+      "file": "tools/layout-studio/style.css",
+      "sha256": "1a6f576b4dc021cad1e572c76d568fac619e0224f58f3a18c55d234ec4693f34"
+    },
+    {
+      "file": "tools/layout-studio/serve.mjs",
+      "sha256": "68bc3fdb14685322b1ac32b81e2b24e02c0b51066fb28a97062b1a0b292c4978"
+    },
+    {
+      "file": "tools/layout-studio/test-support/browser-ui.mjs",
+      "sha256": "43141cd2b6dc462d2a04c9e1f2fa0706e29d7895c0c5dbd3d7bebcdedf6645d4"
+    },
+    {
+      "file": "scripts/demo-switchyard-ui.mjs",
+      "sha256": "99eabcc928ed857102c0ab2d3159489a2ba23e73d3e1496815d3881984708f0a"
+    },
+    {
+      "file": "scripts/run-isolated-tests.mjs",
+      "sha256": "f6decdd7bfc7898a1b16097652f97e7d13218f42bfa59e5ff6bbcaa864d7811d"
+    },
+    {
+      "file": "deployment/suite/release.mjs",
+      "sha256": "368d6581af80b832ecda3c3ab0f77d50051c5726236a0849a599309c792da43b"
+    },
+    {
+      "file": "deployment/suite/release.test.mjs",
+      "sha256": "22e0244d3f9babd58506849660aa130f0d9f926209da38691cdbeb62bfdbccc7"
+    }
+  ],
+  "demonstration": {
+    "schema": "switchyard-observation-ui-demo/v1",
+    "checks": [
+      "previous owned synthetic state removed",
+      "new observation frontend module served exactly",
+      "explicit marks recorded and paused",
+      "selected paused session reviewed as aggregate only",
+      "review left saved observations unchanged",
+      "native model request refused in synthetic UI demo",
+      "session stopped and retained for UI review",
+      "Work recording refused"
+    ],
+    "passed": 8,
+    "browserAccepted": false,
+    "syntheticOnly": true,
+    "hardwareOperations": 0,
+    "realAccountOperations": 0,
+    "modelRequests": 0
+  },
+  "interactionCases": 6,
+  "providerInDesignerFormTest": "synthetic response double behind the authenticated HTTP API",
+  "preliminaryFindings": [
+    {
+      "stage": "runner preflight",
+      "error": "Requested nonexistent workflow.test.mjs; manifest validation stopped before running tests.",
+      "correction": "Use the existing suite/workflow coverage and exact manifest."
+    },
+    {
+      "stage": "complete designer-form fixture teardown",
+      "error": "TypeError: Cannot read properties of undefined (reading 'getElementById') at role-ui.mjs:9:28; late choicesForRole after test document retirement.",
+      "correction": "Fixture dispatches workspace-changing before closing its host and removing the document."
+    },
+    {
+      "stage": "complete designer-form fixture expectation",
+      "error": "Expected raw input plan without canonical defaults; actual saved plan includes h/w=1, qmkKeyboard=null and source=manual.",
+      "correction": "Compare the submitted plan to both the displayed canonical profile and encrypted saved profile; independently verify ordinary KC_A typing."
+    }
+  ],
+  "limitations": [
+    "Event/selection contracts are not visual browser acceptance.",
+    "No actual provider, microphone, hardware, installed update or account operation was performed.",
+    "Screen/audio/input-sequence observation and production editor commands remain separate implementation work."
+  ],
+  "sourceCommit": "5ef1713b7d9864ec6f73cda36f050d92d02ad3d4",
+  "preparedFrontend": {
+    "digest": "a7cf99137ad0dc0be8f5a6b7b9e529bd6f0068dd7166b8e9b294f1040b884f10",
+    "files": 22,
+    "installed": false,
+    "visualBrowserAccepted": false
+  }
+}

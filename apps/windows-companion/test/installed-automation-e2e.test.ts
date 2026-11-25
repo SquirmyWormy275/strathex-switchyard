@@ -13,8 +13,11 @@ import { WorkspaceSnapshotResolver } from "../../../packages/control-plane/src/s
 import { ProtectedJsonStore, type JournalAuthenticator } from "../../../packages/control-plane/src/store.ts";
 import type { AutomationOperationProposal } from "../../../packages/control-plane/src/automation-operation-manifest.ts";
 import { createDurableWindowsCompanion } from "../src/bootstrap.ts";
+import { ProtectedStoreAutomationEffectJournal } from "../src/automation-effect-executor.ts";
 
-const now = "2026-08-26T12:00:00.000Z";
+// Real effect boundaries use wall-clock deadlines. Keep this fixture's stable
+// governance clock current instead of issuing permanently expired permits.
+const now = new Date().toISOString();
 const hash = (value: string | Buffer): string => createHash("sha256").update(value).digest("hex");
 const environment = { toolVersions: { node: process.version, git: "installed-test" } } as const;
 const authenticator: JournalAuthenticator = {
@@ -49,7 +52,7 @@ async function target(root: string) {
 }
 
 test("packaged default composition executes one reviewed Refresh through host-local bytes, private-index Git, and accepted target transitions", async (context) => {
-  const directory = await mkdtemp(join(tmpdir(), "b122-installed-automation-e2e-"));
+  const directory = await mkdtemp(join(tmpdir(), "ia-"));
   const repository = join(directory, "repository");
   const state = join(directory, "state");
   await mkdir(join(repository, "docs"), { recursive: true });
@@ -106,7 +109,7 @@ test("packaged default composition executes one reviewed Refresh through host-lo
     planRevision: session.planRevision,
     allowedActions: ["compound_refresh"],
     prohibitedActions: [],
-    expiresAt: "2026-08-26T12:20:00.000Z",
+    expiresAt: new Date(Date.parse(now) + 20 * 60_000).toISOString(),
     issuedBy: "TEST\\operator"
   });
   const durableSession = await companion.sessions.get(session.id);
@@ -165,7 +168,11 @@ test("packaged default composition executes one reviewed Refresh through host-lo
     confirmationToken: confirmation.token,
     confirmationScopeDigest: prepared.reviewScopeDigest
   });
-  assert.equal(result.status, "completed", JSON.stringify(result));
+  // Include only this synthetic fixture's journal errors when a native effect
+  // fails; the public broker response intentionally omits private diagnostics.
+  const diagnostic = result.status === "completed" || !result.operationId ? null
+    : (await new ProtectedStoreAutomationEffectJournal(store).load(result.operationId))?.errors;
+  assert.equal(result.status, "completed", JSON.stringify({ result, errors: diagnostic }));
   assert.equal(await readFile(join(repository, "docs", "learning.md"), "utf8"), "after\n");
   assert.equal(await git(repository, ["log", "-1", "--pretty=%s"]), message);
   assert.equal(await git(repository, ["status", "--porcelain"]), "");

@@ -1,0 +1,69 @@
+{
+  "schema": "switchyard-claude-focus-role-boundary-source-summary/v1",
+  "baseCommit": "0217be1f76d13295d6e9fe82d34b966db2b831bb",
+  "sourceFiles": {
+    "tools/layout-studio/suite.mjs": "3c3e74af50f3055137f4f2e096b758c275b36d12e52c2c33cc06c7699555a2ed",
+    "tools/layout-studio/claude-coding.mjs": "a2d6ac412117a6d3cdd25085194cc00272f0c0ddff178606c965ea540197ebb9",
+    "tools/layout-studio/task-window.mjs": "06d4f72efeb48964b4d68f78f8c9e5ea79151e3b91c712b31cd8f6390a219f36",
+    "tools/layout-studio/tmux-task-window.mjs": "13defa1050a89aa5b98199d4cc6f966252d87dabc4c99967453592ee3dab0b5a",
+    "tools/layout-studio/claude-coding.test.mjs": "1d707ca50057d158a319c0c6a36fe77a5ecbd4feeb645d3c4769c85c17894acd",
+    "tools/layout-studio/task-window.test.mjs": "33a0680a9a393e71b4377d9274ddf697de7a523a3326133648be55fccd594e95",
+    "tools/layout-studio/tmux-task-window.test.mjs": "4164785f63c4efca0067c8a02b4a8898d237e10e666b83b634a443adc8eda484"
+  },
+  "receipts": [
+    {
+      "id": "fc114226-5199-468a-bc76-afc539d3ad41",
+      "sha256": "16897ffa1ba51d2ab7eb11290f323778d1eb6194c878fadaf30a169e3f725849",
+      "success": false,
+      "totals": {
+        "required": 2,
+        "passed": 0,
+        "failed": 2,
+        "tests": 26,
+        "passedTests": 23,
+        "failedTests": 3,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "originalManifestCommandsBoundsSkipsAndCleanupVerified": true
+    },
+    {
+      "id": "c1648fc0-8490-47d1-87cb-df11aa3c4320",
+      "sha256": "613cf661af6b63b14815e9a344945b4cd56c0d19deeaa8e17a17bdd7017b916c",
+      "success": true,
+      "totals": {
+        "required": 10,
+        "passed": 10,
+        "failed": 0,
+        "tests": 142,
+        "passedTests": 141,
+        "failedTests": 0,
+        "skippedTests": 1,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "originalManifestCommandsBoundsSkipsAndCleanupVerified": true
+    }
+  ],
+  "typechecks": [
+    "tsconfig.json",
+    "apps/vscode-extension/tsconfig.build.json"
+  ],
+  "scope": {
+    "suiteRoleAndWorkspaceGuardForwardedToClaudeFocus": true,
+    "sessionVerificationAlsoChecksOriginalRole": true,
+    "dispatchGuardAfterFinalProcessAndWindowRead": true,
+    "tmuxGuardAfterSocketValidationBeforeSwitch": true,
+    "paneSelectedBeforeRevocationIsNotAutomaticallyRevertedOrRepeated": true,
+    "stalePaneSelectionCannotContinueToCompositorFocus": true,
+    "postFocusGuardRequiredBeforeSuccessfulResult": true,
+    "originalProcessWindowSessionAndAccountChecksPreserved": true
+  },
+  "limitations": [
+    "Native provider, process, compositor and tmux observations are explicit doubles; encrypted Suite state and actual role/workspace transactions are exercised.",
+    "No live session, window, account, model, keyboard, frontend or editor activation was changed.",
+    "Codex/conversation resume, cancellation and design submission still need equivalent role checks at their own effect boundaries.",
+    "Source-only; installed application remains 738c1f7. Windows task-window focus remains unsupported."
+  ]
+}

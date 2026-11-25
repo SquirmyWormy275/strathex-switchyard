@@ -1,0 +1,48 @@
+{
+  "schema": "switchyard-retained-terminal-connection/v1",
+  "basis": "0ad510eeebc4da0a6b8cffec527994e2fa480668",
+  "sourceSha256": {
+    "apps/vscode-extension/src/studio-editor-launch.ts": "dc40d7294addfa3719ee1080186bb91fcc737dab55413f1a1d60f2623fd7affd",
+    "apps/vscode-extension/src/studio-task-client.ts": "eb1ce2556b7bc3bb3844e7500a9dc63643b7cbead9bed6d460e01b1b1764642e",
+    "apps/vscode-extension/test/studio-editor-launch.test.ts": "357a854888a151f563032fa6f38d69713a8a4123dd6f9861c91277884f4e2851",
+    "apps/vscode-extension/test/studio-editor-session.test.ts": "7d7c1b48efa6bb2507794856cacb7e3e5c5d20fd16422f8831767a06baae7b03",
+    "tools/layout-studio/test-support/editor-terminal-fixture.cjs": "5ac35f94926818d10f0e50f39425489b31527a882a8414556bb2dcfea78addc6"
+  },
+  "receipt": "isolated-test-f8be63c9-bef7-40a6-bc47-062b99eb78bb.json",
+  "groups": 6,
+  "passed": 46,
+  "allChildAndTreeCleanupVerified": true,
+  "typecheckPassed": true,
+  "compiledExtensionPassed": true,
+  "commonjsMethodsChecked": 12,
+  "generatedExtensionBuildRemoved": {
+    "files": 34,
+    "bytes": 993751
+  },
+  "implemented": [
+    "The retained launcher opens the dedicated restricted endpoint only after durable consumption, rechecks its exact socket identity, and creates one Terminal with the fixed original task arguments. It no longer points the terminal at the general original owner endpoint.",
+    "The exact Terminal PID, birth and native image precede the one-use peer pin. Launch waits for bounded signed protocol acknowledgement; return-to-terminal rechecks the original target and connection. Historical observation grants no IDE, completion or model authority.",
+    "Lost open replies, substituted ingress, failed peer/acknowledgement and partial terminal effects cannot retry a consumed review. Exact connection retirement is attempted while retaining the original Terminal object.",
+    "Closing the retained Terminal withdraws acknowledgement and starts one joined retirement. Launcher shutdown cancels pending transport, joins outstanding work, retires owned connections before closing the client and reports uncertain cleanup. Neighboring Terminal objects are not disposed."
+  ],
+  "demonstration": {
+    "retainedEditorTerminalDouble": true,
+    "realOwnedSyntheticTerminalProcess": true,
+    "signedHttpClientAndSuite": true,
+    "realEncryptedStoreAndKernelLeases": true,
+    "realLinuxIngressAndDedicatedUpstream": true,
+    "exactPeerPidBirthAndExecutableVerified": true,
+    "syntheticProvider": true,
+    "exactResumeCount": 1,
+    "duplicateLaunchRefused": true,
+    "retainedFocusRechecked": true,
+    "verifiedRetirementLeavesOriginalProviderAlive": true,
+    "liveNativeTaskAccountOrModelEffects": false
+  },
+  "earlierPassingReceipt": "isolated-test-1ee303e3-ccd3-480d-8955-f29954b1c764.json",
+  "limits": [
+    "Production command activation and frozen frontend exposure remain unfinished. No command was registered or invoked in the installed editor.",
+    "Native Codex TUI wire/capability behavior and installed 0.167.0 runtime compatibility remain unaccepted; the reviewed 0.166.0 gate is unchanged.",
+    "The complete Linux 0ad510e run is in progress and predates this launcher checkpoint. Windows restricted helper startup remains separately failed."
+  ]
+}

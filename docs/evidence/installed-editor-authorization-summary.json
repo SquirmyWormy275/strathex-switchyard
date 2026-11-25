@@ -1,0 +1,58 @@
+{
+  "schema": "switchyard-installed-editor-authorization-summary/v1",
+  "sourceCommit": "2c87c03d19d486189bbf86e683c5a1ac8f852816",
+  "applicationRelease": "39c7b5554921be0c14711e28d16d07be30eb196381f3649118635b62afe01011",
+  "update": {
+    "receipt": "assignment-legends-1793948229448.json",
+    "checks": 6
+  },
+  "editorOwnerMetadata": {
+    "receipt": "installed-task-owner-metadata-1793948242451.json",
+    "checks": 10,
+    "signedUnknownOwnerAuthorizationRefusals": 3
+  },
+  "copilotJournalMetadata": {
+    "receipt": "installed-copilot-journal-metadata-1793948242278.json",
+    "checks": 7
+  },
+  "preservation": {
+    "receipt": "installed-editor-authorization-preservation-1793948335224.json",
+    "beforeReceipt": "editor-installed-preflight-1793948213321.json",
+    "workspaceIdentities": 54,
+    "byteIdenticalWorkspaceFiles": 52,
+    "allSealedHashesPreserved": false,
+    "rewrittenVerificationWorkspaces": 2,
+    "reason": "Existing initialization runs restart-recovery and claude-creation-recovery store updates in the two opened workspaces.",
+    "definitionsPackageModesPrivateEndpointAndFrozenHomeVerified": true,
+    "selectedBytesPreservedDuringMetadataChecks": true,
+    "historicalPendingConversationSealedHashPreserved": true,
+    "fullSemanticBeforeAfterComparisonAvailable": false
+  },
+  "launcherBackup": {
+    "id": "2026-11-06T06-57-07.515Z-5606bbe4-e9b2-4bea-b3a2-aefb0a2b3a3c",
+    "reason": "install/update the per-user Switchyard application; preserve dated launcher bytes before changing persistent entries. Protected workspaces, credentials and shared optional runtimes are excluded.",
+    "beforeAfterHashesAndCurrentModesVerified": 4
+  },
+  "ownedCleanup": {
+    "disposableBundleRemoved": true,
+    "extensionBuildRemoved": true
+  },
+  "earlierFailedAssertions": [
+    {
+      "success": false,
+      "claim": "All 54 sealed files remain byte-identical across restart and normal verification.",
+      "cause": "The two opened verification workspaces are resealed by the existing restart-recovery and claude-creation-recovery store updates. Update checks separately verify definitions and exported package; no full semantic before-snapshot was retained."
+    },
+    {
+      "success": false,
+      "claim": "The normal update journal action is named update.",
+      "cause": "The implemented journal action is install/update. The corrected assertion checks that exact value; no installation state was changed by these read-only checks."
+    }
+  ],
+  "limits": [
+    "The exact repository client exercises the installed signed gateway; this does not install or activate an editor extension.",
+    "Only unknown-owner refusals are exercised on the installed application; no actual confirmation or permit is created.",
+    "No provider starts, native task loads, model prompts, account changes, terminal launches, microphone or keyboard operations.",
+    "Terminal creation, command wiring and native attachment acknowledgement remain unfinished."
+  ]
+}

@@ -1,0 +1,138 @@
+{
+  "schema": "switchyard-installed-frontend-controls-summary/v1",
+  "at": "2026-11-09T02:10:34.442235+00:00",
+  "readback": {
+    "schema": "switchyard-frontend-installed-update-readback/v1",
+    "at": "2026-11-09T02:10:02.900Z",
+    "sourceCommit": "9784aa9134fc1eca8c22852dfb7583afe01f5b1d",
+    "release": "47143a9fa5de873a1d6f10bc738ef5c703be64af15727eb8e31ffddfa629ffc7",
+    "previous": "0c71eced8cddd1d184b430947fbe11f79a791c3328ea1a99cc21af714facc297",
+    "frontend": "8114b09fc9d33c6e79b65a58ba58b719629b29bf6e8cd3290b91c09d90ebe35f",
+    "assets": 28,
+    "files": 563,
+    "bytes": 4876464,
+    "workspaces": 54,
+    "semanticSnapshotsPreserved": true,
+    "sealedByteIdentical": 53,
+    "pendingKeyboardOnlyConversationPreserved": true,
+    "selectionPreserved": true,
+    "privateAccessChangedForNewFrontend": true,
+    "datedBackupVerified": true,
+    "managedLauncherReadbackVerified": true,
+    "currentAndOneRollbackOnly": true,
+    "ready": true,
+    "visualAcceptance": false,
+    "checks": [
+      "exact served index.html",
+      "exact served app.mjs",
+      "exact served model.mjs",
+      "exact served workspace.mjs",
+      "exact served connection.mjs",
+      "exact served vial-snapshot.mjs",
+      "exact served observation-ui.mjs",
+      "exact served portable-ui.mjs",
+      "exact served client-ui.mjs",
+      "exact served role-ui.mjs",
+      "exact served suite-ui.mjs",
+      "exact served workflow.mjs",
+      "exact served device-diagnostic-ui.mjs",
+      "exact served device-settings-ui.mjs",
+      "exact served vial-settings.mjs",
+      "exact served vial-keycodes.mjs",
+      "exact served vial-rules.mjs",
+      "exact served device-ui.mjs",
+      "exact served shell.mjs",
+      "exact served home.mjs",
+      "exact served catalog.mjs",
+      "exact served geometry.mjs",
+      "exact served keyboard-view.mjs",
+      "exact served model-f-catalog.json",
+      "exact served style.css",
+      "exact served sample-info.json",
+      "exact served sample-keymap.json",
+      "exact served sample-study-report.json",
+      "installed Personal client catalog matches authority policy",
+      "installed declarative recipe grants no launch authority",
+      "installed Personal refuses Microsoft 365 recipe",
+      "unknown keyboard diagnostic refuses before hardware access"
+    ],
+    "hardwareOpened": false,
+    "nativeProviderRequests": 0
+  },
+  "metadataReceipts": [
+    {
+      "name": "installed-agent-security-metadata-1794190190730.json",
+      "sha256": "f82f07697361f0ba714b546135e4e83786be0200bb94a3ecd5bfb6143ba26350",
+      "checks": 30
+    },
+    {
+      "name": "installed-npm-archive-metadata-1794189912314.json",
+      "sha256": "7f62deb49a3c617a7daf96f7de10f340904a1c81216367880a2ec4d7cfc26bbc",
+      "checks": 3
+    },
+    {
+      "name": "installed-python-inventory-metadata-1794189912343.json",
+      "sha256": "e5a5639bb431eed2aab00fc3b6a23da82090a2d5eb53c256cffb2714ee85ef33",
+      "checks": 14
+    },
+    {
+      "name": "installed-cargo-inventory-metadata-1794189912339.json",
+      "sha256": "7f29573a1eeb364c187f68093376043d7a20e5830e6441a6ae2351f0fe33b01c",
+      "checks": 10
+    },
+    {
+      "name": "installed-workflow-identity-metadata-1794189913290.json",
+      "sha256": "ddc6411b299d15e846b379546dc0f920d16c1d56c18afef81e275f619db2ab04",
+      "checks": 10
+    },
+    {
+      "name": "installed-task-owner-metadata-1794190191483.json",
+      "sha256": "78e1b0b9bb1bcd4e2d1b9fecb71b4ed5c57d146ca9c775bba1c6716262cca92e",
+      "checks": 18
+    },
+    {
+      "name": "installed-copilot-journal-metadata-1794190191819.json",
+      "sha256": "420aa51928f6cb7a6fd577441c61f958797c64aadf1dafa4cdac7dda22e50353",
+      "checks": 7
+    },
+    {
+      "name": "installed-signed-intent-metadata-1794190192199.json",
+      "sha256": "d8cb4b4053c756fdf9838291dc8b112c0aa2496a5a6d9a33671060a9b2a660ff",
+      "checks": 8
+    }
+  ],
+  "metadataChecks": 100,
+  "exactModuleHashes": 58,
+  "workflowsVerified": 57,
+  "sourceProvenance": "frontend-host-provenance-source-summary.json",
+  "originalFailures": {
+    "agentVerifier": {
+      "name": "frontend-controls-installed-original-agent-verifier-failure.json",
+      "reason": "Packaging source hash still referenced an earlier release closure."
+    },
+    "taskOwnerVerifier": {
+      "name": "installed-task-owner-metadata-1794189929916.json",
+      "reason": "Home hash still referenced the former frozen frontend."
+    },
+    "preflight": {
+      "name": "frontend-controls-installed-preflight-finding.json",
+      "reason": "Read-only baseline used a guessed selection filename; corrected to the actual active-compartment.json before installation."
+    }
+  },
+  "correction": "Current packaging, served allowlist and Home hashes are pinned to d32c60d source and its retained 12-group receipt. Historical evidence remains unchanged; behavioral assertions and bounds are unchanged. The equivalent Copilot Home and signed-intent route pins were corrected before their runs.",
+  "cleanup": {
+    "schema": "switchyard-prepared-frontend-cleanup/v1",
+    "at": "2026-11-09T02:10:16.084415+00:00",
+    "release": "47143a9fa5de873a1d6f10bc738ef5c703be64af15727eb8e31ffddfa629ffc7",
+    "filesRemoved": 564,
+    "bytesRemoved": 4978029,
+    "exactDirectoryIdentityVerified": true,
+    "allPayloadHashesVerified": true,
+    "currentAndRollbackUntouched": true
+  },
+  "limitations": [
+    "No visual or responsive acceptance: browser control fails before inspection.",
+    "No actual HID, matrix sample, native account, model request, microphone or IDE task was used.",
+    "Latest complete Windows and Linux acceptance belongs to the separately documented earlier sources."
+  ]
+}

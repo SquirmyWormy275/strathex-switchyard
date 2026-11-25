@@ -1,0 +1,35 @@
+{
+  "schema": "switchyard-complete-linux-quota-failure/v1",
+  "source": "a9cefaf2e8d763839ef54f9b684b9f9138e6bf12",
+  "receipt": "isolated-test-e6302f81-96c0-47bd-964e-46c1275b7e90.json",
+  "accepted": false,
+  "totals": {
+    "required": 242,
+    "passed": 236,
+    "failed": 6,
+    "tests": 1532,
+    "passedTests": 1508,
+    "failedTests": 13,
+    "skippedTests": 11,
+    "cancelledTests": 0,
+    "todoTests": 0
+  },
+  "failedGroups": [
+    "tools/layout-studio/repository-shield-workspaces.test.mjs",
+    "tools/layout-studio/repository-shield.test.mjs",
+    "apps/linux-companion/test/linux-lifecycle.test.ts",
+    "apps/linux-companion/test/linux-process-supervisor.test.ts",
+    "apps/linux-companion/test/linux-repository-runtime.test.ts",
+    "apps/linux-companion/test/omarchy-identity.test.ts"
+  ],
+  "finding": "Every failed group reports Linux errno 122 (EDQUOT) during fixture writes or copies. /tmp is a tmpfs with usrquota; aggregate free space does not establish per-user quota availability.",
+  "cleanupReceipt": "linux-a9cefaf-cleanup-1793941390753.json",
+  "allChildAndTreeCleanupVerified": true,
+  "exactCheckoutDependenciesBuildsAndMarkerRemoved": true,
+  "limits": [
+    "The earlier 370c21e complete pass remains the latest complete acceptance.",
+    "No test deadline, skip, policy or assertion was relaxed.",
+    "No broad temporary-directory deletion or mount/quota change was performed.",
+    "A fresh full run needs an explicitly owned temporary root on available storage with verified final removal."
+  ]
+}

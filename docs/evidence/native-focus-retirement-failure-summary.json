@@ -1,0 +1,54 @@
+{
+  "schema": "switchyard-native-focus-retirement-failure/v1",
+  "sourceCommit": "646f2c683696d34096ca268641319b412c2de7af",
+  "mergeCommit": "0d7b39350503125b4f5ea324db642be3bdde4af5",
+  "sourceTree": "23f8e1b2d156fc9faf2ab9798d84c89298bd7a26",
+  "runId": 42391979706,
+  "jobId": 128461619851,
+  "artifactId": 13582475640,
+  "zipSha256": "0918efe7282bcfc73227ff428b08de72ddeffb9b744409ae73811cd34a9e6fa2",
+  "envelopeSha256": "d285ff065ffe571b66ad08ebe59601c5abcf317b9d2d25cc0a642eda2f10586c",
+  "receiptId": "7bf76b33-d344-4fa9-96b0-0b3f7750536d",
+  "receiptSha256": "e316fde6f44a222ee337041f66ad23c21bd27d06e37a72f0fadebe5cc296b511",
+  "totals": {
+    "required": 23,
+    "passed": 22,
+    "failed": 1,
+    "tests": 185,
+    "passedTests": 176,
+    "failedTests": 1,
+    "skippedTests": 8,
+    "cancelledTests": 0,
+    "todoTests": 0
+  },
+  "failedGroup": {
+    "file": "tools/layout-studio/windows-native-focus.test.mjs",
+    "test": "missing, duplicate or changed application targets refuse without a focus authorization",
+    "error": "Expected the exact-one-target refusal; the original helper retirement record was instead unconfirmed.",
+    "durationMs": 27923,
+    "effectiveTimeoutMs": 45000,
+    "timeout": false,
+    "testCounts": {
+      "total": 17,
+      "passed": 16,
+      "failed": 1,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    }
+  },
+  "originalManifestCommandsBoundsAndCleanupVerified": true,
+  "workflow": {
+    "successfulWorkers": 20,
+    "failedWorkers": 1,
+    "assemblyPassed": true,
+    "collectorRejectedIncompleteAcceptance": true
+  },
+  "diagnosticChange": {
+    "description": "Distinguish helper exit versus durable record and deadline versus rejection without logging callback messages, paths or account data. Retain the original two-second retirement deadline and original owner while unresolved.",
+    "focusedEvidence": "windows-paired-verification-summary.json",
+    "typecheck": true,
+    "nativeAcceptance": false
+  },
+  "cause": "The original error discarded the underlying reason. A slow record and a rejected record cannot yet be distinguished; no root-cause repair or current complete Windows acceptance is claimed."
+}

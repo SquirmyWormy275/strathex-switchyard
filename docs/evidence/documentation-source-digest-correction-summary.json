@@ -1,0 +1,30 @@
+{
+  "schema": "switchyard-documentation-source-digest-correction/v1",
+  "sourceCommitBeforeCorrection": "841618d73fae6d93fa6dad42987f49992c4644c0",
+  "failure": {
+    "run": 42368587301,
+    "job": 128395967133,
+    "sourceCommit": "318fafcaf65342ba4a8de87bc7606535735b2f5c",
+    "step": "Verify generated documentation and the complete manual PDF",
+    "staleFile": "docs/generated/SXSY-B122-documentation-manifest.json"
+  },
+  "changedSourceDigest": "docs/SXSY-B122-complete-key-specification-and-audit.md",
+  "onlyManifestSourceDigestChanged": true,
+  "allSevenManualAndDemoOutputsByteIdentical": true,
+  "generatorCheckPassed": true,
+  "generatorEnvironment": {
+    "pythonEnvironmentReused": true,
+    "pillowVersion": "13.0.0",
+    "newDependenciesDownloaded": false
+  },
+  "temporaryCleanup": {
+    "completed": true,
+    "filesRemoved": 8,
+    "bytesRemoved": 192899,
+    "noNewDependencies": true
+  },
+  "limits": [
+    "The complete Windows workflow has not yet accepted this correction.",
+    "Full local PDF/legend checks require dependencies absent from existing inspected environments; unchanged CI checks retain their pinned requirements."
+  ]
+}

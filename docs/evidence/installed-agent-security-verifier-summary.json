@@ -1,0 +1,50 @@
+{
+  "schema": "switchyard-installed-agent-security-verifier-summary/v1",
+  "installedSource": "cadbccd31277d41405a18f4a8f690a515ef03785",
+  "applicationRelease": "cfa9dbad62d3c7d9bceceab9f381fb237c0419eb69504ea56dd2e724f50c308e",
+  "verifierSourceSha256": "113c4960c3368cdd623276e2fe0bf4dded5d1cf19ac7f1ac05194f955c8a908e",
+  "moduleDigests": {
+    "tools/layout-studio/credential-process.mjs": "7aa7cc5bc68f038385bbb40e6aba10fcda73017c207c5812957c125f8b4edb3a",
+    "tools/layout-studio/suite-store.mjs": "9f597db07665c7cbf49f9bd14f92f74518ec3cb8c64bafa2b98de801617ef27a",
+    "tools/layout-studio/custom-agents.mjs": "860bb7d7040abcd88b8011d0d10f05f869c135c6706ceca31fd20b7117fbc9b3",
+    "tools/layout-studio/agent-observation.mjs": "35619e691cf11a3aef8eb5b1bb249635302d9a48e99e2edc192ab001fd3b1dfe",
+    "tools/layout-studio/suite.mjs": "4238bdee81e40f1e42c763deb40a1fc904f00530561a2532dfc44154f6f7dcd3",
+    "packages/control-plane/src/confirmations.ts": "51e87bee8cb375bdbe0e8c5cc277733307c152b31d30ad7c870c55e747b6b2f4",
+    "deployment/suite/release.mjs": "7a660c4957a35383cfbe1320746dc8a1d28c1a229d3162a2731e7be9ec71455c"
+  },
+  "installedReceipt": "installed-agent-security-metadata-1794000176155.json",
+  "installedReceiptSha256": "27631fbc4a9e9b7154d0fcf6b90e8938db430a47fc09c2b83ba41be800751f3c",
+  "checks": [
+    "seven-exact-tested-installed-module-hashes",
+    "synthetic-credential-result-requires-exact-close",
+    "signal-exit-cannot-return-partial-credential",
+    "uncertain-exact-worker-prevents-replacement",
+    "synthetic-reviewed-revocation-preserves-uncertain-history",
+    "replacement-cannot-inherit-old-claims-or-role-authority",
+    "synthetic-reviewed-uncertainty-never-resends-or-verifies-work",
+    "review-replay-and-private-local-observation-boundary",
+    "review-replay-privacy-and-policy-fences"
+  ],
+  "focusedReceipt": "isolated-test-6bf7fa77-c9f7-4454-b356-4c08aba3bb21.json",
+  "focusedReceiptSha256": "3e7cb79b6921e31c0199fd94605a0a3718f3c7feef8344fcebf92b3657a6e2f7",
+  "focusedTotals": {
+    "required": 3,
+    "passed": 3,
+    "failed": 0,
+    "tests": 28,
+    "passedTests": 28,
+    "failedTests": 0,
+    "skippedTests": 0,
+    "cancelledTests": 0,
+    "todoTests": 0
+  },
+  "pureInMemoryOnly": true,
+  "liveUserCredentialsUsed": false,
+  "liveAgentsRevoked": 0,
+  "nativeProcessesStarted": 0,
+  "providerOrModelRequests": 0,
+  "hardwareOperations": 0,
+  "allChildAndTreeCleanupVerified": true,
+  "ownedFocusedRootRemoved": true,
+  "success": true
+}

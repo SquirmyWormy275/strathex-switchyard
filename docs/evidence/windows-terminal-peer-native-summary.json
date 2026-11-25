@@ -1,0 +1,45 @@
+{
+  "schema": "switchyard-windows-terminal-peer-native-summary/v1",
+  "sourceCommit": "89db483c5c735b2c0817b5710b68c05fc3fd1852",
+  "mergeCommit": "b8f3aa6bd042eb483f71755e618c285222382234",
+  "equalSourceAndMergeTree": "1d1b15b6ec2ee0178270abb5cd26b2c1dd410204",
+  "workflowRun": 42351122361,
+  "clientJob": 128339409875,
+  "helperBuildJob": 128339276148,
+  "overallClientWorkflowPassed": true,
+  "sourceFiles": {
+    "apps/desktop-hotkeys/Program.cs": "bb93aace81a0b40651a489f950ce89dfba0beda1d276c63f4315b41d131afcc0",
+    "apps/windows-companion/provider-desktop-helper/Program.cs": "04f0c5fd546aed1099aeca89377db623c79ac08124fb985009417100c2fec6dc",
+    "tools/layout-studio/windows-terminal-process.mjs": "fe0ed2b7e4d635130c6e734440dd23daf838aad3213837734d9d75f96ae6da7f",
+    "tools/layout-studio/windows-terminal-process.test.mjs": "6c79e27b8f9737fdd38a0923ce933ce02a58fed9fdec7f1db78c00762a71bb1b",
+    "tools/layout-studio/windows-terminal-peer.test.mjs": "e83f37af27b9a47094fdb23ff81fd9d65c0c48ad02c7fafb8fab6fa16b72b9a2",
+    "scripts/verify-client-platform.mjs": "a0a5535afc6803d017bc9c9e1988f18522ccdf3a36b9a03843523413e9b5b245",
+    ".github/workflows/client-platform.yml": "b435b6ebdd8a178531a8c6f692e85286129c8704a4b2100f275f50104b762abf"
+  },
+  "manifestSha256": "51c58d946c81e782f4f0c3f6880c358941bc7970169e63755232a02bffba7593",
+  "receipt": "isolated-test-caf602e5-2408-452a-b26f-e1f9013105c9.json",
+  "receiptSha256": "ea430165407eb258c824b199f1098057ec79b824009daf37c4e3d60be010f468",
+  "artifact": {
+    "id": 13564974304,
+    "bytes": 1918,
+    "sha256": "29f4bdc6c6238fffe294eb2489a373f7831cf6585a1962330e9c1b12a6b7660b",
+    "archiveReadInMemoryOnly": true
+  },
+  "groups": 9,
+  "passedTests": 107,
+  "skippedTests": 0,
+  "originalCommandsBoundsSkipsAndCleanupVerified": true,
+  "actualNativeProcessQueryAccepted": true,
+  "actualNativeTcpPeerQueryAccepted": true,
+  "scope": [
+    "Exact owned Node fixture PID, birth, held executable file identity and SHA-256, current user and session.",
+    "Exact established loopback TCP tuple; wrong client PID, reversed tuple and closed connection refuse.",
+    "Original supervised helper exit and QUERY mask 8."
+  ],
+  "limitations": [
+    "The later authenticated WebSocket carrier is outside this source.",
+    "This does not establish Windows task attachment, Suite/editor routing, live provider/account interaction or interactive native focus.",
+    "Full Windows release and physical device acceptance remain separate."
+  ],
+  "success": true
+}

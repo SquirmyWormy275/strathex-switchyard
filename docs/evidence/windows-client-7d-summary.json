@@ -1,0 +1,26 @@
+{
+  "schema": "switchyard-windows-client-platform-summary/v1",
+  "workflowRun": 42082500125,
+  "workflowJob": 127444401154,
+  "headCommit": "7d9310a0d00de650bf63f2bff6ef12cdfe0f0f97",
+  "executionCommit": "2b8d785c3e9f341c083a3054cd4bf84bd47f1951",
+  "artifact": 13443535181,
+  "artifactSha256": "54d972813df5cbe39bb49a94c8cb18f56ac0f042180024045b57e375a2541147",
+  "artifactDigestVerified": true,
+  "receipt": "windows-client-platform-7d-native.json",
+  "receiptSha256": "1b942cbd9f5316177e5894317e206e3e3f8662546064519e9c4943a26afa5012",
+  "totals": {
+    "required": 7,
+    "passed": 7,
+    "failed": 0,
+    "tests": 71,
+    "passedTests": 71,
+    "failedTests": 0,
+    "skippedTests": 0,
+    "cancelledTests": 0,
+    "todoTests": 0
+  },
+  "allChildCleanup": true,
+  "interactiveAccountOrWindowAcceptance": false,
+  "newTerminalSelectionCodeCovered": false
+}

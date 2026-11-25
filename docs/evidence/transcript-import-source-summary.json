@@ -1,0 +1,90 @@
+{
+  "schema": "switchyard-transcript-import-source-evidence/v1",
+  "scope": "Personal plain-text transcript import without recording/runtime/provider effects, exact retry identity and explicit unverified provenance",
+  "runs": [
+    {
+      "receiptId": "b5611a61-2ed1-4f65-8b54-b3680aa447e2",
+      "sha256": "90407548f40c8cdc458ff844f48c0c14cbb22a792f7447fc9c18095b22d03c45",
+      "success": true,
+      "totals": {
+        "required": 9,
+        "passed": 9,
+        "failed": 0,
+        "tests": 120,
+        "passedTests": 120,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "files": [
+        "scripts/windows-backend-shards.test.mjs",
+        "scripts/run-isolated-tests.test.mjs",
+        "deployment/suite/release.test.mjs",
+        "tools/layout-studio/suite.test.mjs",
+        "tools/layout-studio/conversation-ui.test.mjs",
+        "tools/layout-studio/copilot-ui.test.mjs",
+        "tools/layout-studio/observation-ui.test.mjs",
+        "tools/layout-studio/voice-ui.test.mjs",
+        "tools/layout-studio/voice-queue.test.mjs"
+      ],
+      "originalBoundsPreserved": true,
+      "ownedCleanupComplete": true
+    }
+  ],
+  "addedInteractionCases": 6,
+  "totalVoiceInteractionCases": 20,
+  "sourceFiles": {
+    "tools/layout-studio/voice-ui.mjs": "70405deed9bf332fa95f87164905946972e178c7571d00d642d3de209833d1df",
+    "tools/layout-studio/voice-ui.test.mjs": "ef234af2ebc7cb15b3122fc532b74e29df5219884bd671d702ef0dd45abc6b7c",
+    "tools/layout-studio/index.html": "fcdb89542d9bea3a7c299d4ab1680952d94fa40e0ba5e87d4ee57bf1ced414b4",
+    "tools/layout-studio/suite-ui.mjs": "59d4be49e488316aa5859d15199f4482b203913288a11f1ad96f2c8db80a9d7d",
+    "tools/layout-studio/suite.mjs": "dd7cdb287e523fbad765ac079b2f1e129246e6c62ab3757239b33f61e1251583",
+    "tools/layout-studio/voice-queue.mjs": "7bb766c854078b98ec29b1ce87aef3a7fbdd359386f24d9762dabc2aae886a60",
+    "tools/layout-studio/serve.mjs": "0b1ec5e9de268824aac047a9cbf5b06d85bde376053c87291e8b4a6db364cd21",
+    "deployment/suite/release.mjs": "3c0f52e5571d34cf549f7ecb5fd6483683a87eb3acaf0b8abc6c65c157036f61",
+    "scripts/demo-switchyard-ui.mjs": "f83b59b2b75beeff7a917c68f52ad6ca0e84eb4df8d58cc310d0f866b74f8895"
+  },
+  "livePreview": {
+    "schema": "switchyard-transcript-import-preview/v1",
+    "origin": "http://127.0.0.1:36843",
+    "checks": [
+      "exact served voice-ui.mjs",
+      "exact served suite-ui.mjs",
+      "exact served index.html",
+      "existing synthetic notes readable in keyboard-only mode",
+      "local recognizer and microphone remain unavailable in the preview",
+      "unauthenticated import refused",
+      "import rejects claimed provider authority",
+      "Work recording policy refuses transcript import",
+      "exact imported text saved without recording or recognition",
+      "deliberate exact retry returns the original note",
+      "import identity refuses changed text",
+      "later correction and both earlier notes survive repeated import",
+      "preview refuses voice/start",
+      "preview refuses voice/segment",
+      "preview refuses voice/retry",
+      "other state and Personal selection unchanged"
+    ],
+    "served": {
+      "voice-ui.mjs": "70405deed9bf332fa95f87164905946972e178c7571d00d642d3de209833d1df",
+      "suite-ui.mjs": "59d4be49e488316aa5859d15199f4482b203913288a11f1ad96f2c8db80a9d7d",
+      "index.html": "fcdb89542d9bea3a7c299d4ab1680952d94fa40e0ba5e87d4ee57bf1ced414b4"
+    },
+    "synthetic": true,
+    "microphoneOpened": false,
+    "localRecognizerStarted": false,
+    "nativeProviderRequests": 0,
+    "modelRequests": 0,
+    "hardwareOpened": false,
+    "visualAcceptance": false
+  },
+  "boundaries": [
+    "Actual authenticated HTTP, independent encrypted workspaces and request/content binding are exercised; pasted transcripts are synthetic.",
+    "Personal keyboard-only import is explicit local text entry, not microphone capture or ordinary-keystroke recording. Work recording policy refuses imports.",
+    "Exact repeated input returns the retained note without replacing later corrections; changed input cannot reuse its identity. No automatic retry occurs.",
+    "Import capacity refuses before removing existing notes; the existing retention period and explicit deletion still apply.",
+    "Imported text is unverified content and still requires separate correction review before use in a design draft. No provider or task authority is granted.",
+    "Browser visual review, actual microphone/recognition and new installed adoption remain separate. The active complete Linux run targets earlier 4e3feb4, not this subsequent source."
+  ]
+}

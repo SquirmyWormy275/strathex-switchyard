@@ -1,0 +1,56 @@
+{
+  "schema": "switchyard-full-linux-summary/v1",
+  "sourceCommit": "72e7c22c00c7131722c0c368fe598a2785705b99",
+  "sourceTree": "3bf707204df13380dbbe9f175e3b553e61cd815e",
+  "runId": "0b1a791a-b126-405f-9d5f-86092efe7eaf",
+  "startedAt": "2026-11-09T10:42:39.884Z",
+  "endedAt": "2026-11-09T11:03:10.165Z",
+  "receiptSha256": "a3b85b8a2c50f636b3a00a4d28ee2df5c362c3a2956b2a696ce3969118cf6b5a",
+  "auditSha256": "470cf2c021a23817784d60b10c6afc3525f75012e586477a4ab6e7b1aee76701",
+  "cleanupSha256": "a2799d01af0e41bb5141e77e2c437f013631abdf22034a0fcffef2cf77ece3dc",
+  "success": true,
+  "totals": {
+    "required": 376,
+    "passed": 376,
+    "failed": 0,
+    "tests": 2606,
+    "passedTests": 2574,
+    "failedTests": 0,
+    "skippedTests": 32,
+    "cancelledTests": 0,
+    "todoTests": 0
+  },
+  "originalManifestVerified": true,
+  "originalCommandsAndBoundsVerified": true,
+  "originalSkipInventoryVerified": true,
+  "serialOrderVerified": true,
+  "allChildTreeCleanupVerified": true,
+  "unitExit": {
+    "SubState": "exited",
+    "MainPID": "0",
+    "Result": "success",
+    "ExecMainStatus": "0",
+    "ControlGroup": ""
+  },
+  "cleanup": {
+    "schema": "switchyard-owned-full-linux-cleanup/v1",
+    "sourceCommit": "72e7c22c00c7131722c0c368fe598a2785705b99",
+    "receiptSha256": "a3b85b8a2c50f636b3a00a4d28ee2df5c362c3a2956b2a696ce3969118cf6b5a",
+    "generatedFiles": 806,
+    "generatedBytes": 12507496,
+    "aliasesRemoved": 9,
+    "checkoutRemoved": true,
+    "ownerRemoved": true,
+    "temporaryParentRemoved": true,
+    "runnerRemoved": true,
+    "originalWorktreesPreserved": true,
+    "unitStopped": true
+  },
+  "noNewDependencies": true,
+  "cleanupNote": "First cleanup inventory refused an unexpected empty artifacts directory before any deletion. Its emptiness was inspected; the exact empty directory was added to the owned inventory. Final identity/hash checks and removal pass.",
+  "limitations": [
+    "This complete source predates the later legacy history account-read correction, which has separate integration and installed evidence.",
+    "Linux platform skips do not establish native Windows acceptance.",
+    "Synthetic provider/device tests do not establish live accounts, browser/editor UI, microphone or physical keyboard acceptance."
+  ]
+}

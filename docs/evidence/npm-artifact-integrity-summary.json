@@ -1,0 +1,70 @@
+{
+  "schema": "switchyard-npm-artifact-integrity-source/v1",
+  "basis": "ad4d5e607c56329863fc10785d3827e514c2c381",
+  "sourceSha256": {
+    "tools/layout-studio/shield-scanner-engine.mjs": "a5c4e434add78ed9323342aefe5798855e9db0dce9e55a7c5867594b0a6c2ef6",
+    "tools/layout-studio/repository-shield.mjs": "c8b3a979b259472560e3998976410488fb23853e489179e022d2f0bedc3741b0",
+    "tools/layout-studio/repository-shield-artifacts.test.mjs": "2356c68d79d6b1592df3a4b86664161c6b005bffab7c25431866fd598efe8c94",
+    "tools/layout-studio/test-support/shield-scanner-fixture.mjs": "82efe2eb97de35273c918cc30f796139a03ba30f3f86af9901d154d3480e62d7",
+    "tools/layout-studio/test-support/repository-shield-fixture.mjs": "2f915bc6a799d1cb1deeb728fc1d31703a0d76a184fadc37307894233b47aedd",
+    "tools/layout-studio/test-support/windows-execution-fixture.mjs": "294fa2ad6d7affe467da7e3ab41e3f6170f097997aa0f96ca4668f1facf13372",
+    "scripts/run-isolated-tests.mjs": "cd578867e004fc3da760afa4895b077c9cfe0097e6773814f6a719a8de34de00",
+    "scripts/run-isolated-tests.test.mjs": "11a35d4ebdb446f53fd2fca0fa188d9076a51ba8571fc35758f7e2891ff8a1a2",
+    "scripts/verify-windows-storage-contracts.mjs": "dda6eca69e1d0cb32a175ec4ea3d5b8d6d80c36663eb8dfc5224007467e69ea8",
+    "scripts/windows-scenario-groups.test.mjs": "6f90f63593201e787cfeaefe518a21093c78c6955ab6d787bb1d7af4d9dc543a",
+    ".github/workflows/switchyard-windows-filesystem.yml": "0b5f306a7759b94ab53d0ed5c6c0932f1f9ac25d894a6eee940405b21ef5528b"
+  },
+  "initial": {
+    "receipt": "isolated-test-d05646b8-0020-4215-801b-77755be59f32.json",
+    "totals": {
+      "required": 13,
+      "passed": 11,
+      "failed": 2,
+      "tests": 89,
+      "passedTests": 87,
+      "failedTests": 2,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    },
+    "failures": [
+      "scripts/run-isolated-tests.test.mjs",
+      "scripts/windows-scenario-groups.test.mjs"
+    ],
+    "explanation": "Behavior and integration groups passed; exact timeout and CI-lane inventory assertions still needed the new group/lane. Those two lists were corrected without changing existing bounds or assertions."
+  },
+  "followup": {
+    "receipt": "isolated-test-9459fccc-704c-4e38-8f19-0ad2d4757442.json",
+    "totals": {
+      "required": 2,
+      "passed": 2,
+      "failed": 0,
+      "tests": 26,
+      "passedTests": 26,
+      "failedTests": 0,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    }
+  },
+  "acceptedAcrossReceipts": {
+    "groups": 13,
+    "tests": 89,
+    "failed": 0,
+    "skipped": 0,
+    "allChildAndTreeCleanupVerified": true
+  },
+  "typecheckPassed": true,
+  "actualLinuxScans": 6,
+  "windowsGuestDoubleScans": 6,
+  "canonicalPaddingCases": 256,
+  "noncanonicalPaddingAliasesRefused": 256,
+  "nativeWindowsHostAcceptance": "Source f0aacab passes eight tests with two declared Linux-only skips on actual Windows; guest execution remains doubled. Original 300000 ms bound and all child/tree cleanup verify. See npm-artifact-windows-native-summary.json.",
+  "installedChanged": false,
+  "newRuntimeOrDependencyDownloads": false,
+  "claims": [
+    "Explicit reviewed npm lock location plus selected file size/SHA-256 bounds a raw-byte SHA-512 comparison. No URL fetch, package manager, archive extraction or lifecycle execution.",
+    "Only one canonical SHA-512 SRI declaration is compared. Unsupported declarations remain incomplete; mismatches retain a high provenance finding and failed command receipt.",
+    "Match does not establish archive validity, package identity, installed contents, license, publisher provenance or repository security. CycloneDX records namespaced observation properties without claiming a component hash or passing gate."
+  ]
+}

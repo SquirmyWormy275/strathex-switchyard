@@ -34,3 +34,6 @@ Primary sources are preferred. Access dates are included because product details
 - Preserve upstream spellings and contributor handles, but use a person's preferred name when verified.
 - Record archived URLs or immutable commit identifiers before a release candidate is cut.
 - Never infer a license from public availability.
+
+- [FIRST CVSS v3.1 specification](https://www.first.org/cvss/v3.1/specification-document): base-vector equations, metric constants, integer rounding and severity thresholds; independently implemented in the OSV source collector.
+- [OSV quantitative and package-specific severity](https://ossf.github.io/osv-schema/#severity-field): supported method identities, package applicability and record/package exclusivity.

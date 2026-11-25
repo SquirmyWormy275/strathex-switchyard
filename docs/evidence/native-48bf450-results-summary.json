@@ -1,0 +1,159 @@
+{
+  "schema": "switchyard-native-source-results/v1",
+  "sourceCommit": "48bf4503e3d40a3cfea8ca48797223397c11e751",
+  "mergeCommit": "f3473e522d638539aaabd2f72eaaf0fc98103af8",
+  "sourceTree": "134d8b7014f00c99dddb9ef183ce8e479e543433",
+  "clientRunId": 42595266497,
+  "clientJobId": 129087881433,
+  "clientHelperJobId": 129086251612,
+  "fullRunId": 42595266428,
+  "workerJobs": {
+    "7": 129087495128,
+    "11": 129087495311,
+    "15": 129087495440
+  },
+  "scope": {
+    "platform": "win32",
+    "sourceCommit": "f3473e522d638539aaabd2f72eaaf0fc98103af8",
+    "sourceTree": "134d8b7014f00c99dddb9ef183ce8e479e543433",
+    "nodeVersion": "24.14.0",
+    "nodeExecutable": "C:\\hostedtoolcache\\windows\\node\\24.14.0\\x64\\node.exe",
+    "nodeSha256": "63c259c81e5d472b5f11c8d506070130cb04a1ecf84b80377a34ed6ec9048088",
+    "pythonVersion": "3.13.3",
+    "pythonExecutable": "C:\\hostedtoolcache\\windows\\Python\\3.13.3\\x64\\python.exe",
+    "pythonSha256": "d87063e5597f257004c731b66c59c56c91038861c6877b1a3dca6b8c4e919125",
+    "helperSha256": "8990a21f4b44f9d85c60f206317d489397144322cd2bde6c31173324f8370429",
+    "dotnetManifestSha256": "9387431f821c8af70705752e6d8a9d16ec88e374167bd415c742db3a319c0387"
+  },
+  "proofs": [
+    {
+      "shard": "client",
+      "artifactId": 13663402617,
+      "artifactSha256": "a9fd5bc55ea715a11b4e2f062224c3eb48113a85fad41aee76526c4d2afae7d9",
+      "envelopeSha256": "7e696a4d57bbafa63e7a7621f9de621918783ce0f703ace4fb25a534ac6663f1",
+      "receiptId": "e5d42541-069b-4043-875f-99a7962a3f06",
+      "receiptSha256": "7e696a4d57bbafa63e7a7621f9de621918783ce0f703ace4fb25a534ac6663f1",
+      "totals": {
+        "required": 31,
+        "passed": 31,
+        "failed": 0,
+        "tests": 356,
+        "passedTests": 356,
+        "failedTests": 0,
+        "skippedTests": 0,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "originalManifestCommandsBoundsSkipsAndCleanupVerified": true,
+      "serialScheduleVerified": true,
+      "failures": []
+    },
+    {
+      "shard": "7",
+      "artifactId": 13664171419,
+      "artifactSha256": "3b27b4bd566e6ac91a49ff8989fe86f472f31268649306bd296301f16d9c1619de3a",
+      "envelopeSha256": "9bfabb6b27e91846ce77ae3ed7a700c5fb56f853dbb35969bc37646cc8640ac9",
+      "receiptId": "2645fcbb-35a7-45af-98b9-91866972b403",
+      "receiptSha256": "3e14c44a26c0f2c07dd3f11def073636769bb9b6a5730e0cb621b0d3ebf9bbce",
+      "totals": {
+        "required": 21,
+        "passed": 20,
+        "failed": 1,
+        "tests": 309,
+        "passedTests": 300,
+        "failedTests": 0,
+        "skippedTests": 9,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "originalManifestCommandsBoundsSkipsAndCleanupVerified": true,
+      "serialScheduleVerified": true,
+      "failures": [
+        {
+          "file": "tools/layout-studio/scanner-ui.test.mjs",
+          "timeout": true,
+          "durationMs": 45104,
+          "originalBoundMs": 45000,
+          "counts": null,
+          "diagnosticSha256": "7f84de80dba15eb7f95c1a0eb5c40950c93c05eabf48436c233a39367ac6533b"
+        }
+      ]
+    },
+    {
+      "shard": "11",
+      "artifactId": 13663158117,
+      "artifactSha256": "955e7f97fea17946e16681c3f4caeabbb4c1734e5eb9315b5ef74391377bc6b5",
+      "envelopeSha256": "80ed6f46418bbca98b6479c08f6663f0ca2833454bbb4fd5fe6c2d0548f8400a",
+      "receiptId": "6754a084-0faa-4a84-bfdf-1973b9e6e405",
+      "receiptSha256": "ef46a4f1b0b19ff67fe9eb462ace815e4e0fec0409fdad31bdf76bbdc5b21d46",
+      "totals": {
+        "required": 21,
+        "passed": 20,
+        "failed": 1,
+        "tests": 136,
+        "passedTests": 129,
+        "failedTests": 0,
+        "skippedTests": 7,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "originalManifestCommandsBoundsSkipsAndCleanupVerified": true,
+      "serialScheduleVerified": true,
+      "failures": [
+        {
+          "file": "tools/layout-studio/execution-ui.test.mjs",
+          "timeout": true,
+          "durationMs": 45131,
+          "originalBoundMs": 45000,
+          "counts": null,
+          "diagnosticSha256": "8a31941822c583b637d24ebb40a8d2872def39ff2c19e50ed8c4e78eca3a170c"
+        }
+      ]
+    },
+    {
+      "shard": "15",
+      "artifactId": 13663827290,
+      "artifactSha256": "d4de269752e1ee22247be73a5f255280cb900ce9fc211e424d976f9c1619de3a",
+      "envelopeSha256": "a6ce646f8855842caab6db69a0ba61c498125b60ea13da8f86ce9a8077b56bd9",
+      "receiptId": "f5dc3577-015c-42a7-88dc-8b003cc71fa8",
+      "receiptSha256": "aa1f3010efc2b9fc95178f5fccceb644432ef62f318e8b558cc1328efcc38237",
+      "totals": {
+        "required": 21,
+        "passed": 20,
+        "failed": 1,
+        "tests": 192,
+        "passedTests": 159,
+        "failedTests": 1,
+        "skippedTests": 32,
+        "cancelledTests": 0,
+        "todoTests": 0
+      },
+      "originalManifestCommandsBoundsSkipsAndCleanupVerified": true,
+      "serialScheduleVerified": true,
+      "failures": [
+        {
+          "file": "apps/windows-companion/test/windows-host-action-consumer.test.ts",
+          "timeout": false,
+          "durationMs": 5021,
+          "originalBoundMs": 45000,
+          "counts": {
+            "total": 15,
+            "passed": 14,
+            "failed": 1,
+            "cancelled": 0,
+            "skipped": 0,
+            "todo": 0
+          },
+          "diagnosticSha256": "82ecc107b5c01807a9c0c2a7b5f3e3e155bb7dec192013d3420294afd6ca97e6"
+        }
+      ]
+    }
+  ],
+  "limitations": [
+    "The exact client lane passes 31 groups/356 tests with zero skips; the full Windows suite fails.",
+    "Scanner and execution UI exceed their original 45-second file bounds. Their partial TAP counts are not complete results.",
+    "The window-focus consumer test times out waiting for its second focus cycle; the cause remains unresolved.",
+    "Batching repository queries has not established Windows deadline acceptance.",
+    "No manual CI operation, deadline expansion, new skip, assertion relaxation or binary download occurred."
+  ]
+}

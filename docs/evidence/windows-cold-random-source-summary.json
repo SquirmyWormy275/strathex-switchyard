@@ -1,0 +1,46 @@
+{
+  "schema": "switchyard-cold-random-source/v1",
+  "basis": "5cc43214455b428e066ae8424b23f7d310c2f5fd",
+  "sourceSha256": {
+    ".github/workflows/switchyard-windows-filesystem.yml": "4ac97a6ed0ddacc0fb137ec03a4c2d81b801e70db1a801f0924984b5511a6c17",
+    "deployment/windows/test-support/storage-broker-protocol/Build-ColdRandom.ps1": "b8a8e7ab7460f0c11ca9e61a3e1d346fb17a4802cf490d18fc88882440c22cfc",
+    "deployment/windows/test-support/storage-broker-protocol/ColdRandom.cpp": "181a343028d45ded45c6d2df023db8ae5c655651bf09d2e25516f178a6576ef6",
+    "deployment/windows/test-support/storage-broker-protocol/ColdRandomProcess.cs": "a5bbea97ef8cb58bbe3dd4f81cdc02e0b61457e3b193ca037d3d654adc674f9a",
+    "deployment/windows/test-support/storage-broker-protocol/ColdRandomReport.cs": "0ddecc9cfa63f515523d0c73a365ae10f6aac44bee4be41a88eea72858f6ad4f",
+    "deployment/windows/test-support/storage-broker-protocol/NativeRestrictedHostProof.cs": "fedbcddfcdc9a9d45891c23655d2942255b9a8a5bca6ced553121cce5b34f237",
+    "deployment/windows/test-support/storage-broker-protocol/Program.cs": "c23175b4f55778ee30c167c78ef7d42efe34997c71509ba7d87d007633ecce22",
+    "scripts/verify-windows-storage-broker.mjs": "c9d5f656da08391c5f18fe443e2db4ed48c5ecf8de11561801da82a0ba4c552f",
+    "scripts/windows-broker-restricted-owner.mjs": "30696c08d6925a56ea104f89f04c6c5c857dc4bf7dcb88f84f2815ca8c1e140d",
+    "scripts/windows-restricted-owner-report.mjs": "bbea11a51a7d0fbd583b94993345289e06d5049843cdb76c46c4007964e055a6"
+  },
+  "purpose": "Observe system-preferred and explicit-provider BCrypt API status in a fresh native child under the original restricted primary token, private desktop, exact inherited standard handles, unchanged environment and creation-time Job. No warmed CLR or Node process is used as the probe.",
+  "managedBuild": {
+    "receipt": "managed-source-build-1793946148605.json",
+    "targets": 2,
+    "portableChecksPassed": 1868,
+    "coldParserChecks": 12,
+    "warnings": 0,
+    "errors": 0,
+    "existingSdkReused": true,
+    "ownedScratchRemoved": true
+  },
+  "focusedTests": {
+    "receipt": "isolated-test-8ebd4dc1-4506-4499-b331-b07d926a2be3.json",
+    "groups": 2,
+    "passedTests": 31,
+    "allChildAndTreeCleanupVerified": true,
+    "typecheck": true
+  },
+  "nativeAcceptance": "pending",
+  "limits": [
+    "C++ executable is compiled only in disposable native Windows CI with the existing toolchain; it is not a shipped application dependency.",
+    "A 32-byte fixed status report contains no random bytes, identities or paths. Unknown or incomplete closure evidence refuses.",
+    "Both actual primary tokens are checked before startup and after exit; exact child/tree, pipe and process handle retirement must verify.",
+    "A failed/invalid/absent native diagnostic report does not replace the original Node journey or claim it repaired.",
+    "No new SDK, weakened RNG, token, desktop or account fallback; original Node deadlines and acceptance assertions remain."
+  ],
+  "references": [
+    "https://learn.microsoft.com/en-us/windows/win32/api/bcrypt/nf-bcrypt-bcryptgenrandom",
+    "https://learn.microsoft.com/en-us/cpp/build/reference/md-mt-ld-use-run-time-library?view=msvc-170"
+  ]
+}

@@ -1,0 +1,56 @@
+{
+  "schema": "switchyard-status-diagnostic-native-source-summary/v1",
+  "sourceCommit": "841618d73fae6d93fa6dad42987f49992c4644c0",
+  "mergeCommit": "a2253d703276c7b4766e84da9cfc2b3c12f966b1",
+  "tree": "9edf33739886adabaeed0c1b0271f68ce14b8874",
+  "client": {
+    "workflowRun": 42370212484,
+    "helperJob": 128396585121,
+    "job": 128396733964,
+    "artifact": {
+      "id": 13573805690,
+      "bytes": 3516,
+      "sha256": "9f9f009c70bc5f42ece96c50e6b2bc6500d70dd92a20ef47f8a0091914747e04"
+    },
+    "receipt": {
+      "id": "8d40a533-c37c-4301-805c-0c95d8711999",
+      "sha256": "892b4ca85f5135b5196a0974751644b7e5fbb61ab0fab59c5ad74d5fe194e83a"
+    },
+    "totals": {
+      "required": 25,
+      "passed": 25,
+      "failed": 0,
+      "tests": 243,
+      "passedTests": 243,
+      "failedTests": 0,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    },
+    "originalManifestCommandsBoundsSkipsAndCleanupVerified": true
+  },
+  "restrictedStorage": {
+    "workflowRun": 42370212579,
+    "job": 128396735950,
+    "artifact": {
+      "id": 13573507479,
+      "bytes": 4579,
+      "sha256": "2bbba7e1ff82cd2b3dc369dd7b0bf9a97cdde5c59efeb44215e38524c379c2e4"
+    },
+    "receiptSha256": "8b8776045f2481e92ee073a19f5db5bbce86e80112376b51b684a82ca685592d",
+    "checks": {
+      "preliminary": 9,
+      "restrictedClient": 13,
+      "restrictedExchange": 31,
+      "hostOwner": 8,
+      "restrictedHostOwner": 8
+    },
+    "nativeExitAndExactFixtureServiceRemovalVerified": true,
+    "originalQueryOnlyRegistrationPolicyVerified": true
+  },
+  "limitations": [
+    "These native client and restricted-storage jobs pass after the diagnostic change; no recurrence supplied a real status-query failure phase. The intermittent retirement cause remains unresolved.",
+    "The deliberately invalid native status request case belongs to the full backend lane and is not accepted by these jobs.",
+    "This is not complete Windows release acceptance, an interactive ordinary-account/UAC trial, native provider/TUI acceptance or hardware acceptance."
+  ]
+}

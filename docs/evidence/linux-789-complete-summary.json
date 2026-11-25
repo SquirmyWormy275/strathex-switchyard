@@ -1,0 +1,28 @@
+{
+  "schema": "switchyard-complete-linux-checkpoint/v1",
+  "source": "78978355152a341c600611f41731704b9fd97479",
+  "receipt": "isolated-test-9a76bb6e-dc5d-4a0e-97cb-662913debaaa.json",
+  "totals": {
+    "required": 241,
+    "passed": 241,
+    "failed": 0,
+    "tests": 1511,
+    "passedTests": 1501,
+    "failedTests": 0,
+    "skippedTests": 10,
+    "cancelledTests": 0,
+    "todoTests": 0
+  },
+  "success": true,
+  "allChildCleanupVerified": true,
+  "allProcessTreeExitVerified": true,
+  "cleanupReceipt": "linux-789-complete-cleanup-1793936378653.json",
+  "ownedDependencyAliasesRemoved": true,
+  "ownedBuildOutputsRemoved": true,
+  "ownedWorktreeRemoved": true,
+  "limits": [
+    "Later native lease worker changes have separate focused/build evidence.",
+    "Native Windows and physical/account acceptance remain separate.",
+    "The earlier failed complete Linux run remains failed."
+  ]
+}

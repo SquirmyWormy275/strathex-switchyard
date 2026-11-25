@@ -1,0 +1,29 @@
+{
+  "schema": "switchyard-windows-owner-probe-observation/v1",
+  "basis": "eeb9627c130dc4add7e95ca507b291c7f8f71ad9",
+  "sourceSha256": {
+    "scripts/windows-owner-probe-observation.mjs": "b28369e5ad403b2740358fca04a2666b13f56dc0fc3f6ca07ac1b4dbfff3530e",
+    "scripts/windows-broker-owner-proof.mjs": "49b96099f312396d75881adf61e3f7e6815723d48ed070d76d8355caa084ea34",
+    "scripts/windows-restricted-owner-report.test.mjs": "cd83ebb0fa124fda6380b9a5d83663ed9dbfc3b5dfbc6713b9194a1ff8a666e1"
+  },
+  "isolated": {
+    "receipt": "isolated-test-29f51a56-5be8-435c-be78-791bdbcfbc03.json",
+    "totals": {
+      "required": 5,
+      "passed": 5,
+      "failed": 0,
+      "tests": 60,
+      "passedTests": 60,
+      "failedTests": 0,
+      "skippedTests": 0,
+      "cancelledTests": 0,
+      "todoTests": 0
+    },
+    "allChildAndTreeCleanupVerified": true
+  },
+  "typecheckPassed": true,
+  "scope": "CI-only delegation labels reconcile, setup identity or broker capability and the first failing native lifecycle stage. Calls, arguments, callbacks, exceptions and all eight original owner assertions are preserved.",
+  "privacy": "Only fixed labels and exact known error classifications are projected through the existing bounded failedPhase field. No raw error, child output, path, account or arbitrary code is retained.",
+  "nativeAcceptance": "Pending; 4faa8a1 remains the observed read-only-probe failure, with zero of eight owner checks.",
+  "implementationChanged": false
+}

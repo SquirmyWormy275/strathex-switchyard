@@ -1,0 +1,771 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import { randomUUID } from "node:crypto";
+import { EventEmitter, once } from "node:events";
+import { spawn } from "node:child_process";
+import { mkdtemp, readFile, writeFile, mkdir, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { createSuiteStore } from "./suite-store.mjs";
+import { createSuite } from "./suite.mjs";
+import { createStudioServer } from "./serve.mjs";
+import { createAgentService, codexDesignConfig, assertCodexDesignConfig } from "./agents.mjs";
+import { newPlan, parseBoardProfile } from "./model.mjs";
+import { portableProfile } from "./workspace.mjs";
+import { parseWorkflow, reconcileWorkflow } from "./workflow.mjs";
+import { stopOwnedChild } from "./owned-process.mjs";
+
+function samplePlan() { return newPlan(parseBoardProfile({ schema: "sxsy-board-profile/v1", name: "Synthetic", layout: "one", keys: [{ id: "one", label: "A", matrix: [0, 0], x: 0, y: 0, baseKeycode: "KC_A" }] })); }
+async function fixture(fn) {
+  const root = await mkdtemp(join(tmpdir(), "switchyard-suite-"));
+  const keys = new Map(), secrets = { get: async (id, purpose) => keys.get(`${id}:${purpose}`), set: async (id, purpose, value) => { keys.set(`${id}:${purpose}`, value); } };
+  const store = createSuiteStore({ root, secrets });
+  try { await fn({ root, store, keys, secrets }); } finally { await rm(root, { recursive: true, force: true }); }
+}
+
+test("editor connection initialization is lazy, platform-specific and rejects unrelated fields before construction",()=>fixture(async({store})=>{
+  await store.initialize('personal');const ids={requestId:randomUUID(),editorId:randomUUID(),ownerRequestId:randomUUID(),loadRequestId:randomUUID()};
+  for(const platform of ['linux','win32','darwin']){
+    let constructed=0;const suite=createSuite({store,platform,codingEditorConnectionsFactory:options=>{assert.equal(options.platform,platform);constructed++;throw Error('synthetic construction refused');},agents:{discovery:async()=>[],close:async()=>{}},voice:{discovery:async()=>({available:false})}});
+    try{
+      await suite.handle('/api/suite/bootstrap');assert.equal(constructed,0);
+      await assert.rejects(suite.handle('/api/suite/coding/codex/editor-connections/open',{...ids,command:'never'}),/unrelated fields/);assert.equal(constructed,0);
+      await assert.rejects(suite.handle('/api/suite/coding/codex/editor-connections/open',ids),platform!=='darwin'?/synthetic construction/:/requires Linux or Windows/);assert.equal(constructed,platform!=='darwin'?1:0);
+    }finally{await suite.close();}
+  }
+}));
+test("uncertain editor cleanup preserves workspace selection, saves keyboard-only refusal and still joins owner shutdown",()=>fixture(async({store})=>{
+  const calls=[],editor={stopCompartment:async()=>{calls.push('editor-stop');return{stopped:false};},close:async()=>{calls.push('editor-close');return{stopped:false};}};
+  const owner={stopCompartment:async()=>{calls.push('owner-stop');return{stopped:true};},close:async()=>{calls.push('owner-close');return[];}};
+  const suite=createSuite({store,codingEditorConnections:editor,codingTaskOwners:owner,agents:{discovery:async()=>[],close:async()=>{}},voice:{discovery:async()=>({available:false})}});
+  await suite.handle('/api/suite/bootstrap');await suite.handle('/api/suite/compartment/create',{compartment:'second'});
+  await assert.rejects(suite.handle('/api/suite/compartment/select',{compartment:'second'}),/editor connection/);assert.equal(await store.selection(),'personal');assert.deepEqual(calls,['editor-stop']);
+  await assert.rejects(suite.handle('/api/suite/mode',{mode:'keyboard-only'}),/stop is unconfirmed/);assert.equal((await store.snapshot('personal')).mode,'keyboard-only');assert.deepEqual(calls.slice(-2),['editor-stop','owner-stop']);
+  await assert.rejects(suite.close(),/editor connection retirement/);assert.deepEqual(calls.slice(-2),['editor-close','owner-close']);
+}));
+
+test("permission-bound snapshots use fresh authenticated state and never cache an unavailable compartment key", () => fixture(async ({ root, store, keys, secrets }) => {
+  await store.initialize("personal"); await store.initialize("work", "work");
+  await store.update("personal", "mode-select", s => { s.mode = "personal-companion"; });
+  const saved = keys.get("personal:storage-key"), get = secrets.get; let reads = 0;
+  secrets.get = async (id, purpose) => { if (purpose === "storage-key") reads++; return get(id, purpose); };
+  const before = await readFile(join(root, "personal.sealed.json"));
+  assert.equal((await store.snapshot("personal", { provider: "codex" })).policy, "personal"); assert.equal(reads, 1);
+  await assert.rejects(store.snapshot("work", { provider: "codex" }), /provider is prohibited/);
+  await assert.rejects(store.snapshot("personal", { account: "not-enrolled" }), /not enrolled/);
+  assert.deepEqual(await readFile(join(root, "personal.sealed.json")), before);
+  await store.update("personal", "synthetic-policy-change", s => { s.policy = "work"; s.mode = "managed-companion"; });
+  await assert.rejects(store.snapshot("personal", { provider: "codex" }), /provider is prohibited/);
+  keys.delete("personal:storage-key");
+  await assert.rejects(store.snapshot("personal", { provider: "microsoft-365-copilot" }), /key is unavailable/);
+  keys.set("personal:storage-key", saved);
+}));
+
+test("independent compartment encryption rejects swapping and tampering, with provider/account/export/recording boundaries", () => fixture(async ({ root, store, keys }) => {
+  await assert.rejects(store.initialize("invalid", "constructor"), /Choose Personal/);
+  await assert.rejects(store.initialize("invalid", ["work"]), /Choose Personal/);
+  await store.initialize("personal", "personal"); await store.initialize("work", "work");
+  await store.update("work", "mode-select", (s) => { s.mode = "managed-companion"; });
+  assert.notEqual(keys.get("personal:storage-key"), keys.get("work:storage-key"));
+  await store.update("personal", "synthetic-content", (s) => { s.workflow.name = "private synthetic content"; });
+  const raw = await readFile(join(root, "personal.sealed.json"), "utf8");
+  assert.equal(raw.includes("private synthetic content"), false);
+  await assert.rejects(store.authorize("work", { provider: "codex" }), /prohibited/);
+  await assert.rejects(store.authorize("work", { account: "unapproved" }), /not enrolled/);
+  await assert.rejects(store.authorize("work", { operation: "record" }), /prohibited/);
+  await assert.rejects(store.exportProfile("work"), /prohibited/);
+  await assert.rejects(store.route("work", "personal", "synthetic-content", "microsoft-365-copilot"), /Cross-compartment/);
+  await store.authorize("work", { provider: "microsoft-365-copilot" });
+  assert.deepEqual((await store.snapshot("personal")).audit.at(-1).operation, "synthetic-content");
+  assert.equal(JSON.stringify((await store.snapshot("personal")).audit).includes("private synthetic content"), false);
+  const envelope = JSON.parse(raw); envelope.id = "work";
+  await writeFile(join(root, "work.sealed.json"), JSON.stringify(envelope));
+  await assert.rejects(store.snapshot("work"), /authenticate/);
+}));
+
+test("concurrent suite bootstrap recovers a compartment once and never silently changes its existing policy", () => fixture(async ({ store }) => {
+  let recoveries = 0; const initialize = store.initialize.bind(store);
+  store.initialize = (id, policy, recovery = []) => initialize(id, policy, recovery.map(step => ({ ...step, apply: state => { if (step.operation === "restart-recovery") recoveries++; return step.apply(state); } })));
+  const suite = createSuite({ store, agents: { discovery: async () => [], close() {} }, voice: { discovery: async () => ({ available: false }) } });
+  try {
+    await Promise.all([suite.handle("/api/suite/bootstrap"), suite.handle("/api/suite/bootstrap")]);
+    assert.equal(recoveries, 1);
+    await assert.rejects(suite.handle("/api/suite/compartment/create", { compartment: "personal", policy: "work" }), /policy differs/);
+    assert.equal((await store.snapshot("personal")).policy, "personal");
+  } finally { await suite.close(); }
+}));
+
+test("workspace discovery retains every sealed identity past32 without credentials, partial overflow or non-file substitution", () => fixture(async ({ root, store, secrets }) => {
+  const ids = Array.from({ length: 54 }, (_, i) => "project-" + String(i).padStart(3, "0"));
+  for (const id of ids) await store.initialize(id);
+  await store.selection(ids.at(-1));
+  const original = await readFile(join(root, ids.at(-1) + ".sealed.json")), get = secrets.get;
+  secrets.get = async () => { throw Error("Workspace metadata must not open credentials or decrypt content"); };
+  try { assert.deepEqual(await store.list(), ids.map(id => ({ id }))); } finally { secrets.get = get; }
+  assert.equal(await store.selection(), ids.at(-1)); assert.deepEqual(await readFile(join(root, ids.at(-1) + ".sealed.json")), original);
+  let discoveryCalls = 0;
+  const suite = createSuite({ store, agents: { discovery: async () => { discoveryCalls++; return []; }, close() {} }, voice: { discovery: async () => ({ available: false }) } });
+  try {
+    const result = await suite.handle("/api/suite/bootstrap"); assert.equal(result.activeCompartment, ids.at(-1)); assert.ok(result.compartments.some(row => row.id === ids.at(-1))); assert.equal(result.compartments.length, 55);
+    const callsBefore = discoveryCalls; secrets.get = async () => { throw Error("Inventory must not open workspace content or credentials"); };
+    try { const inventory = await suite.handle("/api/suite/compartment/inventory"); assert.equal(inventory.schema, "switchyard-compartment-inventory/v1"); assert.equal(inventory.complete, true); assert.equal(inventory.authorityGranted, false); assert.equal(inventory.providerObserved, false); assert.equal(inventory.activeCompartment, ids.at(-1)); assert.deepEqual(inventory.compartments, [...ids, "personal"].sort().map(id => ({ id }))); }
+    finally { secrets.get = get; }
+    assert.equal(discoveryCalls, callsBefore);
+    await assert.rejects(suite.handle("/api/suite/compartment/inventory", { compartment: ids[0] }), /accepts no selection/);
+    await assert.rejects(suite.handle("/api/suite/compartment/inventory", { replay: true }), /accepts no selection/);
+    await store.selection(ids[0]); await assert.rejects(suite.handle("/api/suite/compartment/inventory"), /saved workspace changed/); await store.selection(ids.at(-1));
+  }
+  finally { await suite.close(); }
+  const afterRestart = await readFile(join(root, ids.at(-1) + ".sealed.json"));
+  await mkdir(join(root, "substitute.sealed.json")); await assert.rejects(store.list(), /not an ordinary sealed file/); await rm(join(root, "substitute.sealed.json"), { recursive: true });
+  for (let i = 0; i < 201; i++) await writeFile(join(root, "overflow-" + String(i).padStart(3, "0") + ".sealed.json"), "synthetic metadata name only", { mode: 0o600 });
+  assert.equal((await store.list()).length, 256);
+  await writeFile(join(root, "overflow-last.sealed.json"), "synthetic metadata name only", { mode: 0o600 });
+  await assert.rejects(store.list(), /exceeds 256.*no partial workspace list/); assert.equal(await store.selection(), ids.at(-1)); assert.deepEqual(await readFile(join(root, ids.at(-1) + ".sealed.json")), afterRestart);
+}));
+
+test("repository recovery routes preserve exact IDs and unknown native exit prevents false keyboard-only or workspace-stop acceptance", () => fixture(async ({ store }) => {
+  let agentClosed = false, recoveryClosed = false;
+  const repositoryRecovery = { list: async c => [{ compartment: c, status: "recovery-required" }], inspect: async (c, id) => ({ compartment: c, operationId: id, repositoryWritten: false }), stopCompartment: async () => ({ stopped: false }), close: async () => { recoveryClosed = true; throw new Error("Synthetic repository exit unconfirmed"); } };
+  const suite = createSuite({ store, repositoryRecovery, agents: { discovery: async () => [], close() { agentClosed = true; } }, voice: { discovery: async () => ({ available: false }) } });
+  try {
+    await suite.handle("/api/suite/bootstrap");
+    assert.equal((await suite.handle("/api/suite/coding/repository-effects/list", { compartment: "personal" }))[0].status, "recovery-required");
+    const id = "11111111-1111-1111-1111-111111111111", view = await suite.handle("/api/suite/coding/repository-effects/inspect", { compartment: "personal", id }); assert.equal(view.operationId, id); assert.equal(view.repositoryWritten, false);
+    await store.update("personal", "synthetic-recovery-packet", s => { s.repositoryRecoveryJournal = [{ payload: "synthetic-private-recovery-bytes" }]; s.repositoryEffectJournal = [{ payload: "synthetic-private-recovery-bytes" }]; s.repositoryEffectCheckpoints = [{ original: "synthetic-private-recovery-bytes" }]; s.repositoryEffects = []; });
+    const snapshot = await suite.handle("/api/suite/snapshot", { compartment: "personal" }); assert.equal(JSON.stringify(snapshot).includes("synthetic-private-recovery-bytes"), false); assert.equal(Object.hasOwn(snapshot, "repositoryEffectCheckpoints"), false);
+    await assert.rejects(suite.handle("/api/suite/mode", { compartment: "personal", mode: "keyboard-only" }), /owned process stop is unconfirmed/); assert.equal((await store.snapshot("personal")).mode, "keyboard-only");
+    await suite.handle("/api/suite/compartment/create", { compartment: "work", policy: "work" });
+    await assert.rejects(suite.handle("/api/suite/compartment/select", { compartment: "work" }), /guardian has not verified exit/); assert.equal(await store.selection(), "personal");
+  } finally { await assert.rejects(suite.close(), /repository exit unconfirmed/); }
+  assert.equal(agentClosed, true); assert.equal(recoveryClosed, true);
+}));
+
+test("HTTP workspace origin metadata is removed from exact commit, recovery and client proposals without dropping unknown command fields", () => fixture(async ({ store }) => {
+  const calls = [], repositoryCommits = { review: async (c, input) => { calls.push({ c, input }); if (input.force !== undefined) throw new Error("Broader operation fields are rejected"); return { status: "requires-confirmation" }; }, execute: async (c, input) => { calls.push({ c, input }); return { status: "completed" }; }, stopCompartment: async () => ({ stopped: true }), close: async () => {} };
+  const repositoryRecovery = { review: repositoryCommits.review, apply: repositoryCommits.execute, stopCompartment: async () => ({ stopped: true }), close: async () => {} };
+  const executionCalls=[],repositoryExecution={review:async(c,input)=>{executionCalls.push({c,input});if(input.command!==undefined)throw Error("Untrusted execution command field");return {status:"requires-confirmation"};},apply:async(c,input)=>{executionCalls.push({c,input});return {status:"running"};},status:async(c,id)=>({requestId:id}),stopCompartment:async()=>({stopped:true}),close:async()=>{}};
+  repositoryExecution.reviewStop=repositoryExecution.review;repositoryExecution.applyStop=repositoryExecution.apply;
+  const suite = createSuite({ store, repositoryCommits, repositoryRecovery, repositoryExecution, agents: { discovery: async () => [], close() {} }, voice: { discovery: async () => ({ available: false }) } });
+  const token = "t".repeat(43), server = createStudioServer({ suite, bridge: { close() {} }, token }); server.listen(0, "127.0.0.1"); await once(server, "listening");
+  const origin = `http://127.0.0.1:${server.address().port}`;
+  const api = async (path, body) => { const response = await fetch(origin + "/api/suite/coding/commits/" + path, { method: "POST", headers: { "Content-Type": "application/json", Origin: origin, Authorization: `Bearer ${token}` }, body: JSON.stringify(body) }); return { status: response.status, body: await response.json() }; };
+  try {
+    await suite.handle("/api/suite/bootstrap");
+    const requestId = "11111111-1111-1111-1111-111111111111", input = { compartment: "personal", requestId, author: { name: "Synthetic", email: "synthetic@example.invalid" } };
+    assert.equal((await api("review", input)).status, 200); assert.equal(Object.hasOwn(calls[0].input, "workspaceBaseUrl"), false); assert.equal(calls[0].input.requestId, requestId);
+    const rejected = await api("review", { ...input, force: true }); assert.equal(rejected.status, 409); assert.match(rejected.body.error, /Broader operation/); assert.equal(calls[1].input.force, true);
+    assert.equal((await api("execute", { compartment: "personal", requestId, token: "22222222-2222-2222-2222-222222222222" })).status, 200);
+    assert.equal(Object.hasOwn(calls[2].input, "workspaceBaseUrl"), false); assert.equal(calls[2].input.token, "22222222-2222-2222-2222-222222222222");
+    const recover = async (path, body) => { const r = await fetch(origin + "/api/suite/coding/repository-effects/" + path, { method: "POST", headers: { "Content-Type": "application/json", Origin: origin, Authorization: `Bearer ${token}` }, body: JSON.stringify(body) }); return r.status; };
+    assert.equal(await recover("review", { compartment: "personal", id: requestId, cleanupPrivateStaging: true }), 200);
+    assert.equal(Object.hasOwn(calls[3].input, "workspaceBaseUrl"), false); assert.equal(calls[3].input.cleanupPrivateStaging, true);
+    assert.equal(await recover("review", { compartment: "personal", id: requestId, force: true }), 409); assert.equal(calls[4].input.force, true);
+    assert.equal(await recover("apply", { compartment: "personal", id: requestId, reviewId: requestId, token: requestId }), 200); assert.equal(Object.hasOwn(calls[5].input, "workspaceBaseUrl"), false);
+    const execution=async(path,body,authenticated=true)=>{const r=await fetch(origin+"/api/suite/coding/execution/"+path,{method:"POST",headers:{"Content-Type":"application/json",Origin:origin,...(authenticated?{Authorization:`Bearer ${token}`}:{})},body:JSON.stringify(body)});return {status:r.status,body:await r.json()};};
+    assert.equal((await execution("review",{compartment:"personal",requestId},false)).status,401);assert.equal(executionCalls.length,0);
+    assert.equal((await execution("review",{compartment:"personal",requestId})).status,200);assert.equal(Object.hasOwn(executionCalls[0].input,"workspaceBaseUrl"),false);
+    assert.equal((await execution("review",{compartment:"personal",requestId,command:"untrusted"})).status,409);assert.equal(executionCalls[1].input.command,"untrusted");
+    assert.equal((await execution("apply",{compartment:"personal",requestId,token:requestId})).status,200);assert.equal(executionCalls[2].input.token,requestId);
+    assert.equal((await execution("status",{compartment:"personal",requestId,pid:12345})).status,409);
+    assert.equal((await execution("stop/review",{compartment:"personal",requestId,stopId:requestId})).status,200);assert.equal(Object.hasOwn(executionCalls[3].input,"workspaceBaseUrl"),false);
+    assert.equal((await execution("stop/apply",{compartment:"personal",stopId:requestId,token:requestId})).status,200);assert.equal(executionCalls[4].input.token,requestId);
+    for(const field of ["repositoryExecutions","repositoryExecutionJournal","repositoryExecutionReviews","repositoryExecutionStaging","repositoryExecutionStops","repositoryExecutionStopJournal","repositoryWindowsInputs","repositoryWindowsGuests","repositoryWindowsGuestCommands","repositoryWindowsTools","repositoryWindowsImages","repositoryWindowsBrokerExchanges","repositoryWindowsRuns","scannerFixtureReviews","scannerFixtureJournal"])await store.update("personal","synthetic-private-execution",s=>{s[field]=[{private:"synthetic-owned-execution-private"}];});
+    assert.equal(JSON.stringify(await suite.handle("/api/suite/snapshot",{compartment:"personal"})).includes("synthetic-owned-execution-private"),false);
+    const clients = async (path, body, authenticated = true) => { const r = await fetch(origin + "/api/suite/integrations/" + path, { method: "POST", headers: { "Content-Type": "application/json", Origin: origin, ...(authenticated ? { Authorization: `Bearer ${token}` } : {}) }, body: JSON.stringify(body) }); return { status: r.status, body: await r.json() }; };
+    assert.equal((await clients("catalog", { compartment: "personal" }, false)).status, 401);
+    const catalog = await clients("catalog", { compartment: "personal" }); assert.equal(catalog.status, 200); assert.equal(catalog.body.entries.every(e => e.account === "not-verified"), true);
+    const recipe = await clients("recipe", { compartment: "personal", id: "figma-web" }); assert.equal(recipe.status, 200); assert.equal(recipe.body.hostActionAuthorized, false); assert.equal(recipe.body.recipe.importedAuthority, false);
+    assert.equal((await clients("recipe", { compartment: "personal", id: "figma-web", url: "https://foreign.invalid" })).status, 409);
+    const launch = { compartment: "personal", id: "github-copilot-web", requestId };
+    const gated = await clients("launch", launch); assert.equal(gated.status, 409); assert.match(gated.body.error, ["linux", "win32"].includes(process.platform) ? /Keyboard-only/ : /unfinished/);
+    const injected = await clients("launch", { ...launch, command: "untrusted" }); assert.equal(injected.status, 409); assert.match(injected.body.error, /exact documented/);
+  } finally { server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); await server.cleanup(); }
+}));
+
+test("new and legacy workspaces start keyboard-only; portable imports cannot enable providers and companion modes must match policy", () => fixture(async ({ store }) => {
+  let providerCalls = 0;
+  const suite = createSuite({ store, agents: { discovery: async () => [], design: async () => { providerCalls++; }, close() {} }, voice: { discovery: async () => ({ available: false }) } });
+  try {
+    await suite.handle("/api/suite/bootstrap");
+    assert.equal((await suite.handle("/api/suite/snapshot")).mode, "keyboard-only");
+    await store.saveProfile("personal", { ...portableProfile(samplePlan()), mode: "personal-companion" });
+    await assert.rejects(suite.handle("/api/suite/design", { provider: "codex", plan: samplePlan(), message: "Blocked" }), /Keyboard-only/); assert.equal(providerCalls, 0);
+    await store.update("personal", "synthetic-legacy-mode", (s) => { delete s.mode; });
+    assert.equal((await store.snapshot("personal")).mode, "keyboard-only");
+    await assert.rejects(suite.handle("/api/suite/mode", { mode: "managed-companion" }), /matching this workspace/);
+    await suite.handle("/api/suite/mode", { mode: "personal-companion" });
+    await suite.handle("/api/suite/design", { provider: "codex", plan: samplePlan(), message: "Explicitly permitted" }); assert.equal(providerCalls, 1);
+    await suite.handle("/api/suite/compartment/create", { compartment: "company", policy: "work" });
+    assert.equal((await store.snapshot("company")).mode, "keyboard-only");
+    await assert.rejects(suite.handle("/api/suite/mode", { compartment: "company", mode: "personal-companion" }), /matching this workspace/);
+  } finally { await suite.close(); }
+}));
+
+test("keyboard-only selection pauses backend sources and stops only this compartment's owned provider processes", () => fixture(async ({ store }) => {
+  const stopped = [];
+  const suite = createSuite({ store, agents: { discovery: async () => [], stopCompartment: async (id) => { stopped.push(`agent:${id}`); return { stopped: true }; }, close() {} }, voice: { discovery: async () => ({ available: true }), stopCompartment: async (id) => { stopped.push(`voice:${id}`); return { stopped: true }; } } });
+  try {
+    await suite.handle("/api/suite/bootstrap"); await suite.handle("/api/suite/mode", { mode: "personal-companion" });
+    await suite.handle("/api/suite/observation/start", { sources: ["deliberate"], exclusions: [], consent: true });
+    await suite.handle("/api/suite/voice/start", { consent: true });
+    const response = await suite.handle("/api/suite/mode", { mode: "keyboard-only" }), state = await store.snapshot("personal");
+    assert.equal(response.ownedProcessesStopped, true); assert.equal(state.observations[0].status, "paused"); assert.equal(state.voice[0].status, "paused"); assert.deepEqual(stopped.sort(), ["agent:personal", "voice:personal"]);
+    await assert.rejects(suite.handle("/api/suite/voice/start", { consent: true }), /Keyboard-only/);
+  } finally { await suite.close(); }
+}));
+
+test("concurrent bundled-example starts share one launch and mode changes invalidate a pending startup", () => fixture(async ({ store }) => {
+  let launches = 0, release, releaseAuthorityStop, block = false, waiting;
+  const snapshot = store.snapshot.bind(store);
+  store.snapshot = async (...args) => { if (block) { block = false; waiting?.(); await new Promise((r) => { release = r; }); } return snapshot(...args); };
+  const suite = createSuite({ store, agents: { discovery: async () => [], close() {} }, voice: { discovery: async () => ({ available: false }) }, taskAuthority: { stopCompartment: () => new Promise(resolve => { releaseAuthorityStop = () => resolve({ stopped: true }); }), close: async () => {} }, spawnExample: () => {
+    launches++; const child = new EventEmitter(); child.exitCode = null; child.stdin = new EventEmitter(); child.stdin.write = () => {}; child.stdin.end = () => {};
+    child.kill = () => { child.exitCode = 0; queueMicrotask(() => child.emit("close", 0)); return true; };
+    queueMicrotask(() => child.emit("spawn")); return child;
+  } });
+  try {
+    await suite.handle("/api/suite/bootstrap"); await suite.handle("/api/suite/mode", { mode: "personal-companion" });
+    const request = { example: "custom", workspaceBaseUrl: "http://127.0.0.1:43177/" };
+    const starts = await Promise.all([suite.handle("/api/suite/agents/example", request), suite.handle("/api/suite/agents/example", request)]);
+    assert.equal(launches, 1); assert.equal(starts.filter((s) => s.duplicatePrevented).length, 1);
+    await suite.handle("/api/suite/agents/example/stop", { example: "custom" });
+    const blocked = new Promise((r) => { waiting = r; }); block = true;
+    const pending = suite.handle("/api/suite/agents/example", request); const rejection = assert.rejects(pending, /stopped before startup/);
+    await blocked;
+    const mode = suite.handle("/api/suite/mode", { mode: "keyboard-only" });
+    // Wait until the durable mode is selected; then release the older request.
+    while ((await snapshot("personal")).mode !== "keyboard-only") await new Promise((r) => setTimeout(r, 10));
+    await suite.handle("/api/suite/mode", { mode: "personal-companion" });
+    release(); await rejection;
+    while (!releaseAuthorityStop) await new Promise(r => setTimeout(r, 1));
+    releaseAuthorityStop(); await mode;
+    assert.equal(launches, 1);
+  } finally { release?.(); releaseAuthorityStop?.(); await suite.close(); }
+}));
+
+async function exampleLifecycleFixture(fn) {
+  return fixture(async ({ store }) => {
+    const children = [], stops = []; let stop = async () => ({ stopped: false, evidence: "synthetic exit unconfirmed" });
+    const suite = createSuite({ store, agents: { discovery: async () => [], close() {} }, voice: { discovery: async () => ({ available: false }) },
+      stopExampleChild: async child => { if (!child) return { stopped: true }; stops.push(child); return stop(child); },
+      spawnExample: () => {
+        const child = new EventEmitter(); child.exitCode = null; child.signalCode = null;
+        child.stdin = new EventEmitter(); child.stdin.write = () => {}; child.stdin.end = () => {};
+        child.kill = () => false; children.push(child); queueMicrotask(() => child.emit("spawn")); return child;
+      }
+    });
+    const request = { example: "custom", workspaceBaseUrl: "http://127.0.0.1:43177/" };
+    const retire = child => { child.exitCode = 0; child.emit("close", 0); return { stopped: true, evidence: "synthetic exact child exit" }; };
+    try {
+      await suite.handle("/api/suite/bootstrap"); await suite.handle("/api/suite/mode", { mode: "personal-companion" });
+      await suite.handle("/api/suite/agents/example", request);
+      await fn({ suite, store, request, children, stops, retire, setStop: fn => { stop = fn; } });
+    } finally { children.forEach(retire); await suite.close(); }
+  });
+}
+
+test("an unconfirmed bundled-example stop refuses replacement until the exact child exits", () => exampleLifecycleFixture(async ({ suite, store, request, children, stops, setStop, retire }) => {
+  assert.equal((await suite.handle("/api/suite/agents/example/stop", request)).status, "stop-unconfirmed");
+  const saved = (await store.snapshot("personal")).agents.find(a => a.id === "custom-example");
+  assert.equal(saved.lastSeen, null); assert.equal(saved.reportedStatus, "unknown");
+  await assert.rejects(suite.handle("/api/suite/agents/example", request), /exit.*unconfirmed|not verified exit/);
+  assert.equal(children.length, 1); assert.equal(stops.length, 1);
+  setStop(async child => retire(child));
+  assert.equal((await suite.handle("/api/suite/agents/example/stop", request)).status, "stopped");
+  assert.equal(stops[1], children[0]);
+  assert.equal((await suite.handle("/api/suite/agents/example", request)).status, "starting");
+  assert.equal(children.length, 2);
+}));
+
+test("durable agent revocation survives uncertain owned exit and an unavailable stop journal", async () => {
+  for (const failJournal of [false, true]) await exampleLifecycleFixture(async ({ suite, store, request, children }) => {
+    const update = store.update.bind(store);
+    if (failJournal) store.update = (id, op, fn, scope) => { if (op === "example-stopped") throw Error("PRIVATE_SYNTHETIC_JOURNAL_FAILURE"); return update(id, op, fn, scope); };
+    try {
+      const review = await suite.handle("/api/suite/agents/revoke/review", { agentId: "custom-example" });
+      const result = await suite.handle("/api/suite/agents/revoke", { agentId: "custom-example", token: review.confirmation.token });
+      assert.equal(result.status, "revoked"); assert.equal(result.ownedExample.status, "stop-unconfirmed");
+      assert.equal(JSON.stringify(result).includes("PRIVATE_SYNTHETIC"), false);
+      assert.equal((await store.snapshot("personal")).agents[0].enrollmentStatus, "revoked");
+      await suite.handle("/api/suite/agents/enroll", { id: "custom-example", name: "Replacement", capabilities: ["status"] });
+      await assert.rejects(suite.handle("/api/suite/agents/example", request), /not verified exit/);
+      assert.equal(children.length, 1);
+    } finally { store.update = update; }
+  });
+});
+
+test("concurrent bundled-example stops share retirement and refuse new starts while it is pending", () => exampleLifecycleFixture(async ({ suite, request, children, stops, setStop, retire }) => {
+  let release; const gate = new Promise(resolve => { release = resolve; });
+  setStop(async child => { await gate; return retire(child); });
+  const first = suite.handle("/api/suite/agents/example/stop", request), second = suite.handle("/api/suite/agents/example/stop", request);
+  try {
+    await new Promise(resolve => setImmediate(resolve));
+    await assert.rejects(suite.handle("/api/suite/agents/example", request), /retirement|stopping/);
+    assert.equal(stops.length, 1); assert.equal(children.length, 1);
+  } finally { release(); await Promise.all([first, second]); }
+}));
+
+test("keyboard-only refusal retains bundled-example uncertainty across a companion-mode restart", () => exampleLifecycleFixture(async ({ suite, store, request, children, setStop, retire }) => {
+  await assert.rejects(suite.handle("/api/suite/mode", { mode: "keyboard-only" }), /stop is unconfirmed/);
+  assert.equal((await store.snapshot("personal")).mode, "keyboard-only");
+  await suite.handle("/api/suite/mode", { mode: "personal-companion" });
+  await assert.rejects(suite.handle("/api/suite/agents/example", request), /exit.*unconfirmed|not verified exit/);
+  assert.equal(children.length, 1);
+  setStop(async child => retire(child));
+  await suite.handle("/api/suite/agents/example/stop", request);
+}));
+
+test("suite shutdown reports an unconfirmed bundled-example exit and retries only its retained child", () => exampleLifecycleFixture(async ({ suite, children, stops, setStop, retire }) => {
+  await assert.rejects(suite.close(), /bundled example.*exit.*unconfirmed/);
+  assert.deepEqual(stops, [children[0]]);
+  setStop(async child => retire(child)); await suite.close();
+  assert.deepEqual(stops, [children[0], children[0]]);
+}));
+
+test("a throwing bundled-example stop preserves its exact child without exposing diagnostics", () => exampleLifecycleFixture(async ({ suite, request, children, setStop }) => {
+  setStop(async () => { throw Error("SYNTHETIC_PRIVATE_STOP_DETAIL"); });
+  const result = await suite.handle("/api/suite/agents/example/stop", request);
+  assert.equal(result.status, "stop-unconfirmed"); assert.equal(JSON.stringify(result).includes("SYNTHETIC_PRIVATE_STOP_DETAIL"), false);
+  await assert.rejects(suite.handle("/api/suite/agents/example", request), /not verified exit/);
+  assert.equal(children.length, 1);
+}));
+
+test("authenticated revocation API stops its owned example and replacement requires new enrollment and role binding", { timeout: 15000 }, () => fixture(async ({ store, keys }) => {
+  const children = [], suite = createSuite({ store, agents: { discovery: async () => [], close() {} }, voice: { discovery: async () => ({ available: false }) }, spawnExample: (...args) => { const c = spawn(...args); children.push(c); return c; } });
+  const server = createStudioServer({ suite, bridge: { close() {} } });
+  const ready = async child => {
+    const deadline = Date.now() + 5000;
+    while (Date.now() < deadline && child.exitCode === null && child.signalCode === null) {
+      const a = (await store.snapshot("personal")).agents.find(a => a.id === "custom-example");
+      if (a?.reportedStatus === "ready" && a.lastSeen && a.sessionId) return a;
+      await new Promise(resolve => setTimeout(resolve, 20));
+    }
+    throw Error("The exact replacement example did not authenticate readiness.");
+  };
+  try {
+    await suite.handle("/api/suite/bootstrap"); await suite.handle("/api/suite/mode", { mode: "personal-companion" });
+    await store.saveWorkflow("personal", { name: "Synthetic", roles: [{ id: "operator", label: "Operator" }], steps: [] });
+    server.listen(0, "127.0.0.1"); await once(server, "listening"); const origin = `http://127.0.0.1:${server.address().port}`;
+    const api = async (path, body, authorized = true) => { const response = await fetch(origin + "/api/suite/" + path, { method: "POST", headers: { "Content-Type": "application/json", Origin: origin, ...(authorized ? { Authorization: `Bearer ${server.accessToken}` } : {}) }, body: JSON.stringify(body) }); return { status: response.status, body: await response.json() }; };
+    assert.equal((await api("agents/example", { example: "custom" })).status, 200); const original = await ready(children[0]), originalToken = keys.get("personal:agent-custom-example");
+    const role = { roleId: "operator", provider: "custom-agent", targetKind: "custom-agent", targetId: "custom-example", intent: "status" };
+    const bound = await api("roles/bind", role); assert.equal(bound.status, 200); assert.equal(bound.body.credentialEpoch, original.credentialEpoch);
+    assert.equal((await api("agents/revoke/review", { agentId: "custom-example" }, false)).status, 401);
+    assert.equal((await api("agents/revoke/review", { agentId: "custom-example", command: "never" })).status, 409);
+    const review = await api("agents/revoke/review", { agentId: "custom-example" }); assert.equal(review.status, 200);
+    const revoked = await api("agents/revoke", { agentId: "custom-example", token: review.body.confirmation.token });
+    assert.equal(revoked.status, 200); assert.equal(revoked.body.status, "revoked"); assert.equal(revoked.body.ownedExample.status, "stopped"); assert.equal(revoked.body.externalProcessStopped, false);
+    assert.ok(children[0].exitCode !== null || children[0].signalCode !== null);
+    assert.equal((await api("agents/example", { example: "custom" })).status, 409); assert.equal(children.length, 1);
+    assert.equal((await api("roles/dispatch", { roleId: "operator", intent: "status" })).status, 409);
+    const replacement = await api("agents/enroll", { id: "custom-example", name: "Replacement", capabilities: ["status"] }); assert.equal(replacement.status, 200); assert.notEqual(replacement.body.token, originalToken);
+    assert.equal((await api("agents/example", { example: "custom" })).status, 200); const current = await ready(children[1]);
+    await store.update("personal", "synthetic-stale-role", s => { s.roleBindings = [{ ...bound.body, sessionId: current.sessionId }]; });
+    assert.equal((await api("roles/dispatch", { roleId: "operator", intent: "status" })).status, 409, "Even a matching replacement session cannot inherit the old credential generation's role.");
+    const rebound = await api("roles/bind", role); assert.equal(rebound.status, 200); assert.equal(rebound.body.credentialEpoch, current.credentialEpoch);
+    assert.equal((await api("roles/dispatch", { roleId: "operator", intent: "status" })).status, 200);
+    assert.equal((await api("agents/example/stop", { example: "custom" })).body.status, "stopped");
+    assert.ok(children[1].exitCode !== null || children[1].signalCode !== null);
+  } finally {
+    await suite.close(); await Promise.all(children.map(child => stopOwnedChild(child)));
+    server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); await server.cleanup();
+  }
+}));
+
+test("real bundled example joins authenticated readiness, duplicate refusal, stop and keyboard-only retirement", { timeout: 15000 }, () => fixture(async ({ store, root }) => {
+  const children = [];
+  const suite = createSuite({ store, agents: { discovery: async () => [], close() {} }, voice: { discovery: async () => ({ available: false }) },
+    spawnExample: (...args) => { const child = spawn(...args); children.push(child); return child; }
+  });
+  const server = createStudioServer({ suite, bridge: { close() {} } });
+  const ready = async child => {
+    const deadline = Date.now() + 5000;
+    while (Date.now() < deadline && child.exitCode === null && child.signalCode === null) {
+      const a = (await store.snapshot("personal")).agents.find(a => a.id === "custom-example");
+      if (a?.reportedStatus === "ready" && a.lastSeen && a.sessionId) return a.sessionId;
+      await new Promise(resolve => setTimeout(resolve, 20));
+    }
+    throw Error("The exact synthetic example did not authenticate readiness.");
+  };
+  try {
+    await suite.handle("/api/suite/bootstrap"); await suite.handle("/api/suite/mode", { mode: "personal-companion" });
+    const observation = await suite.handle("/api/suite/observation/start", { sources: ["agent-events"], exclusions: [], consent: true });
+    server.listen(0, "127.0.0.1"); await once(server, "listening");
+    const request = { example: "custom", workspaceBaseUrl: `http://127.0.0.1:${server.address().port}/` };
+    await suite.handle("/api/suite/agents/example", request); const firstSession = await ready(children[0]);
+    assert.equal((await suite.handle("/api/suite/agents/example", request)).duplicatePrevented, true); assert.equal(children.length, 1);
+    const queued = await suite.handle("/api/suite/agents/dispatch", { agentId: "custom-example", sessionId: firstSession, intent: "handoff", content: "SYNTHETIC_PRIVATE_HANDOFF_TEXT" });
+    const deadline = Date.now() + 5000;
+    while (Date.now() < deadline && (await store.snapshot("personal")).agents[0].commands[0].status !== "completed") await new Promise(resolve => setTimeout(resolve, 20));
+    const observed = (await store.snapshot("personal")).observations.find(o => o.id === observation.id).events.filter(e => e.phase.startsWith("adapter-command-"));
+    assert.deepEqual(observed.map(e => [e.phase, e.provenance]), [["adapter-command-queued", "switchyard-local-lifecycle"], ["adapter-command-claimed", "switchyard-local-lifecycle"], ["adapter-command-acknowledged", "authenticated-agent-self-report"]]);
+    assert.equal(observed.every(e => e.intent === "handoff" && !e.taskCompletionVerified && !e.timeSavingMeasured), true);
+    for (const value of [queued.commandId, firstSession, "SYNTHETIC_PRIVATE_HANDOFF_TEXT"]) assert.equal(JSON.stringify(observed).includes(value), false);
+    assert.equal((await readFile(join(root, "personal.sealed.json"), "utf8")).includes("SYNTHETIC_PRIVATE_HANDOFF_TEXT"), false);
+    const results = await Promise.all([suite.handle("/api/suite/agents/example/stop", request), suite.handle("/api/suite/agents/example/stop", request)]);
+    assert.equal(results.every(r => r.status === "stopped" && r.taskCompletionVerified === false), true);
+    assert.ok(children[0].exitCode !== null || children[0].signalCode !== null);
+    const stopped = (await store.snapshot("personal")).agents.find(a => a.id === "custom-example");
+    assert.equal(stopped.reportedStatus, "stopped"); assert.equal(stopped.lastSeen, null);
+    await suite.handle("/api/suite/agents/example", request); assert.notEqual(await ready(children[1]), firstSession);
+    assert.equal((await suite.handle("/api/suite/mode", { mode: "keyboard-only" })).ownedProcessesStopped, true);
+    assert.ok(children[1].exitCode !== null || children[1].signalCode !== null);
+    await assert.rejects(suite.handle("/api/suite/agents/example", request), /Keyboard-only/);
+  } finally {
+    await suite.close(); await Promise.all(children.map(child => stopOwnedChild(child)));
+    server.closeAllConnections(); await new Promise(resolve => server.close(resolve)); await server.cleanup();
+  }
+}));
+
+test("missing keys never replace existing data; saved profiles survive restart and omit local environment data", () => fixture(async ({ root, store, keys, secrets }) => {
+  await store.initialize("personal"); const p = portableProfile(samplePlan()); p.credentials = "never-portable";
+  await store.saveProfile("personal", p);
+  const restarted = createSuiteStore({ root, secrets });
+  assert.deepEqual((await restarted.snapshot("personal")).profile.plan, samplePlan());
+  assert.equal(JSON.stringify(await restarted.exportProfile("personal")).includes("never-portable"), false);
+  const before = await readFile(join(root, "personal.sealed.json"), "utf8"); keys.delete("personal:storage-key");
+  await assert.rejects(restarted.initialize("personal"), /key is unavailable/);
+  assert.equal(await readFile(join(root, "personal.sealed.json"), "utf8"), before);
+}));
+
+test("workflow edits validate role bindings, step relationships and cycles", () => {
+  const workflow = parseWorkflow({ name: "Review loop", roles: ["Builder", "Reviewer"], steps: ["Describe", "Build", "Review"] });
+  assert.equal(workflow.steps[2].after[0], workflow.steps[1].id);
+  assert.throws(() => parseWorkflow({ ...workflow, steps: workflow.steps.map((s, i) => ({ ...s, after: i ? [workflow.steps[i - 1].id] : [workflow.steps[2].id] })) }), /cycle/);
+  assert.throws(() => parseWorkflow({ ...workflow, steps: [{ ...workflow.steps[0], roleId: "missing-role" }] }), /relationship/);
+  assert.throws(() => parseWorkflow({ ...workflow, schema: "switchyard-workflow/v99" }), /version is unsupported/);
+});
+
+test("workflow identities and relationships refuse JSON type coercion and duplicate edges", () => {
+  const valid = { name: "Review", roles: [{ id: "builder", label: "Builder" }], steps: [{ id: "build", label: "Build", roleId: "builder", after: [] }, { id: "review", label: "Review", after: ["build"] }] };
+  for (const value of [undefined, null, 1, true, ["builder"], {}, "", "bad id"]) {
+    assert.throws(() => parseWorkflow({ ...valid, roles: [{ id: value, label: "Builder" }], steps: [] }), /role identity/);
+    assert.throws(() => parseWorkflow({ ...valid, steps: [{ id: value, label: "Build", after: [] }] }), /relationship/);
+  }
+  for (const after of [["build", "build"], [1], [null], [["build"]]]) assert.throws(() => parseWorkflow({ ...valid, steps: [valid.steps[0], { ...valid.steps[1], after }] }), /relationship/);
+  assert.deepEqual(parseWorkflow(valid).steps[1].after, ["build"]);
+});
+
+test("invalid workflow edits preserve the encrypted profile, role bindings and revision history", () => fixture(async ({ store, root }) => {
+  await store.initialize("personal");
+  const workflow = parseWorkflow({ name: "Review", roles: [{ id: "builder", label: "Builder" }], steps: ["Build", "Review"] });
+  await store.saveProfile("personal", portableProfile(samplePlan(), "desk", "Desk", workflow));
+  const before = await store.snapshot("personal"), bytes = await readFile(join(root, "personal.sealed.json"));
+  for (const edit of [
+    { ...workflow, roles: [{ id: 1, label: "Builder" }], steps: [] },
+    { ...workflow, steps: [{ id: null, label: "Build", after: [] }] },
+    { ...workflow, steps: [workflow.steps[0], { ...workflow.steps[1], after: [workflow.steps[0].id, workflow.steps[0].id] }] }
+  ]) {
+    await assert.rejects(store.saveWorkflow("personal", edit), /role identity|relationship/);
+    assert.deepEqual(await store.snapshot("personal"), before); assert.deepEqual(await readFile(join(root, "personal.sealed.json")), bytes);
+  }
+}));
+
+test("invalid imported profile identities cannot enter the encrypted library or replace its current arrangement", () => fixture(async ({ store, root }) => {
+  await store.initialize("personal"); const profile = portableProfile(samplePlan(), "desk", "Desk"); await store.saveProfile("personal", profile);
+  const before = await store.snapshot("personal"), bytes = await readFile(join(root, "personal.sealed.json"));
+  for (const value of [undefined, null, 1, true, ["desk"]]) {
+    await assert.rejects(store.saveProfile("personal", { ...profile, id: value }), /identity/);
+    assert.deepEqual(await store.snapshot("personal"), before); assert.deepEqual(await readFile(join(root, "personal.sealed.json")), bytes);
+  }
+}));
+
+test("workflow reordering preserves role meaning, while renaming cannot silently inherit a bound role", () => {
+  const previous = parseWorkflow({ name: "Loop", roles: [{ id: "builder", label: "Builder" }, { id: "reviewer", label: "Reviewer" }], steps: [{ id: "build", label: "Build", roleId: "builder", after: [] }, { id: "review", label: "Review", roleId: "reviewer", after: ["build"] }] });
+  const reordered = reconcileWorkflow({ name: "Loop", roles: ["Reviewer", "Builder"], steps: ["Review", "Build"] }, previous);
+  assert.deepEqual(reordered.roles.map((r) => r.id), ["reviewer", "builder"]);
+  assert.deepEqual(reordered.steps.map((s) => s.id), ["review", "build"]);
+  assert.equal(reordered.steps[1].roleId, "builder"); assert.deepEqual(reordered.steps[1].after, ["review"]);
+  const renamed = reconcileWorkflow({ name: "Loop", roles: ["Implementer", "Reviewer"], steps: ["Build", "Review"] }, previous);
+  assert.notEqual(renamed.roles[0].id, "builder"); assert.equal(renamed.steps[0].roleId, null);
+  assert.throws(() => reconcileWorkflow({ name: "Loop", roles: ["Builder", "Builder"], steps: [] }, previous), /duplicated/);
+});
+
+test("workflow saves update active profile, library and history atomically", () => fixture(async ({ store }) => {
+  await store.initialize("personal"); const old = parseWorkflow({ name: "First", roles: [{ id: "builder", label: "Builder" }], steps: ["Build"] });
+  await store.saveProfile("personal", portableProfile(samplePlan(), "desk", "Desk", old));
+  const saved = await store.saveWorkflow("personal", { name: "Reviewed", roles: ["Builder", "Reviewer"], steps: ["Build", "Review"] });
+  assert.equal(saved.roles[0].id, "builder"); assert.deepEqual((await store.exportProfile("personal")).workflow, saved);
+  const snapshot = await store.snapshot("personal"); assert.deepEqual(snapshot.profiles[0].profile.workflow, saved); assert.deepEqual(snapshot.profileHistory[0].profile.workflow, old);
+}));
+
+test("named profiles retain their workflow, isolate revisions by compartment, and preserve the current saved version after opening history", () => fixture(async ({ root, store, secrets }) => {
+  await store.initialize("personal"); await store.initialize("work", "work");
+  const workflow = parseWorkflow({ name: "Keep my place", roles: [{ id: "builder", label: "Builder" }], steps: ["Define", "Review"] });
+  const first = portableProfile(samplePlan(), "f77", "F77 desk", workflow);
+  await store.saveProfile("personal", first);
+  assert.deepEqual((await store.snapshot("personal")).workflow, workflow);
+  const changed = { ...first, name: "F77 updated" };
+  await store.saveProfile("personal", changed);
+  await store.saveProfile("personal", changed);
+  await store.saveProfile("personal", { ...first, id: "b122", name: "B122 desk" });
+  const restarted = createSuiteStore({ root, secrets }), state = await restarted.snapshot("personal");
+  assert.equal(state.profiles.length, 2); assert.equal(state.profileHistory.length, 1);
+  assert.deepEqual(await restarted.selectProfile("personal", "f77", state.profileHistory[0].revision), first);
+  assert.deepEqual(await restarted.selectProfile("personal", "f77"), changed);
+  await assert.rejects(restarted.selectProfile("work", "f77", state.profileHistory[0].revision), /unavailable/);
+  assert.equal((await restarted.snapshot("work")).profile, null);
+}));
+
+test("observation and voice expose explicit sources, pause/restart recovery, deletion and encrypted retry without duplicating chunks", () => fixture(async ({ store, root }) => {
+  let transcribeCalls = 0;
+  const voice = { discovery: async () => ({ available: true }), transcribe: async () => { transcribeCalls++; return { text: "Synthetic transcript" }; } };
+  const agents = { discovery: async () => [], close() {} };
+  const suite = createSuite({ store, voice, agents });
+  try {
+    await suite.handle("/api/suite/bootstrap");
+    await suite.handle("/api/suite/mode", { mode: "personal-companion" });
+    await suite.handle("/api/suite/compartment/create", { compartment: "work", policy: "work" });
+    await assert.rejects(suite.handle("/api/suite/voice/start", { compartment: "work", consent: true }), /prohibited/);
+    await assert.rejects(suite.handle("/api/suite/observation/start", { compartment: "personal", sources: ["deliberate"], exclusions: [] }), /explicitly/);
+    const o = await suite.handle("/api/suite/observation/start", { compartment: "personal", sources: ["deliberate"], exclusions: [], consent: true });
+    await suite.handle("/api/suite/observation/mark", { id: o.id, kind: "handoff" });
+    await suite.handle("/api/suite/observation/state", { id: o.id, status: "paused" });
+    await assert.rejects(suite.handle("/api/suite/observation/mark", { id: o.id, kind: "resume" }), /Start deliberate/);
+    const v = await suite.handle("/api/suite/voice/start", { consent: true });
+    await suite.handle("/api/suite/voice/segment", { id: v.id, audio: "U3ludGhldGlj", chunkId: "chunk-one" });
+    await suite.handle("/api/suite/voice/segment", { id: v.id, audio: "U3ludGhldGlj", chunkId: "chunk-one" });
+    assert.equal(transcribeCalls, 1);
+    assert.equal((await store.snapshot("personal")).voice[0].chunks[0].audio, null);
+    await suite.handle("/api/suite/voice/review", { id: v.id, transcript: "Corrected synthetic transcript" });
+    await suite.close();
+    const restarted = createSuite({ store, voice, agents });
+    await restarted.handle("/api/suite/bootstrap");
+    const snapshot = await restarted.handle("/api/suite/snapshot");
+    assert.equal(snapshot.observations[0].status, "interrupted");
+    assert.equal(snapshot.voice[0].status, "paused");
+    assert.equal(snapshot.voice[0].reviewedTranscript, "Corrected synthetic transcript");
+    assert.equal((await readFile(join(root, "personal.sealed.json"), "utf8")).includes("Synthetic transcript"), false);
+    await restarted.handle("/api/suite/observation/delete", { id: o.id });
+    await restarted.handle("/api/suite/voice/delete", { id: v.id });
+    assert.equal((await restarted.handle("/api/suite/snapshot")).voice.length, 0);
+    await restarted.close();
+  } finally { await suite.close(); }
+}));
+
+test("Codex designer rejects a late reply when its pinned connection changes while waiting for encrypted persistence", () => fixture(async ({ store, root }) => {
+  await store.initialize("personal");
+  await store.update("personal", "mode-select", s => { s.mode = "personal-companion"; s.observations = [{ id: "design-observation", status: "recording", sources: ["agent-events"], exclusions: [], events: [], updatedAt: Date.now() }]; });
+  for (const boundary of ["closed", "epoch"]) {
+    const calls = [], client = new EventEmitter();
+    Object.assign(client, { closed: false, accountEpoch: 0, nativeVersion: "0.166.0", accountFingerprint: "a".repeat(64), restrictionsVerified: true,
+      initialize: async () => {}, recheckAccount: async () => client.accountFingerprint, close() { this.closed = true; },
+      request: async (method, params) => {
+        calls.push({ method, params });
+        if (method === "thread/start") return { thread: { id: "design-" + boundary }, sandbox: { type: "readOnly" }, approvalPolicy: "never", modelProvider: "openai" };
+        if (method === "turn/start") {
+          setImmediate(() => {
+            client.emit("notification", { method: "item/completed", params: { threadId: "design-" + boundary, turnId: "exact-turn", item: { type: "agentMessage", text: JSON.stringify({ reply: "LATE_REPLY_MUST_NOT_BE_RETAINED", summary: "Review", actions: [], steps: ["Review"], roles: ["Reviewer"] }) } } });
+            client.emit("notification", { method: "turn/completed", params: { threadId: "design-" + boundary, turn: { id: "exact-turn", status: "completed" } } });
+          }); return { turn: { id: "exact-turn" } };
+        }
+        throw Error("Unexpected method");
+      }
+    });
+    const guardedStore = { ...store, update: async (c, operation, mutate, options) => {
+      if (operation === "design-conversation") {
+        // The turn and its final account read already finished. Its original
+        // fingerprint remains the same; only the native connection is invalid.
+        if (boundary === "closed") client.closed = true; else client.accountEpoch++;
+      }
+      return store.update(c, operation, mutate, options);
+    } };
+    const service = createAgentService({ store: guardedStore, runtimeRoot: join(root, boundary), codexFactory: () => client, resolveCli: async () => "/synthetic-native-cli", resolveMcp: async () => [] });
+    try {
+      await assert.rejects(service.design({ compartment: "personal", provider: "codex", message: "Synthetic design review", plan: samplePlan() }), { code: "ACCOUNT_UNCONFIRMED" });
+      const state = await store.snapshot("personal"), saved = state.conversations.find(c => c.sessionId === "design-" + boundary);
+      assert.ok(saved); assert.equal(saved.accountFingerprint, "a".repeat(64)); assert.equal(saved.status, "failed"); assert.equal(saved.messages.length, 1); assert.equal(saved.messages[0].role, "user");
+      assert.equal(JSON.stringify(state).includes("LATE_REPLY_MUST_NOT_BE_RETAINED"), false);
+      assert.deepEqual(state.observations[0].events.slice(-2).map(e => e.phase), ["design-request-reserved", "design-request-failed"]);
+      assert.equal(calls.filter(c => c.method === "thread/start").length, 1); assert.equal(calls.filter(c => c.method === "turn/start").length, 1);
+    } finally { await service.close(); }
+  }
+}));
+
+test("Codex design binds an exact returned session, rejects unsafe outputs and never switches providers", () => fixture(async ({ store, root }) => {
+  await store.initialize("personal"); await store.initialize("work", "work");
+  await store.update("personal", "mode-select", (s) => { s.mode = "personal-companion"; s.observations = [{ id: "design-observation", status: "recording", sources: ["agent-events"], exclusions: [], events: [], updatedAt: Date.now() }]; });
+  const calls = [];
+  const fake = new EventEmitter(); fake.closed = false; fake.nativeVersion = "0.166.0"; fake.accountFingerprint = "a".repeat(64); fake.recheckAccount = async () => fake.accountFingerprint; fake.restrictionsVerified = true; fake.initialize = async () => {}; fake.close = () => { fake.closed = true; };
+  fake.request = async (method, params) => {
+    calls.push({ method, params });
+    if (method === "thread/start") return { thread: { id: "synthetic-thread" }, sandbox: { type: "readOnly" }, approvalPolicy: "never", modelProvider: "openai" };
+    if (method === "thread/resume") return { thread: { id: params.threadId }, sandbox: { type: "readOnly" }, approvalPolicy: "never", modelProvider: "openai" };
+    if (method === "turn/start") {
+      setImmediate(() => {
+        fake.emit("notification", { method: "item/completed", params: { threadId: "synthetic-thread", turnId: "synthetic-turn", item: { type: "agentMessage", text: JSON.stringify({ reply: "A synthetic response", summary: "Review the process", actions: [], steps: ["Review evidence"], roles: ["Reviewer"] }) } } });
+        fake.emit("notification", { method: "turn/completed", params: { threadId: "synthetic-thread", turn: { id: "synthetic-turn", status: "completed" } } });
+      }); return { turn: { id: "synthetic-turn" } };
+    }
+  };
+  const agents = createAgentService({ store, runtimeRoot: join(root, "runtime"), codexFactory: () => fake, resolveCli: async () => "/synthetic-native-cli", resolveMcp: async () => ["configured-one", "configured-two"] });
+  try {
+    await assert.rejects(agents.design({ compartment: "work", provider: "codex", message: "denied", plan: samplePlan() }), /prohibited/);
+    assert.equal(calls.length, 0);
+    const response = await agents.design({ compartment: "personal", provider: "codex", message: "Improve the review routine", plan: samplePlan() });
+    assert.equal(response.sessionId, "synthetic-thread");
+    assert.equal(calls.find((c) => c.method === "thread/start").params.config.features.shell_tool, false);
+    assert.deepEqual(calls.find((c) => c.method === "thread/start").params.config.mcp_servers, { "configured-one": { enabled: false }, "configured-two": { enabled: false } });
+    assert.equal(calls.find((c) => c.method === "turn/start").params.sandboxPolicy.type, "readOnly");
+    assert.equal((await store.snapshot("personal")).conversations[0].sessionId, "synthetic-thread");
+    assert.equal((await store.snapshot("personal")).conversations[0].accountFingerprint, "a".repeat(64));
+    const observed = (await store.snapshot("personal")).observations[0].events;
+    assert.deepEqual(observed.map(e => e.phase), ["design-request-reserved", "design-reply-recorded"]); assert.ok(observed.every(e => e.provenance === "switchyard-local-lifecycle" && e.taskCompletionVerified === false));
+    for (const value of ["Improve the review routine", "A synthetic response", response.sessionId, response.conversationId, "a".repeat(64)]) assert.equal(JSON.stringify(observed).includes(value), false);
+    const count = calls.length, previousProposal = (await store.snapshot("personal")).conversations[0].proposal;
+    fake.accountFingerprint = "b".repeat(64);
+    await assert.rejects(agents.design({ compartment: "personal", provider: "codex", message: "Do not route previous context to this changed login", plan: samplePlan(), conversationId: response.conversationId }), /verified binding/);
+    assert.equal(calls.length, count); assert.deepEqual((await store.snapshot("personal")).conversations[0].proposal, previousProposal);
+    assert.deepEqual((await store.snapshot("personal")).observations[0].events.map(e => e.phase), ["design-request-reserved", "design-reply-recorded", "design-request-reserved", "design-request-failed"]);
+    await store.update("personal", "synthetic-legacy", (s) => { delete s.conversations[0].accountFingerprint; });
+    await assert.rejects(agents.resume("personal", response.conversationId), /legacy conversation/); assert.equal(calls.length, count);
+  } finally { agents.close(); }
+}));
+
+test("Codex design reads back complete tool restrictions and fails closed for enabled or unspecified MCP servers", () => {
+  const config = codexDesignConfig(); assert.deepEqual(config.mcp_servers, {});
+  assert.doesNotThrow(() => assertCodexDesignConfig(config));
+  assert.doesNotThrow(() => assertCodexDesignConfig({ ...config, mcp_servers: { codex_app: { enabled: false } } }));
+  for (const server of [{ enabled: true }, {}]) assert.throws(() => assertCodexDesignConfig({ ...config, mcp_servers: { unexpected: server } }), /No design turn/);
+  assert.throws(() => assertCodexDesignConfig({ ...config, features: { ...config.features, shell_tool: true } }), /No design turn/);
+  assert.throws(() => assertCodexDesignConfig({ ...config, project_doc_max_bytes: 32768 }), /No design turn/);
+  for (const unsupported of [{ model_provider: "alternate" }, { chatgpt_base_url: "https://example.invalid/backend-api" }, { openai_base_url: "https://example.invalid" }, { model_providers: { openai: { base_url: "https://example.invalid" } } }]) assert.throws(() => assertCodexDesignConfig({ ...config, ...unsupported }), /first-party route/);
+  assert.doesNotThrow(() => assertCodexDesignConfig({ ...config, chatgpt_base_url: "https://chatgpt.com/backend-api/" }));
+  assert.throws(() => codexDesignConfig(["escape.features.shell_tool"]), /identities are unsupported/);
+  for(const name of ["tui_extensions_statusline","code_mode_host_output_truncation","interrupt_on_cancel","apps_early_resource_discovery","suppress_model_change_announcements","incremental_exec_tools","gcp_setup_wizard","deferred_tool_world_state"]){
+    assert.equal(config.features[name],false);
+    for(const value of [true,undefined])assert.throws(()=>assertCodexDesignConfig({...config,features:{...config.features,[name]:value}}),/No design turn/);
+  }
+});
+
+test("concurrent exact-session reads share initialization, and a failed connection can be retried without leaking a second runtime", () => fixture(async ({ store, root }) => {
+  await store.initialize("personal");
+  await store.update("personal", "mode-select", (s) => { s.mode = "personal-companion"; });
+  await store.update("personal", "synthetic-bound-conversation", (s) => { s.conversations = [{ id: "owned", provider: "codex", sessionId: "exact-thread", accountFingerprint: "a".repeat(64), updatedAt: Date.now(), messages: [] }]; });
+  let created = 0, closed = 0, fail = true;
+  const service = createAgentService({ store, runtimeRoot: join(root, "runtime"), resolveCli: async () => "/synthetic-native-cli", resolveMcp: async () => [], codexFactory: () => {
+    created++; return { closed: false, accountFingerprint: "a".repeat(64), recheckAccount: async () => {}, initialize: async () => { await new Promise((r) => setTimeout(r, 15)); if (fail) throw new Error("Synthetic unavailable connection"); }, close() { this.closed = true; closed++; }, request: async () => ({ thread: { id: "exact-thread", status: "idle" } }) };
+  } });
+  try {
+    const first = await Promise.allSettled([service.status("personal", "owned"), service.status("personal", "owned")]);
+    assert.ok(first.every((r) => r.status === "rejected")); assert.equal(created, 1); assert.equal(closed, 1);
+    fail = false; const retried = await Promise.all([service.status("personal", "owned"), service.status("personal", "owned")]);
+    assert.equal(created, 2); assert.ok(retried.every((r) => r.sessionId === "exact-thread"));
+  } finally { service.close(); }
+  assert.equal(closed, 2);
+}));
+
+test("stopping a compartment invalidates pending native connection work without closing future permitted connections", () => fixture(async ({ store, root }) => {
+  await store.initialize("personal"); await store.update("personal", "synthetic-connected-session", (s) => { s.mode = "personal-companion"; s.conversations = [{ id: "owned", provider: "codex", sessionId: "exact-thread", accountFingerprint: "a".repeat(64), updatedAt: Date.now(), messages: [] }]; });
+  let release, entered; const gate = new Promise((r) => { release = r; }), reached = new Promise((r) => { entered = r; }); let resolved = 0, spawned = 0;
+  const service = createAgentService({ store, runtimeRoot: join(root, "runtime"), resolveCli: async () => { if (++resolved === 1) { entered(); await gate; } return "/synthetic/codex"; }, resolveMcp: async () => [], codexFactory: () => { spawned++; return { closed: false, accountFingerprint: "a".repeat(64), recheckAccount: async () => {}, initialize: async () => {}, close() { this.closed = true; }, request: async () => ({ thread: { id: "exact-thread", status: "idle" } }) }; } });
+  try {
+    const pending = service.status("personal", "owned"); const rejected = assert.rejects(pending, /stopped/); await reached;
+    await service.stopCompartment("personal"); release(); await rejected; assert.equal(spawned, 0);
+    assert.equal((await service.status("personal", "owned")).sessionId, "exact-thread"); assert.equal(spawned, 1);
+  } finally { release(); await service.close(); }
+}));
+
+test("an unconfirmed native probe or initialization exit blocks every provider replacement in its workspace", () => fixture(async ({ store, root }) => {
+  await store.initialize("personal"); await store.update("personal", "synthetic-mode", (s) => { s.mode = "personal-companion"; });
+  for (const failure of ["probe", "initialize"]) {
+    let stopped = false, resolved = 0, spawned = 0;
+    const child = {}, owned = { child, closed: false, close() { this.closed = true; }, initialize: async () => { throw Error("Synthetic initialization failure"); } };
+    const service = createAgentService({ store, runtimeRoot: join(root, failure), resolveCli: async () => { resolved++; return "/synthetic-native-cli"; }, resolveMcp: async (_, __, { onProbe }) => { if (failure === "probe") { onProbe(owned); throw Error("Synthetic probe failure"); } return []; }, codexFactory: () => { spawned++; return owned; }, stopChild: async () => ({ stopped }) });
+    try {
+      await assert.rejects(service.design({ compartment: "personal", provider: "codex", message: "Synthetic request", plan: samplePlan() }), /probe.*exit|initialization failure/);
+      const priorResolved = resolved, priorSpawned = spawned;
+      await assert.rejects(service.design({ compartment: "personal", provider: "claude-code", message: "No replacement", plan: samplePlan() }), /previous owned provider.*exit/);
+      await assert.rejects(service.design({ compartment: "personal", provider: "codex", message: "No retry", plan: samplePlan() }), /previous owned provider.*exit/);
+      assert.equal(resolved, priorResolved); assert.equal(spawned, priorSpawned);
+      assert.equal((await service.stopCompartment("personal")).stopped, false);
+      stopped = true; assert.equal((await service.stopCompartment("personal")).stopped, true);
+    } finally { stopped = true; await service.close(); }
+  }
+}));
+
+test("initialization recovery commits its ordered stages atomically and preserves bytes on a later failure", () => fixture(async ({ store, root, secrets }) => {
+  await store.initialize("personal");
+  const file = join(root, "personal.sealed.json"), original = await readFile(file);
+  await assert.rejects(store.initialize("personal", undefined, [
+    { operation: "first-recovery", apply: state => { state.workflow.name = "must roll back"; } },
+    { operation: "second-recovery", apply: state => { assert.equal(state.workflow.name, "must roll back"); throw Error("synthetic later recovery failure"); } }
+  ]), /later recovery failure/);
+  assert.deepEqual(await readFile(file), original);
+  const peer = createSuiteStore({ root, secrets }); let entered, release;
+  const ready = new Promise(resolve => { entered = resolve; }), gate = new Promise(resolve => { release = resolve; });
+  const recovering = store.initialize("personal", undefined, [
+    { operation: "first-recovery", apply: async state => { state.workflow.name = "first"; entered(); await gate; } },
+    { operation: "second-recovery", apply: state => { assert.equal(state.workflow.name, "first"); state.workflow.name = "recovered"; } }
+  ]);
+  let writer;
+  try {
+    await ready;
+    writer = peer.update("personal", "peer-after-recovery", state => { assert.equal(state.workflow.name, "recovered"); state.workflow.name = "peer"; });
+    release(); await recovering; await writer;
+    const state = await store.snapshot("personal");
+    assert.equal(state.workflow.name, "peer");
+    assert.deepEqual(state.audit.map(row => row.operation), ["first-recovery", "second-recovery", "peer-after-recovery"]);
+  } finally { release(); await Promise.allSettled([recovering, ...(writer ? [writer] : [])]); }
+  let touched = false;
+  await assert.rejects(store.initialize("personal", "work", [{ operation: "unexpected-recovery", apply: () => { touched = true; } }]), /policy differs/);
+  assert.equal(touched, false);
+  const beforeInvalid = await readFile(file);
+  for (const recovery of [[{ operation: "invalid", apply: "not callable" }], [{ operation: "invalid", apply() {}, extra: true }], Array.from({ length: 9 }, () => ({ operation: "too-many", apply() {} }))]) await assert.rejects(store.initialize("personal", undefined, recovery), /bounded local callbacks/);
+  assert.deepEqual(await readFile(file), beforeInvalid);
+}));
+
+test("one startup transaction retains all prior recovery outcomes including uncertain Claude creation", () => fixture(async ({ store }) => {
+  await store.initialize("personal");
+  await store.update("personal", "synthetic-interrupted-state", state => {
+    const updatedAt = Date.now();
+    state.observations = [{ id: "recorded", status: "recording", updatedAt }];
+    state.voice = [{ id: "voice", status: "recording", updatedAt }];
+    state.conversations = [{ id: "conversation", status: "pending", updatedAt }];
+    state.deviceTransactions = [{ status: "applying" }];
+    state.codingSessions = [{ id: "uncertain", provider: "claude-code", nativeTransport: "owned-print", nativeIdentityVerified: false, status: "registered" }, { id: "clean", provider: "claude-code", nativeTransport: "owned-print", nativeIdentityVerified: false, status: "registered" }, { id: "creating", status: "creating" }];
+    state.codingTurns = [{ taskId: "uncertain", status: "submitting", updatedAt }, { taskId: "clean", status: "failed-before-turn", updatedAt }];
+    state.clientLaunches = [{ status: "launching" }];
+    state.repositoryEffects = [{ status: "executing" }];
+    state.repositoryCommitReviews = [{ status: "executing" }];
+    state.repositoryExecutionReviews = [{ status: "running" }];
+  });
+  const suite = createSuite({ store, agents: { discovery: async () => [], close() {} }, voice: { discovery: async () => ({ available: false }) },
+    repositoryExecution: { recoverCompartment: async () => {}, close: async () => {} } });
+  try {
+    await suite.handle("/api/suite/bootstrap"); const state = await store.snapshot("personal");
+    assert.equal(state.observations[0].status, "interrupted"); assert.equal(state.voice[0].status, "paused"); assert.equal(state.conversations[0].status, "interrupted");
+    assert.equal(state.deviceTransactions[0].status, "recovery-pending");
+    assert.deepEqual(state.codingSessions.map(row => row.status), ["creation-uncertain", "registered", "creation-uncertain"]);
+    assert.deepEqual(state.codingTurns.map(row => row.status), ["outcome-unconfirmed", "failed-before-turn"]);
+    assert.equal(state.clientLaunches[0].status, "outcome-unconfirmed"); assert.equal(state.repositoryEffects[0].status, "recovery-required"); assert.equal(state.repositoryCommitReviews[0].status, "recovery-required"); assert.equal(state.repositoryExecutionReviews[0].status, "outcome-unconfirmed");
+    assert.deepEqual(state.audit.filter(row => ["restart-recovery", "claude-creation-recovery"].includes(row.operation)).map(row => row.operation), ["restart-recovery", "claude-creation-recovery"]);
+  } finally { await suite.close(); }
+}));
+
+test("closing the suite joins its original startup lease and prevents later recovery or discovery", () => fixture(async ({ store }) => {
+  let entered, release, providersClosing;
+  const ready = new Promise(resolve => { entered = resolve; }), gate = new Promise(resolve => { release = resolve; });
+  const providersStopped = new Promise(resolve => { providersClosing = resolve; });
+  const initialize = store.initialize.bind(store); let extraRecovery = 0, discovery = 0;
+  store.initialize = (id, policy, recovery = []) => initialize(id, policy, recovery.map((step, index) => ({ ...step,
+    apply: async state => { if (index === 0) { entered(); await gate; } return step.apply(state); }
+  })));
+  const suite = createSuite({ store,
+    agents: { discovery: async () => { discovery++; return []; }, close: async () => { providersClosing(); } },
+    voice: { discovery: async () => { discovery++; return { available: false }; } },
+    fixtureAdministration: { recover: async () => { extraRecovery++; }, close: async () => {} }
+  });
+  const startup = suite.handle("/api/suite/bootstrap"); startup.catch(() => {});
+  let closing, closeDone = false;
+  try {
+    await ready; closing = suite.close().then(() => { closeDone = true; });
+    await providersStopped; await new Promise(resolve => setImmediate(resolve));
+    assert.equal(closeDone, false, "shutdown must not return while its original startup lease is held");
+    await assert.rejects(suite.handle("/api/suite/compartment/create", { compartment: "late" }), /closed/);
+    release(); await assert.rejects(startup, /closed/); await closing;
+    assert.equal(extraRecovery, 0); assert.equal(discovery, 0);
+    assert.deepEqual((await store.list()).map(row => row.id), ["personal"]);
+  } finally { release(); await Promise.allSettled([startup, ...(closing ? [closing] : [suite.close()])]); }
+}));

@@ -1,0 +1,119 @@
+{
+  "schema": "switchyard-windows-bootstrap-native-followup/v1",
+  "at": "2026-11-09T13:17:47.376373+00:00",
+  "sourceCommit": "167df7b125af93e46c0631b2a1b08d1ec9bec951",
+  "mergeCommit": "f72e6707f2bd516ccc604369a3ddc29f3451c5d8",
+  "tree": "c4adc1d52d06c6e621ae6485a293a71136b1512d",
+  "runId": 42620025971,
+  "jobId": 129170298273,
+  "artifactId": 13676378868,
+  "artifactBytes": 3236,
+  "zipSha256": "8497dbfe786ca0dc06cc2554cf1ed1db63fa5043d19ec6b13710bc30809dee55",
+  "envelopeSha256": "84210db5723eb48905d2b14cfb4ba87e39b63fdc6caab24966213244e1bb4643",
+  "receiptId": "8fcf4b34-5b67-4f34-acfd-859dd10917ee",
+  "receiptSha256": "61ff4403538343e314b09758c8a21608c8bb6aaa1998bf615cdad59727c1e7e1",
+  "totals": {
+    "required": 13,
+    "passed": 13,
+    "failed": 0,
+    "tests": 12,
+    "passedTests": 12,
+    "failedTests": 0,
+    "skippedTests": 0,
+    "cancelledTests": 0,
+    "todoTests": 0
+  },
+  "groups": [
+    {
+      "file": "build:companion",
+      "durationMs": 7279,
+      "effectiveTimeoutMs": 45000,
+      "success": true
+    },
+    {
+      "file": "build:linux-companion",
+      "durationMs": 7247,
+      "effectiveTimeoutMs": 45000,
+      "success": true
+    },
+    {
+      "file": "build:provider-host",
+      "durationMs": 5226,
+      "effectiveTimeoutMs": 45000,
+      "success": true
+    },
+    {
+      "file": "build:vscode",
+      "durationMs": 3387,
+      "effectiveTimeoutMs": 45000,
+      "success": true
+    },
+    {
+      "file": "deployment/windows/Test-B122ManifestGenerators.ps1",
+      "durationMs": 32148,
+      "effectiveTimeoutMs": 180000,
+      "success": true
+    },
+    {
+      "file": "deployment/windows/Test-B122InstallLifecycle.ps1",
+      "durationMs": 53689,
+      "effectiveTimeoutMs": 240000,
+      "success": true
+    },
+    {
+      "file": "deployment/windows/Test-B122TrustedBootstrap.ps1#powershell5",
+      "durationMs": 74669,
+      "effectiveTimeoutMs": 300000,
+      "success": true
+    },
+    {
+      "file": "deployment/windows/Test-B122TrustedBootstrap.ps1#pwsh",
+      "durationMs": 39741,
+      "effectiveTimeoutMs": 300000,
+      "success": true
+    },
+    {
+      "file": "deployment/windows/Test-B122ProviderDesktopRelease.ps1",
+      "durationMs": 103283,
+      "effectiveTimeoutMs": 300000,
+      "success": true
+    },
+    {
+      "file": "apps/windows-companion/test/main-shutdown.test.ts",
+      "durationMs": 2505,
+      "effectiveTimeoutMs": 45000,
+      "success": true
+    },
+    {
+      "file": "apps/windows-companion/test/packaged-runtime.test.ts",
+      "durationMs": 3739,
+      "effectiveTimeoutMs": 45000,
+      "success": true
+    },
+    {
+      "file": "apps/provider-adapter-host/test/tls-network-e2e.test.ts",
+      "durationMs": 46943,
+      "effectiveTimeoutMs": 300000,
+      "success": true
+    },
+    {
+      "file": "apps/provider-adapter-host/test/tls-network-e2e.test.ts",
+      "durationMs": 102266,
+      "effectiveTimeoutMs": 300000,
+      "success": true
+    }
+  ],
+  "audit": {
+    "originalManifestCommandsBoundsSkips": true,
+    "serialOrder": true,
+    "outputBounds": true,
+    "originalChildTreeCleanup": true,
+    "originalFailedReceiptPreserved": true,
+    "zipOrHelperRetained": false
+  },
+  "acceptance": "Both native Windows PowerShell 5.1 and pwsh trusted-bootstrap variants pass with the original 300-second group bounds and original 15-second fixture wait.",
+  "limitations": [
+    "The same full cohort fails the separately retained client UI platform fixture; no complete-source acceptance is claimed.",
+    "This predates deleted-history implementation and its new immutable frontend."
+  ]
+}

@@ -1,0 +1,136 @@
+{
+  "schema": "switchyard-windows-scheduling-refresh-summary/v1",
+  "baseCommit": "30330f58fdf6aac1400857211a43f1a18fc7db0c",
+  "sourceFiles": {
+    "scripts/fixtures/windows-backend-costs.json": "ccd08d945b4781b86690a87eabd351b7ead04e958b6151f49b828072e220e8a7",
+    "scripts/windows-backend-shards.mjs": "980eb8c0b9b92c07bcddf6969aaf22cbc05660a8b7b15ba507fb73b6d7b87b86",
+    "scripts/windows-backend-shards.test.mjs": "69ddc11091c02f06fc4e439e085639bad88c910a1697166827968d054e3cb6c9",
+    ".github/workflows/b122-windows.yml": "e6466eea95b5987eaff793f8628e339ce0a7fae22bf8c20a51ba8ed798a9b634"
+  },
+  "originalInterruption": {
+    "sourceCommit": "67270542181bebbc5b434f596e94e6deaf010d7e",
+    "mergeCommit": "69e25d466fce8b5d869689c054b5fc9a3bff32b6",
+    "tree": "744785ebddc1a028cbecfa21c89742bece00468d",
+    "workflowRun": 42379166911,
+    "job": {
+      "id": 128424905379,
+      "startedAt": "2026-11-07T14:04:07Z",
+      "completedAt": "2026-11-07T14:24:12Z",
+      "conclusion": "cancelled"
+    },
+    "completedProgressGroups": 39,
+    "requiredGroups": 40,
+    "lastStarted": {
+      "at": "2026-11-07T14:20:48.0092033Z",
+      "shard": 6,
+      "schema": "switchyard-test-progress/v1",
+      "runId": "f832d295-91c0-4e59-958a-5027393fe26c",
+      "verificationComplete": false,
+      "phase": "started",
+      "group": 40,
+      "requiredGroups": 40,
+      "file": "tools/layout-studio/windows-scanner-recipe-files.test.mjs",
+      "pattern": null
+    },
+    "finalReceiptProduced": false,
+    "retainedEvidence": {
+      "file": "windows-6727054-shard-6-interruption.json",
+      "sha256": "5cc35294f91a04f3ddb9b783a877ec0e9bd9659fed882594d0f4744c8124d48e"
+    },
+    "inference": "Cancellation coincides with the unchanged 20-minute job budget. The last group had started; its failure or completion was not observed. No full-shard acceptance is claimed."
+  },
+  "nativeMeasurementSource": {
+    "commit": "e5a57816a47fa6434811b9c1efe81fedd6d3ff77",
+    "evidence": "docs/evidence/windows-backend-e5a5781-summary.json",
+    "groups": 232,
+    "receipts": [
+      {
+        "shard": 1,
+        "receiptSha256": "4b483c5e8c5a64a43da7933722c9a24d1a29c12de59a749179361a8ca3594c0d"
+      },
+      {
+        "shard": 2,
+        "receiptSha256": "d718f2c8b880d427961279098c309e676ef3a8bf432522fb97c882dda3b6ccc9"
+      },
+      {
+        "shard": 3,
+        "receiptSha256": "1798824d7b212720fef007b8ee55ab7a28880ccdb907b3db3784b9ff7b0878eb"
+      },
+      {
+        "shard": 4,
+        "receiptSha256": "0aff1da89fd8cd5d641435236af330dd30b657a385013e44aca852f63bc862d1"
+      },
+      {
+        "shard": 5,
+        "receiptSha256": "78c7516412e5c663f41e8cdd39315abbb5fd55f61d1ff4c11b572c978e24b94f"
+      },
+      {
+        "shard": 6,
+        "receiptSha256": "51d8f256bfc26e3158bc831ac8440aa381046f34860b7593bcfb06ba54f8b5cb"
+      }
+    ],
+    "measuredTotalMs": 4940849,
+    "conservativeTotalMs": 5169260,
+    "priorEstimates": {
+      "sourceCommit": "9f35961ca18087b2406e7e2ad716b5fe97ebc2bb",
+      "sourceEvidence": "docs/evidence/windows-backend-9f35961-native-summary.json",
+      "fixtureSha256": "12132c207c3b3b33a3bc663201a5910aa53e88adac25eaa61522d9fdd4b75563",
+      "groups": 198
+    },
+    "priorEstimatesNeverReduced": true
+  },
+  "assignments": [
+    {
+      "shard": 1,
+      "groups": 39,
+      "estimatedMs": 891480
+    },
+    {
+      "shard": 2,
+      "groups": 39,
+      "estimatedMs": 891484
+    },
+    {
+      "shard": 3,
+      "groups": 39,
+      "estimatedMs": 891550
+    },
+    {
+      "shard": 4,
+      "groups": 40,
+      "estimatedMs": 891629
+    },
+    {
+      "shard": 5,
+      "groups": 39,
+      "estimatedMs": 891633
+    },
+    {
+      "shard": 6,
+      "groups": 39,
+      "estimatedMs": 891484
+    }
+  ],
+  "accepted": {
+    "groups": 3,
+    "passedTests": 35,
+    "skippedTests": 0,
+    "receiptId": "c70e809c-23ee-4d9f-b137-adf444295f22",
+    "receiptSha256": "c8c084d72222dedf9c72244447e4dcad4d65871f06a1fbd0e8400f259516a617",
+    "originalManifestCommandsBoundsSkipsAndCleanupVerified": true
+  },
+  "unchanged": {
+    "jobs": 6,
+    "jobTimeoutMinutes": 20,
+    "originalChildDeadlines": true,
+    "fallbackEstimateMs": 60000,
+    "maximumHistoricalWorkloadMs": 950000,
+    "permissions": true,
+    "allOriginalTests": true
+  },
+  "limitations": [
+    "Scheduling estimates are historical placement guidance, not new native performance or suite acceptance.",
+    "The complete Linux 7f2a52a run is independent and predates this scheduling-data update. Future automatically queued native jobs must establish the current Windows outcome.",
+    "No manual CI dispatch, cancellation or retry was performed."
+  ]
+}

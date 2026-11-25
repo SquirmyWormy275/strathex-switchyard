@@ -1,0 +1,51 @@
+{
+  "schema": "switchyard-restricted-environment-native/v1",
+  "source": "d798f4f88646dd9b994fa3ef1184864e0fd76e23",
+  "executionMerge": "97f498ebcdadd9c441df61017c4d25554de46cb0",
+  "runId": 42168194489,
+  "jobId": 127729879400,
+  "artifactId": 13479824099,
+  "archiveSha256": "0d9c82491fbaf4fd95581e0939bfac94a4a737d1165867c87811c909fe28e59a",
+  "receipt": "windows-restricted-environment-d798-native.json",
+  "accepted": false,
+  "environment": {
+    "schema": "switchyard-restricted-child-environment/v1",
+    "entryCount": 32,
+    "systemRootPresent": true,
+    "systemRootMatchesWindows": true,
+    "windirPresent": true,
+    "windirMatchesWindows": true,
+    "openSslConfigPresent": false,
+    "openSslModulesPresent": false,
+    "nodeOptionsPresent": false
+  },
+  "childExit": {
+    "waitResult": 0,
+    "exitCode": 134,
+    "resultAvailable": false
+  },
+  "standardIo": {
+    "schema": "switchyard-restricted-child-stdio/v1",
+    "standardHandles": 3,
+    "inheritanceRestricted": true,
+    "stdinEof": true,
+    "stdoutBytes": 0,
+    "stderrBytes": 663,
+    "outputBounded": true,
+    "handlesClosedVerified": true,
+    "drainsCompleted": true,
+    "stderr": {
+      "category": "assertion",
+      "function": "ncrypto::CSPRNG",
+      "code": null,
+      "sourceFile": "node.cc",
+      "sourceLine": 1221
+    }
+  },
+  "failedFixturePreserved": true,
+  "finding": "SystemRoot and WINDIR are present and match the native shared Windows directory; OpenSSL configuration/modules and Node options are absent. The cold child still aborts at ncrypto::CSPRNG, so missing SystemRoot is not supported as this failure cause. The observation changes no child environment, token or containment.",
+  "limits": [
+    "Parent-process CNG probes succeed but do not prove cold-child cryptographic initialization.",
+    "Separate native filesystem and setup jobs pass. The restricted owner journey and whole failed-fixture retirement remain unaccepted."
+  ]
+}

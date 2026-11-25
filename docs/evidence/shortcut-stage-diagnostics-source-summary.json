@@ -1,0 +1,38 @@
+{
+  "schema": "switchyard-shortcut-stage-diagnostics-source/v1",
+  "baseCommit": "01e0a364911e3eb68bd11cea3e392e58cfb62f42",
+  "sourceFiles": {
+    "deployment/suite/shortcut-process.mjs": "a5454599be0aa1166880ce07f135c9c42f39e622c132d78f7651bc275570e6d0",
+    "deployment/suite/shortcut.ps1": "59dc8988bf9270fc1587c319f346336e239936ff4e3a96ef5391a2abf88190aa",
+    "deployment/suite/shortcut-process.test.mjs": "ed4b4bfceac4fdbf8f9e4bcb6ccf0a2a1f0b1a00ddcdab60eed432784b1b9a19"
+  },
+  "verificationReceipt": "isolated-test-700c7791-51a6-484d-a33e-6971f7a85229.json",
+  "verificationReceiptSha256": "60b79272a883f982f4587f0c98e729706d58137b0ea2289ec48fcd888ee70470",
+  "totals": {
+    "required": 19,
+    "passed": 19,
+    "failed": 0,
+    "tests": 36,
+    "passedTests": 36,
+    "failedTests": 0,
+    "skippedTests": 0,
+    "cancelledTests": 0,
+    "todoTests": 0
+  },
+  "allChildAndTreeCleanupVerified": true,
+  "ownedTemporaryRootRemoved": true,
+  "newFocusedCases": 3,
+  "nativeShortcutDeadlineMs": 10000,
+  "nativeRequestLimitBytes": 8192,
+  "nativeOutputLimitBytes": 1024,
+  "originalDeadlinesAndAssertionsPreserved": true,
+  "arbitraryNativeDiagnosticsReturned": false,
+  "realControlledWriterProcesses": 2,
+  "nativePowerShellExecutionAccepted": false,
+  "recurringNativeTimeoutCauseEstablished": false,
+  "originalPackageBudgetPreserved": true,
+  "frontendChanged": false,
+  "installedChanged": false,
+  "success": true,
+  "excludedHarnessAttempt": "The initial selected-file count did not account for sixteen independent installation scenarios; the preflight refused before launching any child. The corrected selection retained all sixteen original scenarios."
+}
