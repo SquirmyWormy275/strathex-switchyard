@@ -11,15 +11,27 @@ Start with the [product introduction](../README.md) and
 The [requirement ledger](switchyard-requirements.md) tracks the wider scope;
 [PR 20](https://github.com/SquirmyWormy275/strathex-switchyard/pull/20) remains a draft.
 
-## Current follow-up — November 24
+## Accepted checkpoint — November 25
 
-Source **8dd849e** passes all six normal-push workflows: Linux release, Windows
-release, complete Windows source, Windows filesystem boundaries, Windows policy
-admission and client platform checks. Both complete Windows receipts contain
-**499 groups / 3,182 passes / 246 declared skips**. The original commands,
-deadlines and skip inventory are preserved. The nine-worker scheduling fix is
-accepted; earlier failed runs remain historical evidence.
-[Native and release results](evidence/backend-capacity-native-summary.json).
+Source **7d2a34e** passes all six normal-push workflows. Complete Windows source
+and private Windows release each pass **500 groups / 3,194 tests / 246 declared
+skips**. All 23 source-worker receipts match the collector; release commands,
+original limits, skip inventory, source trees and cleanup are independently
+audited. All 15 native shortcut checks pass, including literal Unicode file
+bytes and exact readback. The workspace teardown correction is included.
+[Accepted checkpoint](evidence/shortcut-shell-native-summary.json).
+
+The installed Linux runtime remains **65b5aac**; these later runtime changes
+are Windows-only. Following the workstation restart, the app reports ready but
+saved-workspace readback still needs an OS keyring unlock. All 55 encrypted-state
+files remain present, with 54 matching pre-update bytes; the previously recorded
+Personal audit change accounts for the remaining file. No reset or new key is
+used. Interactive Windows, keyboard, tenant and browser acceptance remain open.
+
+## Earlier follow-up evidence — November 24
+
+The following paragraphs retain source-specific failures and pending states
+from before the accepted 7d2a34e checkpoint above.
 
 The workspace recovery follow-up adds a visible retry control after a failed
 startup or saved-state read, and conditional keyring-unlock guidance. It preserves
@@ -179,7 +191,10 @@ after restart. Saved-workspace readback then hits CREDENTIAL_PROCESS_TIMEOUT;
 OS keyring unlock is requested again after this new restart. No state reset or
 replacement key is used. [CI and interruption evidence](evidence/linux-ci-interruption-summary.json).
 
-## Remaining implementation and defects
+## Resolved native failures and retained diagnostics
+
+The shortcut and workspace cases below now pass at 7d2a34e. Earlier failures
+remain evidence; the intermittent recovery timeout is not claimed impossible.
 
 The new Windows shortcut Unicode-path case fails at `cd770c0`; its audited
 18-group worker has one failure. The original generic exit diagnostic omitted
@@ -228,6 +243,8 @@ Native Windows `86ca7cb` now passes all five workspace cases in the audited
 23-group worker: 163 passes and 10 declared skips, with original bounds and
 cleanup. The separate Unicode shortcut case still prevents complete acceptance.
 [Native workspace evidence](evidence/workspace-fixture-native-summary.json).
+
+## Remaining implementation
 
 - Linux Claude Desktop executable binding and launch/focus remain unfinished.
   Its vendor beta supports Ubuntu/Debian, while the pilot runs Omarchy and has no

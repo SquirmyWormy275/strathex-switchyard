@@ -8,6 +8,22 @@ for work that remains.
 
 ## Current evidence
 
+Source **7d2a34e** passes all six normal-push workflows. Complete Windows source
+and private Windows release each pass **500 groups / 3,194 tests / 246 declared
+skips**. All 23 source-worker receipts match the collector; release commands,
+original limits, skip inventory, source trees and cleanup are independently
+audited. All 15 native shortcut checks pass, including literal Unicode file
+bytes and exact readback. The workspace teardown correction is included.
+[Accepted checkpoint](evidence/shortcut-shell-native-summary.json).
+
+The installed Linux runtime remains **65b5aac**; these later runtime changes
+are Windows-only. Following the workstation restart, the app reports ready but
+saved-workspace readback still needs an OS keyring unlock. All 55 encrypted-state
+files remain present, with 54 matching pre-update bytes; the previously recorded
+Personal audit change accounts for the remaining file. No reset or new key is
+used. Interactive Windows, keyboard, tenant and browser acceptance remain open.
+
+
 The November 24 workspace-fixture follow-up retains two failed native worker
 receipts and joins asynchronous UI handlers before fixture teardown. Two local
 groups pass 20 checks without skips or changed deadlines; typechecking passes.
@@ -16,10 +32,10 @@ The earlier 75 ms host-action settlement failure remains unresolved.
 
 | Scope | Source | Accepted result and limits |
 | --- | --- | --- |
-| Current full-platform baseline | `8dd849e` | All six workflows pass. Complete Windows source and private release each pass 499 groups / 3,182 tests / 246 declared skips; exact receipts, original limits and cleanup verified. [Receipt](evidence/backend-capacity-native-summary.json). |
+| Earlier full-platform baseline | `8dd849e` | All six workflows pass. Complete Windows source and private release each pass 499 groups / 3,182 tests / 246 declared skips; exact receipts, original limits and cleanup verified. [Receipt](evidence/backend-capacity-native-summary.json). |
 | Workspace connection recovery | Follow-up to `8dd849e` | Eight groups / 135 tests, zero skips; eight verifier guards and typecheck pass. Conditional keyring guidance and single-flight UI retry preserve drafts and do not replay prior effects. Browser acceptance is blocked. [Receipt](evidence/workspace-recovery-source-summary.json). |
 | Interrupted workspace changes | Follow-up to `c41807c` | Three reproduced failures; five final regressions within six integration groups / 83 tests. Two runner/scheduling groups / 30 tests also pass. No skips, bounds expanded or effects replayed. Installed/platform acceptance is separate. [Receipt](evidence/workspace-boundary-source-summary.json). |
-| Native shortcut startup | Follow-up to `87cfc30` | Original `c41807c` Windows filesystem receipt has one failure among 17 groups at the utility-module startup stage. Correction passes 18 local groups / 34 tests and typecheck, retaining the 10-second limit and exact readback. Native follow-up is pending. [Receipt](evidence/shortcut-startup-source-summary.json). |
+| Native shortcut startup | Follow-up to `87cfc30` | Original `c41807c` Windows filesystem receipt has one failure among 17 groups at the utility-module startup stage. Correction passes 18 local groups / 34 tests and typecheck, retaining the 10-second limit and exact readback. Native follow-up passes all 15 shortcut cases at 7d2a34e; earlier failed receipts remain retained. [Receipt](evidence/shortcut-shell-native-summary.json). |
 | Complete Linux source | `a7958c4` | 376 groups, 2,578 passes, 32 declared skips. Original commands, bounds, serial order and owned-tree cleanup audited. [Receipt](evidence/linux-a7958c4-complete-summary.json). |
 | Later legacy history account checks | `7317371` | Three regressions reproduced the omission; 13 integration groups pass 139 tests/one existing skip. Separate package and type checks pass. [Evidence](evidence/codex-legacy-read-account-summary.json). |
 | Installed Linux application | `65b5aac` | 578 payload files, 36 served assets and 25 metadata/refusal checks verify. All 54 non-audit workspace snapshots, 57 workflows and three conversations are preserved. Personal appends four expected audit entries; its authority epoch stays 83. Prepared staging is removed; current plus one rollback remain. [Receipt](evidence/workspace-boundary-installed-summary.json). |

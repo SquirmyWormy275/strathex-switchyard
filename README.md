@@ -77,7 +77,8 @@ accept later changes.
 | Native Linux repository inspection | Twelve real Git guardians, at most four concurrent reads, independent exit and unchanged repository bytes. [Receipt](docs/evidence/batched-inspection-source-summary.json) |
 | Complete Linux suite, `a7958c4` | 376 groups, 2,578 passing tests, 32 declared skips; original commands, limits and cleanup audited. Predates the later frontend. [Receipt](docs/evidence/linux-a7958c4-complete-summary.json) |
 | Windows client lane, `3222727` | 31 groups, 362 passing tests, zero skips; later lease correction and full-suite acceptance remain separate. [Receipt](docs/evidence/native-client-3222727-summary.json) |
-| Full platform baseline, `8dd849e` | All six workflows pass. Complete Windows source and Windows release each pass 499 groups, 3,182 tests and 246 declared skips, with original bounds and cleanup verified. This predates the workspace recovery follow-ups. [Receipt](docs/evidence/backend-capacity-native-summary.json) |
+| Current platform checkpoint, `7d2a34e` | All six workflows pass. Complete Windows source and release each pass 500 groups / 3,194 tests / 246 declared skips; all 15 native shortcut cases pass. Exact receipts, original limits and cleanup verify. [Receipt](docs/evidence/shortcut-shell-native-summary.json) |
+| Earlier platform baseline, `8dd849e` | All six workflows pass. Complete Windows source and Windows release each pass 499 groups, 3,182 tests and 246 declared skips, with original bounds and cleanup verified. This predates the workspace recovery follow-ups. [Receipt](docs/evidence/backend-capacity-native-summary.json) |
 
 **Unfinished software:** Linux Claude Desktop focus/launch and the broader
 observation and scanner capabilities tracked in the ledger. Complete Linux and

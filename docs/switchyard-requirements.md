@@ -9,7 +9,24 @@ entry point, evidence and remaining work. A hardware/account check does not excu
 unfinished independent software. Read [current status](switchyard-status.md) for
 accepted checkpoints and [verification](verification.md) for reproducible checks.
 
-## Current evidence — November 24
+## Current evidence — November 25
+
+Source **7d2a34e** passes all six normal-push workflows. Complete Windows source
+and private Windows release each pass **500 groups / 3,194 tests / 246 declared
+skips**. All 23 source-worker receipts match the collector; release commands,
+original limits, skip inventory, source trees and cleanup are independently
+audited. All 15 native shortcut checks pass, including literal Unicode file
+bytes and exact readback. The workspace teardown correction is included.
+[Accepted checkpoint](evidence/shortcut-shell-native-summary.json).
+
+The installed Linux runtime remains **65b5aac**; these later runtime changes
+are Windows-only. Following the workstation restart, the app reports ready but
+saved-workspace readback still needs an OS keyring unlock. All 55 encrypted-state
+files remain present, with 54 matching pre-update bytes; the previously recorded
+Personal audit change accounts for the remaining file. No reset or new key is
+used. Interactive Windows, keyboard, tenant and browser acceptance remain open.
+
+## Earlier evidence — November 24
 
 All six source/platform/private-package workflows pass at **8dd849e**. The two
 complete Windows receipts each cover 499 groups / 3,182 passing tests and 246

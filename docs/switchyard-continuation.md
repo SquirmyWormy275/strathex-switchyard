@@ -10,7 +10,30 @@ and [verification](verification.md). Publish reviewable checkpoints to
 [draft PR 20](https://github.com/SquirmyWormy275/strathex-switchyard/pull/20).
 No merge, public release or visibility change is authorized.
 
-## Resumed checkpoint — November 24
+## Accepted checkpoint — November 25
+
+Source **7d2a34e** passes all six normal-push workflows. Complete Windows source
+and private Windows release each pass **500 groups / 3,194 tests / 246 declared
+skips**. All 23 source-worker receipts match the collector; release commands,
+original limits, skip inventory, source trees and cleanup are independently
+audited. All 15 native shortcut checks pass, including literal Unicode file
+bytes and exact readback. The workspace teardown correction is included.
+[Accepted checkpoint](evidence/shortcut-shell-native-summary.json).
+
+The installed Linux runtime remains **65b5aac**; these later runtime changes
+are Windows-only. Following the workstation restart, the app reports ready but
+saved-workspace readback still needs an OS keyring unlock. All 55 encrypted-state
+files remain present, with 54 matching pre-update bytes; the previously recorded
+Personal audit change accounts for the remaining file. No reset or new key is
+used. Interactive Windows, keyboard, tenant and browser acceptance remain open.
+
+Continue independent implementation from the requirement ledger. Do not replay
+retired staging, installation, receipt downloads or completed audits.
+
+## Historical follow-up chronology — November 24
+
+Pending native statements below refer to those exact earlier sources; 7d2a34e
+now accepts the included corrections.
 
 **8dd849e** passes all six normal-push workflows. Complete Windows source and
 Windows release each pass 499 groups / 3,182 tests with 246 declared skips;

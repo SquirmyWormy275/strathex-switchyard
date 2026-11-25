@@ -1,0 +1,73 @@
+{
+  "schema": "switchyard-shell-writer-native-accepted/v1",
+  "date": "2026-11-25",
+  "sourceCommit": "7d2a34e08e1a8f6f36b3dc4d3b06ef1125deedc5",
+  "mergeCommit": "75886f07c9f648328e904185f698beca6981d6cf",
+  "sourceTree": "7d9a20cd5c94eef6c9d0daa00fd5a3bbe3824bc4",
+  "workflow": 45497339906,
+  "collectorJob": 138822635556,
+  "collectorArtifact": 14970329303,
+  "worker1Job": 138811748720,
+  "worker1Artifact": 14969861773,
+  "totals": {
+    "required": 500,
+    "passed": 500,
+    "failed": 0,
+    "tests": 3440,
+    "passedTests": 3194,
+    "failedTests": 0,
+    "skippedTests": 246,
+    "cancelledTests": 0,
+    "todoTests": 0
+  },
+  "workers": 23,
+  "collectorMatchesIndependentAudit": true,
+  "originalCommandsBoundsSkipsAndCleanupVerified": true,
+  "sourceTreeVerified": true,
+  "shortcut": {
+    "counts": {
+      "total": 15,
+      "passed": 15,
+      "failed": 0,
+      "cancelled": 0,
+      "skipped": 0,
+      "todo": 0
+    },
+    "durationMs": 4035,
+    "effectiveTimeoutMs": 45000,
+    "innerWriterTimeoutMs": 10000,
+    "unicodeFileAssertion": true,
+    "exactReadback": true
+  },
+  "release": {
+    "workflow": 45497340035,
+    "artifact": 14974525501,
+    "totals": {
+      "required": 500,
+      "passed": 500,
+      "failed": 0,
+      "tests": 3440,
+      "passedTests": 3194,
+      "failedTests": 0,
+      "skippedTests": 246,
+      "cancelledTests": 0,
+      "todoTests": 0
+    },
+    "originalManifestCommandsBoundsSkipsAndCleanupVerified": true
+  },
+  "allSixWorkflowsPassed": true,
+  "workflows": [
+    45497339943,
+    45497340035,
+    45497339906,
+    45497339863,
+    45497339964,
+    45497340024
+  ],
+  "linuxReinstallRequired": false,
+  "limits": [
+    "No interactive Windows, physical keyboard, M365 tenant or browser acceptance is inferred.",
+    "Earlier intermittent native failures remain retained; one passing cohort does not prove they can never recur.",
+    "Saved-workspace readback after restart still awaits OS keyring unlock."
+  ]
+}
